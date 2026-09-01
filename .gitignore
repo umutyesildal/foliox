@@ -1,0 +1,17 @@
+.anchor
+target
+node_modules
+.DS_Store
+.env
+dist
+.next
+out
+coverage
+/tmp
+*.log
+
+# Keys
+keys/
+**/id.json
+!backend/.env.example
+!app/.env.example

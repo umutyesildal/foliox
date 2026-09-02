@@ -42,7 +42,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, TOKEN_2022_
 import { anchorIxDiscriminator } from "../indexer/events.js";
 import { isPgLike, type PgLike } from "../db/client.js";
 
-export const BASKET_PROGRAM_ID = "37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1"; // programs/basket/src/lib.rs:4
+export const BASKET_PROGRAM_ID = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k"; // programs/basket/src/lib.rs:4
 export const FEE_CRANK_INTERVAL_MS = 3_600_000; // hourly — spec §7 fee_accrue_crank
 export const FEE_ACCRUE_MIN_ELAPSED_SEC = 3600; // baskets with elapsed > 1h
 const SECONDS_PER_YEAR = 31_536_000n;

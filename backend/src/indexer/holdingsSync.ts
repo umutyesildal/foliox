@@ -295,7 +295,7 @@ export function u64LeBytes(value: string | bigint): Buffer {
 export function deriveBasketPda(factory: PublicKey, creator: PublicKey, nonce: string | bigint): PublicKey {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("basket"), factory.toBuffer(), creator.toBuffer(), u64LeBytes(nonce)],
-    new PublicKey("37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1"), // basket program (Anchor.toml)
+    new PublicKey("6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k"), // basket program (Anchor.toml)
   )[0];
 }
 

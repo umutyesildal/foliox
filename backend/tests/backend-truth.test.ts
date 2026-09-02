@@ -446,7 +446,7 @@ describe("indexer/holdingsSync — syncHoldings", () => {
 
 // --- 7. Listener: decode + DB upserts / DB-less degradation ------------------
 
-const FACTORY_PROGRAM = new PublicKey("sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq");
+const FACTORY_PROGRAM = new PublicKey("3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF");
 
 function buildCreateBasketData(): Buffer {
   return Buffer.concat([

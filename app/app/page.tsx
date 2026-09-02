@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { EmptyState, FreshnessBadge, TableRowSkeleton } from "@/components/states";
+import { FreshnessBadge } from "@/components/states";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { SessionCard } from "@/components/landing/session-card";
+import { TerminalStrip } from "@/components/landing/terminal-strip";
+import { LegalReviewTag } from "@/components/create";
 import { formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -28,11 +32,19 @@ function numeric(value: string | number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** A2 — mono stat strip under the hero copy: program facts only. */
+const HERO_STATS: { value: string; label: string }[] = [
+  { value: "2-20", label: "assets" },
+  { value: "10,000", label: "bps exact" },
+  { value: "≤300/100/300", label: "fee caps" },
+  { value: "1", label: "atomic tx" },
+];
+
 /**
- * Landing — asymmetric editorial hero with ONE primary CTA, a quiet
- * Create → Mint → Redeem explainer, and a featured basket only when the
- * indexer actually returns one. No marquee, no gradient, no faux chrome, no
- * fabricated numbers.
+ * Landing — "premium terminal" hero: status strip, split copy/session layout
+ * on a hero-only 1px grid texture, mono stat strip, a Create → Mint → Redeem
+ * explainer, and a slim "Latest basket" row only when the indexer actually
+ * returns one. No marquee, no gradient, no faux chrome, no fabricated numbers.
  */
 export default function LandingPage() {
   const [featured, setFeatured] = useState<BasketRow | null>(null);
@@ -79,160 +91,131 @@ export default function LandingPage() {
 
   return (
     <div className="mx-auto w-full">
-      {/* Hero — asymmetric editorial: copy left, sourced featured column right */}
-      <section className="grid gap-10 pb-12 pt-6 md:grid-cols-[1.15fr_0.85fr] md:pb-16 md:pt-10">
-        <div className="min-w-0">
-          <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
-            Onchain strategy baskets · xStocks
-          </p>
-          <h1 className="mt-4 text-5xl font-semibold leading-[1.04] tracking-tight md:text-6xl">
-            Create an index.
-            <br />
-            Own your thesis.
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">
-            Pick 2-20 whitelisted xStocks, fix the weights in basis points, cap
-            your fees, and seed the vault atomically. One share token, pro-rata
-            redemption, no oracle — and nothing changes after deploy.
-          </p>
-          <div className="mt-8">
-            <Link
-              href="/create"
-              className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-            >
-              Create an index
-            </Link>
-            <span className="ml-4 text-xs text-muted-foreground">
-              or{" "}
+      {/* A4 — hero-only 1px grid texture (≤4% foreground lines), nothing elsewhere */}
+      <div className="foliox-hero-grid">
+        <TerminalStrip />
+
+        {/* A2 — split hero: copy left, simulated session right */}
+        <section className="mx-auto grid max-w-6xl gap-10 px-4 pb-16 pt-10 sm:px-6 md:grid-cols-[1.1fr_0.9fr] md:items-start md:pt-14">
+          <div className="min-w-0">
+            <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+              Onchain strategy baskets · xStocks
+            </p>
+            <h1 className="mt-4 text-6xl font-semibold leading-[1.02] tracking-tight md:text-7xl">
+              Create an index.
+              <br />
+              Own your thesis.
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-foreground/80">
+              Pick 2-20 whitelisted xStocks, fix the weights in basis points,
+              cap your fees, and seed the vault atomically. One share token,
+              pro-rata redemption, no oracle — and nothing changes after deploy.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                href="/create"
+                className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                Create an index
+              </Link>
               <Link
                 href="/explore"
-                className="text-foreground underline underline-offset-4 hover:text-muted-foreground"
+                className="inline-flex h-10 items-center rounded-lg px-4 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
-                explore existing baskets
+                explore baskets →
               </Link>
+            </div>
+
+            <dl className="mt-10 grid max-w-xl grid-cols-2 gap-x-10 gap-y-6 border-t border-[hsl(var(--border-strong))] pt-6">
+              {HERO_STATS.map((stat) => (
+                <div key={stat.label} className="min-w-0">
+                  <dd className="font-mono text-2xl tabular-nums tracking-tight text-foreground">
+                    {stat.value}
+                  </dd>
+                  <dt className="mt-1 text-xs text-muted-foreground">{stat.label}</dt>
+                </div>
+              ))}
+            </dl>
+
+            <p className="mt-8 flex max-w-xl flex-wrap items-center gap-2 text-xs leading-5 text-muted-foreground">
+              <span>
+                Not investment advice. xStocks are Backed structured
+                instruments, not direct equity.
+              </span>
+              <LegalReviewTag />
+            </p>
+          </div>
+
+          <SessionCard className="min-w-0 self-start md:mt-9" />
+        </section>
+      </div>
+
+      {/* A6 — slim real "Latest basket" row, only when the indexer returned one */}
+      {featuredState === "ready" && featured && (
+        <section
+          aria-label="Latest indexed basket"
+          className="mx-auto max-w-6xl px-4 sm:px-6"
+        >
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-[hsl(var(--border-strong))] py-3 text-sm">
+            <span className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+              Latest basket
+            </span>
+            <Link
+              href={`/basket/${featured.pubkey}`}
+              className="font-mono text-xs underline-offset-2 hover:underline"
+            >
+              {truncateAddress(featured.pubkey, 8, 6)}
+            </Link>
+            <span className="font-mono text-xs tabular-nums text-muted-foreground">
+              NAV {nav === null ? "—" : formatUsd(nav)}
+            </span>
+            <span className="font-mono text-xs tabular-nums text-muted-foreground">
+              share {sharePrice === null ? "—" : formatUsd(sharePrice)}
+            </span>
+            {featured.holders !== null && featured.holders !== undefined && (
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                {formatTokenAmount(featured.holders, { maximumFractionDigits: 0 })} holders
+              </span>
+            )}
+            <span
+              className={cn(
+                "font-mono text-xs tabular-nums",
+                drift !== null && drift > 0 && "text-[hsl(var(--status-positive))]",
+                drift !== null && drift < 0 && "text-destructive",
+              )}
+            >
+              {drift === null ? "drift —" : `drift ${drift > 0 ? "+" : ""}${drift.toLocaleString()} bps`}
+            </span>
+            <span className="ml-auto">
+              <FreshnessBadge source={featuredSource ?? ""} asOf={featuredAsOf ?? undefined} />
             </span>
           </div>
-          <p className="mt-10 max-w-xl text-xs leading-5 text-muted-foreground">
-            Not investment advice. xStocks are Backed structured instruments,
-            not direct equity. Baskets are immutable; redeem is permissionless
-            and oracle-free. LEGAL_REVIEW_REQUIRED applies across this site.
+        </section>
+      )}
+      {featuredState === "loading" && (
+        <div className="mx-auto max-w-6xl px-4 sm:px-6" role="status" aria-label="Loading latest basket">
+          <span className="sr-only">Loading latest basket</span>
+        </div>
+      )}
+
+      {/* A5/B8 — 3-column mechanics explainer, rhythmic section break */}
+      <section
+        className="border-t border-border/60 py-16"
+        aria-label="How FolioX works"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <h2 className="text-xl font-semibold tracking-tight">
+            Create → Mint → Redeem
+          </h2>
+          <div className="mt-8">
+            <HowItWorks />
+          </div>
+          <p className="mt-10 max-w-3xl text-xs leading-5 text-muted-foreground">
+            Historical NAV is the only performance figure shown anywhere in the
+            app; drift versus target weights is expected between mints.{" "}
+            <LegalReviewTag />
           </p>
         </div>
-
-        {/* Featured basket — only real indexer data; otherwise a quiet empty */}
-        <div className="min-w-0 self-start rounded-xl border border-border bg-card p-4">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-medium">Featured basket</h2>
-            {featuredSource && featuredState === "ready" && (
-              <FreshnessBadge source={featuredSource} asOf={featuredAsOf ?? undefined} />
-            )}
-          </div>
-
-          {featuredState === "loading" && (
-            <div className="mt-4" role="status" aria-label="Loading featured basket">
-              <span className="sr-only">Loading featured basket</span>
-              <div className="flex flex-col gap-2">
-                <TableRowSkeleton rows={3} columns={1} label="Loading featured basket" />
-              </div>
-            </div>
-          )}
-
-          {featuredState === "ready" && featured && (
-            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-              <dt className="text-xs text-muted-foreground">Basket</dt>
-              <dd className="text-right">
-                <Link
-                  href={`/basket/${featured.pubkey}`}
-                  className="font-mono text-xs underline-offset-2 hover:underline"
-                >
-                  {truncateAddress(featured.pubkey, 8, 6)}
-                </Link>
-              </dd>
-              <dt className="text-xs text-muted-foreground">NAV</dt>
-              <dd className="text-right font-mono text-sm tabular-nums">
-                {nav === null ? "—" : formatUsd(nav)}
-              </dd>
-              <dt className="text-xs text-muted-foreground">Share price</dt>
-              <dd className="text-right font-mono text-sm tabular-nums">
-                {sharePrice === null ? "—" : formatUsd(sharePrice)}
-              </dd>
-              <dt className="text-xs text-muted-foreground">Holders</dt>
-              <dd className="text-right font-mono text-sm tabular-nums">
-                {featured.holders === null || featured.holders === undefined
-                  ? "—"
-                  : formatTokenAmount(featured.holders, { maximumFractionDigits: 0 })}
-              </dd>
-              <dt className="text-xs text-muted-foreground">Drift vs target</dt>
-              <dd
-                className={cn(
-                  "text-right font-mono text-sm tabular-nums",
-                  drift !== null && drift > 0 && "text-[hsl(var(--status-positive))]",
-                  drift !== null && drift < 0 && "text-destructive",
-                )}
-              >
-                {drift === null
-                  ? "—"
-                  : `${drift > 0 ? "+" : ""}${drift.toLocaleString()} bps`}
-              </dd>
-            </dl>
-          )}
-
-          {featuredState === "empty" && (
-            <EmptyState
-              className="mt-3 border-border/60"
-              title="No baskets indexed yet"
-              description="The indexer has no baskets to feature. Numbers appear here only once a real basket is deployed and tracked — never before."
-              action={
-                <Link
-                  href="/create"
-                  className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                >
-                  Be the first creator
-                </Link>
-              }
-            />
-          )}
-        </div>
-      </section>
-
-      {/* Quiet 3-step explainer: Create → Mint → Redeem */}
-      <section className="border-t border-border/60 py-10" aria-label="How FolioX works">
-        <h2 className="text-xl font-semibold tracking-tight">Create → Mint → Redeem</h2>
-        <ol className="mt-6 grid gap-6 md:grid-cols-3">
-          <li>
-            <p className="font-mono text-xs text-muted-foreground">01</p>
-            <h3 className="mt-2 text-base font-medium">Create</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Weights must sum to exactly 10,000 bps; fees are capped at 300 /
-              100 / 300 bps and split 90/10 creator-treasury. The seed transfer
-              and basket creation are one atomic transaction.
-            </p>
-          </li>
-          <li>
-            <p className="font-mono text-xs text-muted-foreground">02</p>
-            <h3 className="mt-2 text-base font-medium">Mint</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Deposit the xStocks in-kind, proportionally to the weights. Or zap
-              USDC through Jupiter — a convenience path of sequential swaps with
-              typical 1-3% slippage exposure, not part of the core program.
-            </p>
-          </li>
-          <li>
-            <p className="font-mono text-xs text-muted-foreground">03</p>
-            <h3 className="mt-2 text-base font-medium">Redeem</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Burn shares and receive pro-rata vault holdings, floored to the
-              raw token unit. Permissionless and oracle-free — the program
-              cannot pause it, and no backend needs to be online.
-            </p>
-          </li>
-        </ol>
-        <p className="mt-8 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Historical NAV is the only performance figure shown anywhere in the
-          app. Drift versus target weights is expected between mints — V0 has no
-          rebalancing, and baskets never trade. Placeholder legal copy is
-          pending counsel review.
-        </p>
       </section>
     </div>
   );

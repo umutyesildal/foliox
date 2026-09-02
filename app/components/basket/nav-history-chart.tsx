@@ -33,6 +33,7 @@ export function NavHistoryChart({ rows }: { rows: NavHistoryRow[] }) {
   if (data.length < 2) {
     return (
       <EmptyState
+        chip="NO CHART"
         title="Not enough NAV snapshots yet"
         description="The indexer stores a NAV snapshot per interval. Fewer than two points are indexed for this basket, so no line is drawn — nothing is interpolated."
       />

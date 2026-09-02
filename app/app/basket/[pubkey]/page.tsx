@@ -138,6 +138,7 @@ export default function BasketDetailPage({
 
       {status === "not-found" ? (
         <EmptyState
+          chip="NOT INDEXED"
           title="This basket is not indexed"
           description={`The backend has no basket ${truncateAddress(pubkey, 6, 6)} — baskets only appear here after a create_basket transaction is indexed. Nothing is fabricated to fill the page.`}
           action={

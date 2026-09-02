@@ -162,6 +162,7 @@ export function InKindMintForm({
   if (missingVault || supply === null) {
     return (
       <EmptyState
+        chip="NO SNAPSHOT"
         title="Vault ratios are not indexed yet"
         description="The in-kind form replicates the on-chain weight check from indexed vault holdings and supply. This basket has no complete holdings snapshot yet, so no deposit can be validated — nothing is guessed."
       />

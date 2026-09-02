@@ -70,10 +70,23 @@ export function MintPicker({
 
   if (status === "empty") {
     return (
-      <EmptyState
-        title="No mints whitelisted yet"
-        description="The whitelist API responded but returned zero mints. Nothing can be selected until the whitelist authority adds xStocks."
-      />
+      <div className="flex flex-col gap-4">
+        <EmptyState
+          chip="NOT INDEXED"
+          title="No mints whitelisted yet"
+          description="The whitelist API responded but returned zero mints — nothing can be selected until the whitelist authority adds xStocks."
+        />
+        {/* B11 — skeleton mint-card tiles keep the wizard stage from collapsing
+            to a void while the whitelist is empty. */}
+        <div aria-hidden="true" className="flex flex-col gap-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <SkeletonRow key={i} />
+          ))}
+        </div>
+        <p className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground/80">
+          Layout preview — selectable xStock tiles
+        </p>
+      </div>
     );
   }
 

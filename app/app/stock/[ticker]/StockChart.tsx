@@ -113,7 +113,7 @@ export default function StockChart({ data }: StockChartProps) {
                 dataKey="real"
                 fill="hsl(var(--chart-2))"
                 stroke="hsl(var(--chart-2))"
-                fillOpacity={0.14}
+                fillOpacity={0}
                 strokeWidth={1}
               />
               <ChartBrush
@@ -133,19 +133,28 @@ export default function StockChart({ data }: StockChartProps) {
               margin={{ top: 12, right: 12, bottom: 24, left: 48 }}
               className="h-full w-full"
             >
-              <Grid horizontal />
+              {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
+                  fading to 0 by ~40% height; secondary/benchmark line-only. */}
+              <Grid
+                horizontal
+                highlightRowValues={[100]}
+                highlightRowStroke="hsl(var(--chart-grid))"
+                highlightRowStrokeDasharray="0"
+                highlightRowStrokeWidth={1}
+              />
               <Area
                 dataKey="xStock"
                 fill="hsl(var(--chart-1))"
                 stroke="hsl(var(--chart-1))"
-                fillOpacity={0.2}
+                fillOpacity={0.06}
+                gradientSpan={0.4}
                 strokeWidth={2}
               />
               <Area
                 dataKey="real"
                 fill="hsl(var(--chart-2))"
                 stroke="hsl(var(--chart-2))"
-                fillOpacity={0.14}
+                fillOpacity={0}
                 strokeWidth={2}
               />
               <Area

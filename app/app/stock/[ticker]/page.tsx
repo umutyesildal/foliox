@@ -7,7 +7,8 @@ import { FreshnessBadge } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatUsd, truncateAddress } from "@/lib/format";
+import { CopyButton } from "@/components/ui/copy-button";
+import { formatUsd } from "@/lib/format";
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 
@@ -120,7 +121,7 @@ export default async function StockPage({
             .
           </p>
         </div>
-        <FreshnessBadge source="Yahoo Finance via /api/v1/prices/chart" asOf={asOf} />
+        <FreshnessBadge source="Yahoo Finance" asOf={asOf} />
       </div>
 
       <nav aria-label="Chart range" className="flex flex-wrap items-center gap-2">
@@ -146,30 +147,34 @@ export default async function StockPage({
 
       {compare ? (
         <div className="grid gap-3 md:grid-cols-3">
-          <Card>
+          <Card className="h-full">
             <CardHeader className="pb-2">
               <CardDescription>xStock (Jupiter)</CardDescription>
-              <CardTitle className="font-mono text-lg tabular-nums">
+              <CardTitle className="font-mono text-2xl tabular-nums">
                 {compare.jupiter !== null ? formatUsd(compare.jupiter) : "—"}
               </CardTitle>
-              <CardDescription className="font-mono text-xs">
-                mint {compare.mint ? truncateAddress(compare.mint, 6, 4) : "—"}
-              </CardDescription>
+              {/* Mint address gets its own row with a copy affordance (B10). */}
+              {compare.mint ? (
+                <CardDescription className="flex items-center gap-2 font-mono text-xs">
+                  <span className="truncate">{compare.mint}</span>
+                  <CopyButton value={compare.mint} label="Copy mint address" />
+                </CardDescription>
+              ) : null}
             </CardHeader>
           </Card>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="pb-2">
               <CardDescription>Real ({yahooSymbol} · Yahoo)</CardDescription>
-              <CardTitle className="font-mono text-lg tabular-nums">
+              <CardTitle className="font-mono text-2xl tabular-nums">
                 {compare.yahoo !== null ? formatUsd(compare.yahoo) : "—"}
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="pb-2">
               <CardDescription>Token vs equity</CardDescription>
               <CardTitle
-                className={`font-mono text-lg tabular-nums ${
+                className={`font-mono text-2xl tabular-nums ${
                   diffBps === null
                     ? ""
                     : depeg
@@ -209,8 +214,7 @@ export default async function StockPage({
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Price comparison — {range} (normalized 100)</CardTitle>
           <CardDescription className="text-xs leading-relaxed">
-            Blue = xStock token (simulated in V0 — see the note below), green = real equity, gray
-            dashed = Nasdaq QQQ. Zoom with the brush sliders; the y-scale follows the visible window.
+            Blue = xStock token (simulated in V0), green = real equity, gray dashed = Nasdaq QQQ.
           </CardDescription>
         </CardHeader>
         <CardContent className="min-h-[380px]">
@@ -222,6 +226,9 @@ export default async function StockPage({
               Yahoo returned no candles — retry another range.
             </p>
           )}
+          <p className="mt-4 border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">
+            Zoom with the brush sliders — the y-scale follows the visible window.
+          </p>
         </CardContent>
       </Card>
 
@@ -244,9 +251,8 @@ export default async function StockPage({
 
       <div className="space-y-1 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
         <p>
-          The xStock series is simulated in V0 (jitter around the Yahoo close); it is replaced by real
-          Jupiter price snapshots once the indexer stores them. It is labeled simulated above and must
-          not be read as a token price feed.
+          The xStock series is simulated in V0 (jitter around the Yahoo close) and is replaced by
+          real Jupiter snapshots once the indexer stores them.
         </p>
         <p>
           LEGAL_REVIEW_REQUIRED: xStocks are Backed Finance structured instruments — holders carry

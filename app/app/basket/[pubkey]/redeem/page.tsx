@@ -193,8 +193,9 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
 
       {status === "not-found" ? (
         <EmptyState
+          chip="NOT INDEXED"
           title="This basket is not indexed"
-          description="There is nothing to redeem here — the backend has no basket at this address. The on-chain redeem instruction itself works without this indexer over any RPC."
+          description="There is nothing to redeem here — the backend has no basket at this address. The on-chain redeem instruction works over any RPC without the indexer."
           action={
             <Button render={<Link href="/explore" />} size="sm">
               Back to explore
@@ -357,6 +358,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                 </div>
               ) : shares !== null && shares > 0n && (supply === null || vaultBalances.some((v) => v === null)) ? (
                 <EmptyState
+                  chip="NO SNAPSHOT"
                   title="Preview unavailable"
                   description="This preview replicates the on-chain pro-rata math from indexed vault holdings and supply. This basket has no complete snapshot yet — the on-chain instruction remains available over RPC."
                 />

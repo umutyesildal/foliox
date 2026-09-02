@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
-import { EmptyState, ErrorState, FreshnessBadge, TableRowSkeleton } from "@/components/states";
+import { EmptyState, ErrorState, FreshnessBadge, Skeleton, TableRowSkeleton } from "@/components/states";
 import { WalletButton } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +76,7 @@ export default function PortfolioPage() {
         setStatus("error");
         setError(
           payload?.error?.message ??
-            `GET /api/v1/users/:pubkey/portfolio responded ${res.status}. Indexed positions are unavailable.`,
+            `Indexed positions are unavailable (HTTP ${res.status}).`,
         );
         return;
       }
@@ -108,21 +108,45 @@ export default function PortfolioPage() {
 
   if (!connected || !publicKey) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full min-h-[60vh] max-w-3xl">
         <h1 className="text-3xl font-semibold tracking-tight">Portfolio</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Basket share positions for the connected wallet.
         </p>
         <EmptyState
           className="mt-8"
+          chip="NO WALLET"
           title="No wallet connected"
-          description="Positions are read from your wallet's basket share balances as indexed by the backend. Nothing is shown until a wallet is connected — FolioX never fabricates balances."
+          description="Positions are read from your wallet's basket share balances as indexed by the backend — nothing is shown until a wallet is connected."
           action={<WalletButton />}
+          previewLabel="Layout preview — positions table"
+          preview={
+            <div className="overflow-hidden rounded-md border border-border/60">
+              <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] gap-3 border-b border-border/60 bg-muted/40 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+                <span>Basket</span>
+                <span className="text-right">Shares (units)</span>
+                <span className="text-right">Cost basis</span>
+                <span className="text-right">Value est.</span>
+              </div>
+              <div className="flex flex-col gap-2.5 px-3 py-3">
+                {Array.from({ length: 3 }, (_, row) => (
+                  <div
+                    key={row}
+                    className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] items-center gap-3"
+                  >
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="ml-auto h-4 w-4/5" />
+                    <Skeleton className="ml-auto h-4 w-4/5" />
+                    <Skeleton className="ml-auto h-4 w-4/5" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          }
         />
         <p className="mt-6 text-xs leading-5 text-muted-foreground">
-          After connecting, positions load from{" "}
-          <span className="font-mono text-foreground">GET /api/v1/users/&lt;wallet&gt;/portfolio</span>{" "}
-          and show raw share balances, cost basis and redeem shortcuts.
+          After connecting, positions load with raw share balances, cost basis
+          and redeem shortcuts.
         </p>
       </div>
     );
@@ -169,8 +193,9 @@ export default function PortfolioPage() {
       {status === "ready" && positions.length === 0 && (
         <EmptyState
           className="mt-8"
+          chip="NOT INDEXED"
           title="No indexed positions for this wallet"
-          description="The indexer returned zero user_positions rows. Either this wallet holds no basket shares yet, or the basket has not been indexed. On-chain balances are the source of truth — the indexer never invents rows."
+          description="The indexer returned zero user_positions rows — on-chain balances are the source of truth and the indexer never invents rows."
           action={
             <Link
               href="/explore"
@@ -178,6 +203,18 @@ export default function PortfolioPage() {
             >
               Browse baskets
             </Link>
+          }
+          previewLabel="Layout preview — positions table"
+          preview={
+            <div className="flex flex-col gap-2.5">
+              {Array.from({ length: 3 }, (_, row) => (
+                <div key={row} className="grid grid-cols-[minmax(0,2fr)_1fr_1fr] items-center gap-3">
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="ml-auto h-4 w-4/5" />
+                  <Skeleton className="ml-auto h-4 w-1/2" />
+                </div>
+              ))}
+            </div>
           }
         />
       )}
@@ -248,13 +285,13 @@ export default function PortfolioPage() {
           Raw values are the on-chain truth; share units are raw ÷ 10^6 (share
           mints are fixed 6 decimals with no scaled-UI multiplier — underlying
           xStock multipliers apply inside vault holdings). &ldquo;Value
-          est.&rdquo; comes from the indexer as balance × latest share_price;
-          treat it as a reference, not a quote.
+          est.&rdquo; is balance × latest share_price — a reference, not a
+          quote.{" "}
+          <LegalReviewTag />
         </p>
         <p>
           RPC {connection.rpcEndpoint.split("//")[1] ?? connection.rpcEndpoint} · positions are
-          read-only here; redemption is permissionless on the basket page.{" "}
-          <LegalReviewTag />
+          read-only here; redemption is permissionless on the basket page.
         </p>
       </div>
     </div>

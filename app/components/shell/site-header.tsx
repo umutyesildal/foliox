@@ -21,10 +21,10 @@ function NavLink({ href, label }: { href: string; label: string }) {
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative text-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm",
+        "rounded-md px-2.5 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active
-          ? "text-foreground after:absolute after:inset-x-0 after:-bottom-1.5 after:h-px after:bg-foreground/70"
-          : "text-muted-foreground",
+          ? "bg-muted text-foreground"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       {label}
@@ -63,11 +63,16 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
         <Link
           href="/"
-          className="rounded-sm font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="flex items-center rounded-sm font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
+          {/* 10px mint mark — pure CSS, no mascot (B4) */}
+          <span
+            aria-hidden="true"
+            className="mr-2 inline-block size-2.5 shrink-0 rounded-[2px] bg-primary"
+          />
           FolioX
           <span className="hidden font-normal text-muted-foreground sm:inline">
             {" "}
@@ -88,7 +93,9 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 className={buttonVariants({
-                  variant: index === 0 ? "default" : "outline",
+                  // Create stays the primary action; Portfolio is demoted to a
+                  // quiet ghost control (B4).
+                  variant: index === 0 ? "default" : "ghost",
                   size: "sm",
                 })}
               >

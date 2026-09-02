@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ErrorState, EmptyState, FreshnessBadge, TableRowSkeleton } from "@/components/states";
+import { ErrorState, EmptyState, FreshnessBadge, Skeleton, TableRowSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -224,12 +224,42 @@ export default function ExploreClient() {
         />
       ) : !hasBaskets ? (
         <EmptyState
+          chip="NOT INDEXED"
           title="No baskets indexed yet"
-          description="The backend returns an empty list until baskets are created and indexed — nothing here is fabricated. Create a strategy basket to populate this ranking."
+          description="The backend returns an empty list until baskets are created and indexed — nothing here is fabricated."
           action={
             <Button render={<Link href="/create" />} size="sm">
               Create the first basket
             </Button>
+          }
+          previewLabel="Layout preview — basket ranking table"
+          preview={
+            <div className="overflow-hidden rounded-md border border-border/60">
+              {/* Real column headers of the populated table */}
+              <div className="grid grid-cols-[2rem_minmax(0,2fr)_1fr_1fr_1fr_1fr] gap-3 border-b border-border/60 bg-muted/40 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+                <span>#</span>
+                <span>Basket</span>
+                <span className="text-right">AUM</span>
+                <span className="text-right">Share price</span>
+                <span className="text-right">24h</span>
+                <span className="text-right">Holders</span>
+              </div>
+              <div className="flex flex-col gap-2.5 px-3 py-3">
+                {Array.from({ length: 4 }, (_, row) => (
+                  <div
+                    key={row}
+                    className="grid grid-cols-[2rem_minmax(0,2fr)_1fr_1fr_1fr_1fr] items-center gap-3"
+                  >
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="ml-auto h-4 w-4/5" />
+                    <Skeleton className="ml-auto h-4 w-4/5" />
+                    <Skeleton className="ml-auto h-4 w-4/5" />
+                    <Skeleton className="ml-auto h-4 w-4/5" />
+                  </div>
+                ))}
+              </div>
+            </div>
           }
         />
       ) : (

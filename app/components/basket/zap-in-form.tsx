@@ -237,6 +237,7 @@ export function ZapInForm({
   if (!supplyValid || vaultBalances.some((v) => v === null)) {
     return (
       <EmptyState
+        chip="NO SNAPSHOT"
         title="Zap preview unavailable"
         description="The zap ends in mint_in_kind, which is validated against indexed vault holdings and supply. This basket has no complete holdings snapshot yet."
       />

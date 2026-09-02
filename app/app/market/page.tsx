@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import MarketChart, { type MarketSeriesMeta } from "./market-chart";
 import { FreshnessBadge } from "@/components/states";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -120,6 +120,8 @@ function buildNormalizedRows(data: OverviewSeries[]): {
     label: SERIES_LABELS[o.key] ?? o.key,
     color: SERIES_COLORS[o.key],
     dashed: o.key === "IXIC",
+    // Ochre never appears as an area fill (B1) — DIA stays line-only.
+    lineOnly: o.key === "DIA",
   }));
 
   return { rows, series };
@@ -181,6 +183,7 @@ export default async function MarketPage({
       label: SERIES_LABELS[key],
       color: SERIES_COLORS[key],
       dashed: key === "IXIC",
+      lineOnly: key === "DIA",
     }));
     volume = fixtureVolume();
     volumeLabel = "^IXIC (fixture)";
@@ -199,13 +202,13 @@ export default async function MarketPage({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
           <h1 className="text-3xl font-semibold tracking-tight">Market overview</h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          <p className="max-w-2xl text-sm leading-6 text-foreground/80">
             Nasdaq benchmarks normalized to 100 — the base for comparing xStocks-backed strategy
             baskets against the underlying equity indices.
           </p>
         </div>
         <FreshnessBadge
-          source={demo ? "fixture" : "Yahoo Finance via /api/v1/market/overview"}
+          source={demo ? "fixture" : "Yahoo Finance"}
           asOf={asOf}
           demo={demo}
         />
@@ -245,13 +248,14 @@ export default async function MarketPage({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Normalized comparison — 100 base</CardTitle>
-          <CardDescription className="text-xs leading-relaxed">
-            Four index series over {range}. The benchmark series is dashed. Drag the brush (or use
-            the range sliders) to zoom the x-domain; the y-scale tweens to the visible window.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <MarketChart rows={rows} series={series} volume={volume} volumeLabel={volumeLabel} />
+          {/* Interaction instructions live in a muted footer line, not the card header (B10). */}
+          <p className="mt-4 border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">
+            Four index series over {range}; the benchmark is dashed. Drag the brush to zoom the
+            x-domain — the y-scale tweens to the visible window.
+          </p>
         </CardContent>
       </Card>
 

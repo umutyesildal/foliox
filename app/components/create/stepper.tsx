@@ -40,7 +40,14 @@ export function Stepper({
         return (
           <li key={step.key} className="flex min-w-0 items-start gap-1">
             {index > 0 && (
-              <span aria-hidden="true" className="mt-2.5 h-px w-3 shrink-0 bg-border" />
+              // Completed-step connector is mint (B11).
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "mt-2.5 h-px w-3 shrink-0 transition-colors",
+                  index <= current ? "bg-primary/70" : "bg-border",
+                )}
+              />
             )}
             {canJump ? (
               <button

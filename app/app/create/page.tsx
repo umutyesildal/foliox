@@ -308,7 +308,7 @@ export default function CreatePage() {
           />
 
           <section className="mt-5 rounded-xl border border-border bg-card p-4" aria-label={`Step ${step + 1}: ${STEPS[step]}`}>
-            <h2 className="mb-4 text-base font-medium">
+            <h2 className="mb-4 text-lg font-medium">
               {step + 1}. {STEPS[step]}
             </h2>
 

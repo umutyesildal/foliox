@@ -19,6 +19,8 @@ export interface MarketSeriesMeta {
   label: string;
   color: string;
   dashed?: boolean;
+  /** Line-only series (benchmark, ochre) — never rendered as an area fill. */
+  lineOnly?: boolean;
 }
 
 export interface MarketChartProps {
@@ -71,7 +73,7 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
                 dataKey={benchmarkKey}
                 fill="hsl(var(--chart-3))"
                 stroke="hsl(var(--chart-3))"
-                fillOpacity={0.12}
+                fillOpacity={0}
                 strokeWidth={1}
               />
               <ChartBrush
@@ -91,14 +93,23 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
               margin={{ top: 12, right: 16, bottom: 28, left: 48 }}
               className="h-full w-full"
             >
-              <Grid horizontal />
+              {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
+                  fading to 0 by ~40% height; secondary/benchmark line-only. */}
+              <Grid
+                horizontal
+                highlightRowValues={[100]}
+                highlightRowStroke="hsl(var(--chart-grid))"
+                highlightRowStrokeDasharray="0"
+                highlightRowStrokeWidth={1}
+              />
               {series.map((s) => (
                 <Area
                   key={s.key}
                   dataKey={s.key}
                   fill={s.color}
                   stroke={s.color}
-                  fillOpacity={s.dashed ? 0 : 0.14}
+                  fillOpacity={s.dashed || s.lineOnly ? 0 : 0.06}
+                  gradientSpan={0.4}
                   strokeWidth={s.dashed ? 1.5 : 2}
                   dashFromIndex={s.dashed ? 0 : undefined}
                   dashArray={s.dashed ? "6 4" : undefined}

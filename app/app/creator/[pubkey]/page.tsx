@@ -161,8 +161,9 @@ export default function CreatorPage() {
       {status === "not-indexed" && (
         <EmptyState
           className="mt-8"
+          chip="NOT INDEXED"
           title="Creator stats appear once the indexer tracks activity"
-          description={`No baskets and no fee history are indexed for ${truncateAddress(pubkeyParam, 6, 6)} yet. This page only renders indexer data — it never estimates or fabricates stats. Deploy a basket with this wallet and the profile fills in from BasketCreated events.`}
+          description={`No baskets or fee history are indexed for ${truncateAddress(pubkeyParam, 6, 6)} yet — deploy a basket with this wallet and the profile fills in from BasketCreated events.`}
           action={
             <Link
               href="/create"
@@ -221,6 +222,7 @@ export default function CreatorPage() {
           {baskets.length === 0 ? (
             <EmptyState
               className="mt-3"
+              chip="NOT INDEXED"
               title="No indexed baskets"
               description="The stats row exists but no baskets are linked to this creator yet."
             />

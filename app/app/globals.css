@@ -4,7 +4,13 @@
 
 @layer base {
   :root {
-    /* Light mode — Mineral Desk (brand-design 2026-09-01): warm paper canvas, deep teal ink */
+    /* Light mode — Mineral Desk (brand-design 2026-09-01): warm paper canvas, deep teal ink
+       Designer-critique token changes (2026-09-02, Mineral Desk system):
+       + --border-strong (light 62% / dark 28% L) — card headers + structural dividers;
+         dark value passes 2:1 contrast against --card.
+       ~ --card (dark) raised 6.7% -> 8.0% lightness — primary panels one visible
+         elevation step above the canvas (still below --popover 8.4%). */
+    --border-strong: 36.9 11.3% 62.0%;
     --background: 33.3 47.4% 96.3%;
     --foreground: 38.2 40.7% 5.3%;
     --card: 0.0 0.0% 100.0%;
@@ -41,9 +47,10 @@
   }
   .dark {
     /* Dark mode — Mineral Desk (brand-design 2026-09-01): warm near-black canvas, mineral-mint ink */
+    --border-strong: 35.0 10.0% 28.0%;
     --background: 34.3 46.7% 2.9%;
     --foreground: 33.3 25.7% 93.1%;
-    --card: 36.0 29.4% 6.7%;
+    --card: 36.0 29.4% 8.0%;
     --card-foreground: 33.3 25.7% 93.1%;
     --popover: 32.7 25.6% 8.4%;
     --popover-foreground: 33.3 25.7% 93.1%;
@@ -79,4 +86,23 @@
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
+}
+
+@layer utilities {
+  /* Hero-only 1px grid texture (landing spec A4): ≤4% foreground lines via
+     color-mix — no hardcoded hex, rendered nowhere else. */
+  .foliox-hero-grid {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 32px 32px;
+  }
 }

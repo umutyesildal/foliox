@@ -115,8 +115,9 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
 
       {status === "not-found" ? (
         <EmptyState
+          chip="NOT INDEXED"
           title="This basket is not indexed"
-          description="There is nothing to buy here — the backend has no basket at this address. Nothing is fabricated to fill the page."
+          description="There is nothing to buy here — the backend has no basket at this address."
           action={
             <Button render={<Link href="/explore" />} size="sm">
               Back to explore

@@ -222,7 +222,7 @@ export default async function ProvidersPage() {
               {rows.map((p) => {
                 const link = p.url ?? PROVIDER_LINKS[p.id];
                 return (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className="h-11 hover:bg-muted/40">
                     <TableCell className="pl-4">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">{p.name}</span>
@@ -315,8 +315,9 @@ export default async function ProvidersPage() {
           {xstockRows.length === 0 && fallbackMints.length === 0 ? (
             <div className="p-4">
               <EmptyState
+                chip="NOT INDEXED"
                 title="Instrument list unavailable"
-                description="/api/v1/xstocks and the registry mints are both unreachable right now, so no mint list is shown. Nothing is fabricated here."
+                description="/api/v1/xstocks and the registry mints are unreachable right now, so no mint list is shown."
               />
             </div>
           ) : (
@@ -334,10 +335,10 @@ export default async function ProvidersPage() {
               </TableHeader>
               <TableBody>
                 {(xstockRows.length > 0 ? xstockRows : fallbackMints).map((x) => (
-                  <TableRow key={x.ticker}>
-                    <TableCell className="pl-4 font-mono text-sm">{x.ticker}</TableCell>
+                  <TableRow key={x.ticker} className="h-11 hover:bg-muted/40">
+                    <TableCell className="pl-4 font-mono text-sm tabular-nums">{x.ticker}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">Backed Finance</TableCell>
-                    <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">
+                    <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
                       {x.mint ? truncateAddress(x.mint, 6, 6) : "—"}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
@@ -361,9 +362,8 @@ export default async function ProvidersPage() {
 
       <div className="space-y-1 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
         <p>
-          Issuer context: xStock tokens are issued by Backed Finance as structured instruments — they
-          track the underlying equity but are not the share itself. Holders carry issuer, depeg, and
-          custody-bridge risk.
+          xStock tokens are issued by Backed Finance as structured instruments —
+          they track the underlying equity but are not the share itself.
         </p>
         <p>LEGAL_REVIEW_REQUIRED: issuer disclosure must be approved by counsel before mainnet.</p>
       </div>

@@ -34,7 +34,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
 
 /**
  * Site header: FolioX wordmark (text only), primary nav
- * (Explore/Market/Providers), contextual actions (Create/Portfolio), network
+ * (Stocks/ETFs/Baskets), contextual actions (Create/Portfolio), network
  * indicator, wallet button, and a no-dependency mobile disclosure nav.
  */
 export function SiteHeader() {

@@ -16,10 +16,35 @@ const HERO_IMAGE = {
 } as const;
 
 /**
+ * Section gateway — the three main areas of the product. Small mono index,
+ * name, one short line, arrow. Details live on the pages themselves.
+ */
+const SECTIONS = [
+  {
+    index: "01",
+    name: "Stocks",
+    line: "Tokenized stocks across providers.",
+    href: "/stocks",
+  },
+  {
+    index: "02",
+    name: "Tokenized ETFs",
+    line: "Traditional vs tokenized — the difference, then the list.",
+    href: "/etfs",
+  },
+  {
+    index: "03",
+    name: "Baskets",
+    line: "Community-made baskets, benchmarked on-chain.",
+    href: "/explore",
+  },
+] as const;
+
+/**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02):
- * a badge line, h1, one subline, two CTAs, then the real product visual, one
- * quiet Create → Mint → Redeem row and a single muted disclosure line. No
- * texture, stats, devices, or data fetch — details live on the other pages.
+ * a badge line, h1, one subline, two CTAs, then the real product visual, a
+ * quiet three-row section gateway (Stocks / Tokenized ETFs / Baskets) and a
+ * single muted disclosure line. No texture, stats, devices, or data fetch.
  * The landing deliberately renders no SiteFooter; footers are per-page.
  */
 export default function LandingPage() {
@@ -70,25 +95,41 @@ export default function LandingPage() {
         </p>
       </section>
 
-      {/* Single quiet section — three one-liners, no snippets. */}
-      <section
-        aria-label="How FolioX works"
-        className="border-t border-border/60 py-12"
-      >
-        <ul className="mx-auto grid max-w-3xl gap-3 px-4 font-mono text-sm text-muted-foreground sm:grid-cols-3 sm:px-6">
-          <li>
-            <span className="text-foreground">Create</span> — pick 2-20 xStocks,
-            fix the weights.
-          </li>
-          <li>
-            <span className="text-foreground">Mint</span> — seed the vault in
-            one atomic transaction.
-          </li>
-          <li>
-            <span className="text-foreground">Redeem</span> — burn shares for a
-            pro-rata payout.
-          </li>
-        </ul>
+      {/* Section gateway — three quiet link rows, full-bleed in the container. */}
+      <section aria-label="Explore FolioX" className="border-t border-border/60 py-12">
+        <nav aria-label="Sections" className="mx-auto max-w-3xl px-4 sm:px-6">
+          <ul className="border-b border-border/60">
+            {SECTIONS.map((section) => (
+              <li key={section.href}>
+                <Link
+                  href={section.href}
+                  className="group -mx-4 flex min-h-14 items-center gap-4 border-t border-border/60 px-4 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:-mx-6 sm:px-6"
+                >
+                  <span
+                    aria-hidden
+                    className="font-mono text-xs text-muted-foreground"
+                  >
+                    {section.index}
+                  </span>
+                  <span className="min-w-0 flex-1 sm:flex sm:items-baseline sm:gap-3">
+                    <span className="block text-sm font-medium text-foreground">
+                      {section.name}
+                    </span>
+                    <span className="block min-w-0 truncate text-sm text-muted-foreground">
+                      {section.line}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden
+                    className="font-mono text-sm text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
+                  >
+                    ↗
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </section>
 
       {/* Not a footer block — one tiny muted disclosure line. */}

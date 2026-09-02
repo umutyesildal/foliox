@@ -8,9 +8,9 @@ export interface NavItem {
 }
 
 export const PRIMARY_NAV: NavItem[] = [
-  { href: "/explore", label: "Explore" },
-  { href: "/market", label: "Market" },
-  { href: "/providers", label: "Providers" },
+  { href: "/stocks", label: "Stocks" },
+  { href: "/etfs", label: "ETFs" },
+  { href: "/explore", label: "Baskets" },
 ];
 
 export const CONTEXT_ACTIONS: NavItem[] = [

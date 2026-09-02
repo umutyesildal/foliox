@@ -3,8 +3,9 @@ import Link from "next/link";
 import { LegalReviewTag } from "@/components/create";
 
 const PRODUCT_LINKS: { href: string; label: string }[] = [
-  { href: "/explore", label: "Explore" },
-  { href: "/market", label: "Market" },
+  { href: "/stocks", label: "Stocks" },
+  { href: "/etfs", label: "ETFs" },
+  { href: "/explore", label: "Baskets" },
   { href: "/create", label: "Create" },
   { href: "/portfolio", label: "Portfolio" },
 ];

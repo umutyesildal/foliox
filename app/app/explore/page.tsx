@@ -4,12 +4,12 @@ import { SiteFooter } from "@/components/shell";
 import ExploreClient from "./explore-client";
 
 export const metadata: Metadata = {
-  title: "Explore baskets — FolioX",
+  title: "Baskets — FolioX",
   description:
-    "Comparison-first ranking of onchain strategy baskets: AUM, share price, 24h change, holders, drift, and data freshness.",
+    "Community-made strategy baskets: who created each one, AUM, share price, holders, and performance vs the SPY benchmark.",
 };
 
-export default function ExplorePage() {
+export default function BasketsPage() {
   return (
     <>
       <ExploreClient />

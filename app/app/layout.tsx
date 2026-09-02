@@ -1,22 +1,34 @@
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 
+import { SiteFooter } from "@/components/shell/site-footer";
+import { SiteHeader } from "@/components/shell/site-header";
+import { AppProviders } from "./providers";
+
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const geistMono = Geist_Mono({subsets:['latin'],variable:'--font-mono'});
 
 export const metadata = { title: "FolioX — Strategy Baskets on Solana", description: "Create an index. Own your thesis. Onchain strategy baskets powered by xStocks." };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn("dark font-sans", geist.variable)}>
+    <html lang="en" className={cn("dark font-sans", geist.variable, geistMono.variable)}>
       <body className="min-h-screen bg-background text-foreground antialiased">
-        <header className="sticky top-0 z-10 border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-            <a href="/" className="font-semibold tracking-tight">FolioX <span className="text-muted-foreground">· xStocks baskets</span></a>
-            <nav className="flex gap-4 text-sm text-muted-foreground"><a href="/providers" className="hover:text-foreground">Providers</a><a href="/market" className="hover:text-foreground">Market</a><a href="/stock/TSLAx" className="hover:text-foreground">TSLAx</a><a href="/explore" className="hover:text-foreground">Explore</a><a href="/create" className="hover:text-foreground">Create</a><a href="/portfolio" className="hover:text-foreground">Portfolio</a></nav>
+        <AppProviders>
+          <div className="flex min-h-screen flex-col">
+            <a
+              href="#main"
+              className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:text-primary-foreground"
+            >
+              Skip to content
+            </a>
+            <SiteHeader />
+            <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+              {children}
+            </main>
+            <SiteFooter />
           </div>
-        </header>
-        <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
-        <footer className="mx-auto max-w-6xl px-6 py-10 text-xs text-muted-foreground">Not investment advice · xStocks are structured instruments · <a href="/legal" className="underline">Risks & Disclosures</a></footer>
+        </AppProviders>
       </body>
     </html>
   );

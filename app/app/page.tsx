@@ -1,210 +1,239 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Shield, Zap, TrendingUp, Sparkles } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { AreaChart, Area } from "@/components/charts/area-chart";
-import { Grid } from "@/components/charts/grid";
-import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
 
-// Mock SP500 / QQQ rising data for hero dashboard
-function genRising(n = 40, start = 100) {
-  let v = start;
-  return Array.from({ length: n }, (_, i) => {
-    v += (Math.random() - 0.42) * 1.8;
-    if (i % 7 === 0) v += 0.9;
-    return { date: new Date(Date.now() - (n - i) * 3600000 * 6), value: Number(v.toFixed(2)), spy: Number((v * 0.96 + Math.random() * 2).toFixed(2)) };
-  });
+import { EmptyState, FreshnessBadge, TableRowSkeleton } from "@/components/states";
+import { formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
+
+interface BasketRow {
+  pubkey: string;
+  creator?: string | null;
+  nav?: string | number | null;
+  share_price?: string | number | null;
+  holders?: number | null;
+  drift_bps?: string | number | null;
+  driftBps?: string | number | null;
+  source?: string | null;
+  asOf?: string | null;
+  nav_as_of?: string | null;
 }
 
-export default function Page() {
-  const [data, setData] = useState<{ date: Date; value: number; spy: number }[]>([]);
-  const [livePrice, setLivePrice] = useState(582.14);
-  const [spStatus, setSpStatus] = useState<"loading" | "ready">("loading");
+function numeric(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Landing — asymmetric editorial hero with ONE primary CTA, a quiet
+ * Create → Mint → Redeem explainer, and a featured basket only when the
+ * indexer actually returns one. No marquee, no gradient, no faux chrome, no
+ * fabricated numbers.
+ */
+export default function LandingPage() {
+  const [featured, setFeatured] = useState<BasketRow | null>(null);
+  const [featuredState, setFeaturedState] = useState<"loading" | "ready" | "empty">("loading");
+  const [featuredSource, setFeaturedSource] = useState<string | null>(null);
+  const [featuredAsOf, setFeaturedAsOf] = useState<string | null>(null);
+
   useEffect(() => {
-    // client-only initial data to avoid hydration mismatch
-    setData(genRising(36, 100));
-    const t = setTimeout(() => setSpStatus("ready"), 600);
-    const id = setInterval(() => {
-      setData((d) => {
-        if (!d.length) return d;
-        const last = d[d.length - 1].value;
-        const next = last + (Math.random() - 0.44) * 1.2;
-        return [...d.slice(1), { date: new Date(), value: Number(next.toFixed(2)), spy: Number((next * 0.97 + Math.random()).toFixed(2)) }];
-      });
-      setLivePrice((p) => Number((p + (Math.random() - 0.48) * 0.9).toFixed(2)));
-    }, 1800);
-    return () => { clearTimeout(t); clearInterval(id); };
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/baskets?sort=aum&limit=1`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const payload = (await res.json()) as {
+          data?: BasketRow[];
+          source?: string | null;
+          asOf?: string | null;
+        };
+        if (cancelled) return;
+        const row = payload.data?.[0] ?? null;
+        // Only render when the indexer returned a real basket with a pubkey.
+        if (row && typeof row.pubkey === "string" && row.pubkey.length > 0) {
+          setFeatured(row);
+          setFeaturedSource(payload.source ?? row.source ?? null);
+          setFeaturedAsOf(payload.asOf ?? row.asOf ?? row.nav_as_of ?? null);
+          setFeaturedState("ready");
+        } else {
+          setFeaturedState("empty");
+        }
+      } catch {
+        if (!cancelled) setFeaturedState("empty");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const change = ((livePrice - 575.3) / 575.3) * 100;
+  const nav = numeric(featured?.nav);
+  const sharePrice = numeric(featured?.share_price);
+  const drift = numeric(featured?.drift_bps ?? featured?.driftBps);
 
   return (
-    <div className="bg-background">
-      {/* Hero - bklit */}
-      <div className="relative bg-background overflow-visible">
-        <div className="mx-auto max-w-6xl px-6 pt-14 pb-10 md:pt-20 md:pb-16">
-          <div className="grid gap-10 md:grid-cols-[1.1fr_0.9fr] items-center">
-            {/* Left copy */}
-            <div>
-              <Badge variant="outline" className="gap-1.5 rounded-full border-primary/20 bg-primary/5 px-3 py-1 text-xs">
-                <Sparkles className="h-3 w-3" /> Onchain strategy baskets · xStocks
-              </Badge>
-              <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-6xl md:leading-[0.95]">
-                Create an <span className="bg-gradient-to-r from-primary via-primary/70 to-primary/40 bg-clip-text text-transparent">index.</span>
-                <br />
-                Own your thesis.
-              </h1>
-              <p className="mt-4 max-w-xl text-[15px] leading-6 text-muted-foreground">
-                Pick 2–20 xStocks, set weights, seed once, deploy an <span className="text-foreground">immutable vault</span>. One token, pro-rata redeem, no oracle.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Button asChild size="lg" className="rounded-full px-6 gap-2">
-                  <Link href="/create">Create basket <ArrowRight className="h-4 w-4" /></Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="rounded-full px-6">
-                  <Link href="/explore">Explore baskets</Link>
-                </Button>
-                <Button asChild variant="ghost" size="sm" className="rounded-full">
-                  <Link href="/providers" className="gap-1.5 flex items-center">Live prices <TrendingUp className="h-3.5 w-3.5" /></Link>
-                </Button>
-              </div>
-              <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
-                <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1"><Shield className="h-3 w-3" /> Immutable vault</span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1"><Zap className="h-3 w-3" /> 300/100/300 bps caps</span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1">90/10 creator split</span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 font-mono">6 dec · 1M genesis</span>
-              </div>
-            </div>
-
-            {/* Right dashboard preview */}
-            <div className="relative">
-              <div className="pointer-events-none absolute -inset-4 -z-10 blur-2xl opacity-20 bg-gradient-to-br from-primary/10 via-chart-2/10 to-transparent rounded-[32px]" />
-              <Card className="overflow-visible rounded-[20px] border-border/50 shadow-2xl backdrop-blur">
-                <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500/80" /><span className="h-2.5 w-2.5 rounded-full bg-yellow-500/80" /><span className="h-2.5 w-2.5 rounded-full bg-green-500/80" /></div>
-                    <span className="ml-2 text-xs font-mono text-muted-foreground">SPY · S&P 500 xStock basket</span>
-                  </div>
-                  <Badge variant="secondary" className="font-mono text-xs">LIVE</Badge>
-                </div>
-                <div className="px-4 pt-4">
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-2xl font-semibold tracking-tight font-mono">${livePrice.toFixed(2)}</span>
-                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${change >= 0 ? "bg-emerald-500/15 text-emerald-500" : "bg-red-500/15 text-red-500"}`}>{change >= 0 ? "+" : ""}{change.toFixed(2)}% today</span>
-                    <span className="ml-auto text-xs text-muted-foreground">1M · normalized 100</span>
-                  </div>
-                  <div className="mt-3 w-full overflow-visible">
-                    <AreaChart
-                      data={data}
-                      xDataKey="date"
-                      margin={{ top: 20, right: 12, bottom: 24, left: 12 }}
-                      className="w-full overflow-visible"
-                      style={{ height: 180 }}
-                      yDomainTween
-                      status={spStatus}
-                      loadingLabel="Loading SPY..."
-                    >
-                      <Grid horizontal shimmer={spStatus === "loading"} shimmerSync />
-                      <Area dataKey="value" fill="hsl(var(--primary))" stroke="hsl(var(--primary))" fillOpacity={0.22} strokeWidth={2} />
-                      <Area dataKey="spy" fill="hsl(var(--chart-2))" stroke="hsl(var(--chart-2))" fillOpacity={0.08} strokeWidth={1.5} />
-                      <ChartTooltip />
-                    </AreaChart>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 py-3 text-xs">
-                    <div className="rounded-lg bg-muted/50 p-2.5"><div className="text-muted-foreground">NAV</div><div className="font-mono font-medium">$2.48M</div><div className="text-[11px] text-emerald-500">↗ +3.2% 24h</div></div>
-                    <div className="rounded-lg bg-muted/50 p-2.5"><div className="text-muted-foreground">Holders</div><div className="font-mono font-medium">1,284</div><div className="text-[11px] text-muted-foreground">+18 today</div></div>
-                    <div className="rounded-lg bg-muted/50 p-2.5"><div className="text-muted-foreground">Drift</div><div className="font-mono font-medium">+0.4%</div><div className="text-[11px] text-muted-foreground">target 50/30/20</div></div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-2.5 text-xs">
-                  <span className="text-muted-foreground">Backed Finance · <span className="font-mono">TSLAx/AAPLx/NVDAx</span></span>
-                  <Link href="/stock/TSLAx" className="text-primary hover:underline font-medium">View TSLAx →</Link>
-                </div>
-              </Card>
-              {/* floating mini */}
-              <div className="hidden md:block absolute -bottom-4 -left-6 rotate-[-1.5deg]">
-                <Card className="p-3 shadow-xl border-primary/20 w-[220px]">
-                  <div className="text-xs text-muted-foreground">Basket share</div>
-                  <div className="font-mono text-sm font-medium">FOLIO-7A3… · 6 dec</div>
-                  <div className="mt-1 text-xs text-emerald-500">Redeem: pro-rata, oracle-free</div>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <TickerStrip />
-
-      {/* Live SP500 Pulse — full width */}
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <Card className="overflow-hidden border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-sm"><TrendingUp className="h-4 w-4 text-emerald-500" /> S&P 500 Pulse — live rising</CardTitle>
-              <CardDescription className="text-xs">SPY · Yahoo Finance 1mo normalized to 100 — new candle every 1.8s, bklit AreaChart</CardDescription>
-            </div>
-            <Badge variant="outline" className="font-mono text-xs gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> LIVE</Badge>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="w-full overflow-visible p-4">
-              <AreaChart
-                data={data}
-                xDataKey="date"
-                margin={{ top: 20, right: 12, bottom: 24, left: 12 }}
-                className="w-full overflow-visible"
-                style={{ height: 260 }}
-                yDomainTween
-                status={spStatus}
-                loadingLabel="Syncing S&P 500..."
+    <div className="mx-auto w-full">
+      {/* Hero — asymmetric editorial: copy left, sourced featured column right */}
+      <section className="grid gap-10 pb-12 pt-6 md:grid-cols-[1.15fr_0.85fr] md:pb-16 md:pt-10">
+        <div className="min-w-0">
+          <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+            Onchain strategy baskets · xStocks
+          </p>
+          <h1 className="mt-4 text-5xl font-semibold leading-[1.04] tracking-tight md:text-6xl">
+            Create an index.
+            <br />
+            Own your thesis.
+          </h1>
+          <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">
+            Pick 2-20 whitelisted xStocks, fix the weights in basis points, cap
+            your fees, and seed the vault atomically. One share token, pro-rata
+            redemption, no oracle — and nothing changes after deploy.
+          </p>
+          <div className="mt-8">
+            <Link
+              href="/create"
+              className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              Create an index
+            </Link>
+            <span className="ml-4 text-xs text-muted-foreground">
+              or{" "}
+              <Link
+                href="/explore"
+                className="text-foreground underline underline-offset-4 hover:text-muted-foreground"
               >
-                <Grid horizontal shimmer={spStatus === "loading"} shimmerSync />
-                <Area dataKey="value" fill="hsl(var(--primary))" stroke="hsl(var(--primary))" fillOpacity={0.18} strokeWidth={2} />
-                <ChartTooltip />
-              </AreaChart>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* How it works — minimal, all English, no big white cards */}
-      <div className="mx-auto max-w-6xl px-6 pb-8">
-        <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground border-y border-border/40 py-4">
-          <span className="inline-flex items-center gap-1.5"><Shield className="h-3 w-3" /> Permissionless redeem — `V·burn/S` pro-rata, never pausable</span>
-          <span className="text-border">·</span>
-          <span className="inline-flex items-center gap-1.5"><Zap className="h-3 w-3" /> Immutable — weights/fees/mints never change</span>
-          <span className="text-border">·</span>
-          <span>Self-custodial · Program <span className="font-mono text-foreground">37VPGt…gbb1</span> · Not investment advice</span>
+                explore existing baskets
+              </Link>
+            </span>
+          </div>
+          <p className="mt-10 max-w-xl text-xs leading-5 text-muted-foreground">
+            Not investment advice. xStocks are Backed structured instruments,
+            not direct equity. Baskets are immutable; redeem is permissionless
+            and oracle-free. LEGAL_REVIEW_REQUIRED applies across this site.
+          </p>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function TickerStrip() {
-  const items = [
-    { s: "TSLAx", v: "+2.31%", up: true },
-    { s: "NVDAx", v: "+1.84%", up: true },
-    { s: "AAPLx", v: "-0.42%", up: false },
-    { s: "SPYx", v: "+0.88%", up: true },
-    { s: "QQQ", v: "+1.12%", up: true },
-    { s: "DIA", v: "+0.64%", up: true },
-  ];
-  return (
-    <div className="overflow-hidden border-y border-border/40 bg-muted/20 py-2">
-      <div className="flex animate-[marquee_22s_linear_infinite] gap-8 whitespace-nowrap will-change-transform">
-        {[...items, ...items].map((it, i) => (
-          <span key={i} className="flex items-center gap-2 text-xs font-mono">
-            <span className="text-foreground">{it.s}</span>
-            <span className={it.up ? "text-emerald-500" : "text-red-500"}>{it.v}</span>
-            <span className="text-muted-foreground">·</span>
-          </span>
-        ))}
-      </div>
-      <style>{`@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
+        {/* Featured basket — only real indexer data; otherwise a quiet empty */}
+        <div className="min-w-0 self-start rounded-xl border border-border bg-card p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-medium">Featured basket</h2>
+            {featuredSource && featuredState === "ready" && (
+              <FreshnessBadge source={featuredSource} asOf={featuredAsOf ?? undefined} />
+            )}
+          </div>
+
+          {featuredState === "loading" && (
+            <div className="mt-4" role="status" aria-label="Loading featured basket">
+              <span className="sr-only">Loading featured basket</span>
+              <div className="flex flex-col gap-2">
+                <TableRowSkeleton rows={3} columns={1} label="Loading featured basket" />
+              </div>
+            </div>
+          )}
+
+          {featuredState === "ready" && featured && (
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+              <dt className="text-xs text-muted-foreground">Basket</dt>
+              <dd className="text-right">
+                <Link
+                  href={`/basket/${featured.pubkey}`}
+                  className="font-mono text-xs underline-offset-2 hover:underline"
+                >
+                  {truncateAddress(featured.pubkey, 8, 6)}
+                </Link>
+              </dd>
+              <dt className="text-xs text-muted-foreground">NAV</dt>
+              <dd className="text-right font-mono text-sm tabular-nums">
+                {nav === null ? "—" : formatUsd(nav)}
+              </dd>
+              <dt className="text-xs text-muted-foreground">Share price</dt>
+              <dd className="text-right font-mono text-sm tabular-nums">
+                {sharePrice === null ? "—" : formatUsd(sharePrice)}
+              </dd>
+              <dt className="text-xs text-muted-foreground">Holders</dt>
+              <dd className="text-right font-mono text-sm tabular-nums">
+                {featured.holders === null || featured.holders === undefined
+                  ? "—"
+                  : formatTokenAmount(featured.holders, { maximumFractionDigits: 0 })}
+              </dd>
+              <dt className="text-xs text-muted-foreground">Drift vs target</dt>
+              <dd
+                className={cn(
+                  "text-right font-mono text-sm tabular-nums",
+                  drift !== null && drift > 0 && "text-[hsl(var(--status-positive))]",
+                  drift !== null && drift < 0 && "text-destructive",
+                )}
+              >
+                {drift === null
+                  ? "—"
+                  : `${drift > 0 ? "+" : ""}${drift.toLocaleString()} bps`}
+              </dd>
+            </dl>
+          )}
+
+          {featuredState === "empty" && (
+            <EmptyState
+              className="mt-3 border-border/60"
+              title="No baskets indexed yet"
+              description="The indexer has no baskets to feature. Numbers appear here only once a real basket is deployed and tracked — never before."
+              action={
+                <Link
+                  href="/create"
+                  className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  Be the first creator
+                </Link>
+              }
+            />
+          )}
+        </div>
+      </section>
+
+      {/* Quiet 3-step explainer: Create → Mint → Redeem */}
+      <section className="border-t border-border/60 py-10" aria-label="How FolioX works">
+        <h2 className="text-xl font-semibold tracking-tight">Create → Mint → Redeem</h2>
+        <ol className="mt-6 grid gap-6 md:grid-cols-3">
+          <li>
+            <p className="font-mono text-xs text-muted-foreground">01</p>
+            <h3 className="mt-2 text-base font-medium">Create</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Weights must sum to exactly 10,000 bps; fees are capped at 300 /
+              100 / 300 bps and split 90/10 creator-treasury. The seed transfer
+              and basket creation are one atomic transaction.
+            </p>
+          </li>
+          <li>
+            <p className="font-mono text-xs text-muted-foreground">02</p>
+            <h3 className="mt-2 text-base font-medium">Mint</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Deposit the xStocks in-kind, proportionally to the weights. Or zap
+              USDC through Jupiter — a convenience path of sequential swaps with
+              typical 1-3% slippage exposure, not part of the core program.
+            </p>
+          </li>
+          <li>
+            <p className="font-mono text-xs text-muted-foreground">03</p>
+            <h3 className="mt-2 text-base font-medium">Redeem</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Burn shares and receive pro-rata vault holdings, floored to the
+              raw token unit. Permissionless and oracle-free — the program
+              cannot pause it, and no backend needs to be online.
+            </p>
+          </li>
+        </ol>
+        <p className="mt-8 max-w-3xl text-xs leading-5 text-muted-foreground">
+          Historical NAV is the only performance figure shown anywhere in the
+          app. Drift versus target weights is expected between mints — V0 has no
+          rebalancing, and baskets never trade. Placeholder legal copy is
+          pending counsel review.
+        </p>
+      </section>
     </div>
   );
 }

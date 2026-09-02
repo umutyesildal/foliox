@@ -15,3 +15,7 @@ keys/
 **/id.json
 !backend/.env.example
 !app/.env.example
+
+# brand-design artifacts
+.brand-preview/
+app/app/globals.css.bak

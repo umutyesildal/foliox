@@ -1,87 +1,66 @@
 # FolioX — xStocks Strategy Baskets on Solana
 
-> “Create an index. Own your thesis.” — Onchain strategy baskets powered by xStocks.
-> V0 spec: `docs/foliox-v0-spec.md` (normative product constraints). Execution plan: `plan.md`.
-> Current state: scaffold/prototype with documented gaps; not localnet-ready or production-ready.
+> "Create an index. Own your thesis." — Onchain strategy baskets powered by xStocks.
+> V0 spec: `docs/foliox-v0-spec.md` (normative product constraints). Execution plan: `plan.md`. Brand: `brand.md`.
+> Current state: **V0 implementation waves complete** — protocol, backend, and frontend are real and gated (see `plan.md` §6 release gates, all evidenced PASS). Localnet E2E attempt in flight (SBF toolchain blocker tracked there). Not yet devnet/mainnet — `LEGAL_REVIEW_REQUIRED` placeholders still need counsel.
+
+## Tests (all green)
+
+```bash
+cargo test                                  # 178 Rust tests
+npm --prefix backend install                # once (backend has its own lockfile)
+npm --prefix backend run build              # strict NodeNext, no suppressions
+npm --prefix backend test -- --run          # 373 TS tests
+(cd app && npx tsc --noEmit --incremental false)   # 0 errors
+npm --prefix app run build                  # 13 routes, no ignored errors
+```
 
 ## Stack
 
-- **Solana programs (Anchor 0.30):** `whitelist`, `basket_factory`, `basket` (optional `zap_router` V0 = client Jupiter sequential)
-- **Backend:** TypeScript + Node + PostgreSQL + Redis + BullMQ (indexer, NAV, rankings, Jupiter quotes) — *convenience only, redeem remains permissionless*
-- **Frontend:** Next.js 15 + Tailwind 3.4 + shadcn + **bklit UI** (`@bklit` registry `area-chart`/`line-chart`/`bar-chart`/`candlestick`) + wallet-adapter — **Hep bklit kullanılacak** (https://bklit.com/docs/installation), düz HTML/recharts yasak
+- **Solana programs (Anchor 0.30, real Token-2022 CPI):** `whitelist` (Token-2022 ownership + decimals verification), `basket_factory` (atomic seed transfers, genesis 1M with temp-mint-authority handoff), `basket` (real `transfer_checked`/`burn`/`mint_to`; `redeem_in_kind` permissionless + oracle-free, structurally tested)
+- **Backend:** Node 20 + TypeScript (strict) + PostgreSQL + optional Redis — real indexer (Anchor event decode), holdings sync with ScaledUiAmount multiplier, exact BigInt fixed-point NAV engine, REST API with `source`/`asOf` provenance on every row; backend never signs
+- **Frontend:** Next.js 15 + Tailwind 3.4 + **bklit UI** (registry provenance verified — see `docs/bklit-registry-findings-2026-09-01.md`; Brush = documented local adapter) + wallet-adapter (Phantom/Solflare, full state machine) — brand per `brand.md` (Mineral Desk, Geist/Geist Mono)
 - **Token:** SPL Token-2022 — raw transfers on-chain, `scaled = raw × multiplier` for display/NAV
-
-## Quick Start (read-only checks)
-
-The workspace has been scaffolded manually and the verified checks are the current source of truth:
-
-```bash
-cargo build
-cargo test
-
-# Or with anchor CLI
-anchor build
-anchor test
-```
 
 ## Programs
 
-| Program | ID (localnet) | Description |
-|---------|---------------|-------------|
-| `whitelist` | `bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz` | `init_config`, `add_mint`, `pause_mint`, `unpause_mint`, `transfer_authority` |
-| `basket_factory` | `sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq` | `init_factory`, `create_basket` validation scaffold; seed/share behavior still requires implementation |
-| `basket` | `37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1` | math and instruction scaffold; real transfer/mint/burn behavior still requires implementation |
+| Program | ID (localnet/devnet) | State |
+|---------|----------------------|-------|
+| `whitelist` | `bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz` | Real; `add_mint` verifies Token-2022 ownership + decimals (extension-aware) |
+| `basket_factory` | `sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq` | Real; full §3.2 validations, atomic seed, genesis mint, real `vault_bump` |
+| `basket` | `37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1` | Real; `mint_in_kind` (4n remaining-accounts contract, pause-gated), `redeem_in_kind` (3n, never gated), `accrue_management_fee` |
 
-See `docs/foliox-v0-spec.md` §2-6 for account model, instruction args, mint/redeem math, fee math.
+See `docs/foliox-v0-spec.md` §2-6 for account model, instruction args, mint/redeem math, fee math. Client instruction builders live in `app/lib/transactions.ts` + `app/lib/create-basket.ts` (mirrored from program source, discriminators cross-verified).
 
 ## Token-2022 Accounting
 
-- On-chain: **raw** (`transfer_checked` with `decimals` from whitelist)
-- Off-chain: `scaled = raw × multiplier` (via `ScaledUiAmountConfig` extension)
-- Tests: dividend/split multiplier updates must not break raw math (`cargo test test_token2022`)
+- On-chain: **raw** (`transfer_checked` with decimals; `// RAW ONLY` on every CPI site)
+- Off-chain: `scaled = raw × multiplier` (`ScaledUiAmountConfig`, f64 per spl-token 0.4.15); amounts crossing module boundaries travel as decimal strings (BigInt-exact)
 
-## Backend (prototype; incomplete)
+## Backend (real)
 
-```
-backend/src/
-  indexer/  listener.ts, holdingsSync.ts
-  workers/  navEngine.ts, priceFetch.ts, feeCrank.ts
-  api/      routes/baskets.ts, quotes.ts
-```
+Indexer listens for `BasketCreated/Minted/Redeemed/FeeAccrued` (Borsh decoders), upserts `baskets`/`events`/`creator_stats`, syncs `vault_holdings` (raw + multiplier + scaled), NAV engine snapshots `nav_snapshots` + refreshes `basket_rankings`, fee crank emits **unsigned** `accrue_management_fee` transactions. REST `/api/v1` implements the spec §8-9 routes with honest empty/error states (`NOT_INDEXED`, `DB_UNAVAILABLE`, `QUOTE_UNAVAILABLE`) — no fabricated production-looking data. Zap quotes proxy Jupiter; provenance + sequential/non-atomic warning included.
 
-The intended indexer listens to `BasketCreated/Minted/Redeemed/FeeAccrued`, syncs `vault_holdings` raw+scaled, computes `NAV = Σ(scaled*price)`, and snapshots every 60s. Current server wiring still has empty/mock basket data and must pass the backend build before this is claimed live.
+## Frontend (real — 13 routes)
 
-## Frontend (prototype; bklit migration pending)
-
-```
-app/
-  page.tsx (landing) / explore / basket/[pubkey] / create (6-step wizard) / portfolio / legal
-```
-
-The visual wizard includes validation concepts, but wallet signing and `create_basket` execution are not complete. The current chart tree is local and uses `@visx`; Bklit registry provenance must be verified before claiming full Bklit compliance.
+Landing, Explore (comparison-first table), Market + Stock (normalized multi-series AreaChart + OHLC Candlestick + volume + Brush), Providers (honest status), basket Detail (NAV chart, drift table, fees, action rail), Buy (In-Kind with exact 1%-tolerance validation + Zap with provenance), Redeem (pro-rata floor preview, oracle-free copy), Create (6-step wizard with hard validation gates + account-level review modal), Portfolio, Creator, Legal. Wallet: Phantom/Solflare with disconnected/connecting/connected/wrong-network/rejected states. Shared: skeleton/error/empty/`FreshnessBadge` library, `@/lib/format` (raw↔scaled BigInt-exact).
 
 ## Security
 
-See spec §11. Key invariants:
-
-- `redeem_in_kind` never gated by oracle/pauser/backend
-- No `admin_withdraw`
-- Fuzz properties: deposits→full redeem pro-rata, no over-redeem, management fee cap, multiplier invariance
-
-Run `cargo test` + `cso` + `review-and-iterate` before `deploy-to-mainnet`.
+See spec §11. Key invariants (all evidenced in `plan.md` §6 gate table): `redeem_in_kind` never gated (no whitelist/oracle/pauser account in its context; structural test), no `admin_withdraw`, RAW-only transfers, fee caps + 90/10 split, genesis 1M inflation-attack protection. Run `cargo test` + `cso` + `review-and-iterate` before devnet/mainnet.
 
 ## Legal Placeholders `LEGAL_REVIEW_REQUIRED`
 
-Every basket shows: not investment advice, jurisdiction restrictions, xStocks are structured instruments, creators not licensed advisers. See spec §12.
+11 files carry visible placeholders (landing, basket, redeem, providers, stock, legal, footer, deploy-panel, fees-editor, legal-checkboxes, legal-review-tag). Never describe FolioX as an ETF/fund; voice rules in `brand.md`. Counsel review required before mainnet.
 
 ## Milestones
 
-The detailed execution plan is in `plan.md`. Current: **discovery complete; G0/G1 decision gates pending; implementation not started in this coordination wave**.
+Execution state in `plan.md` §7-8. G0 (brand: Mineral Desk + Geist) and G1 (Bklit provenance) resolved; protocol/backend truth waves complete; Wave C pages complete; Wave D static QA complete. In flight: localnet E2E (`scripts/e2e.sh` + SBF toolchain attempt — `anchor build` SBF is blocked by edition2024 platform-tools; see AGENTS.md §20).
 
 ## Scripts
 
-- `scripts/e2e.sh` — intended deterministic localnet flow; referenced helper scripts are currently missing, so do not treat this as runnable E2E.
+- `scripts/e2e.sh` — deterministic localnet flow (validator → whitelist → basket → mint/redeem → fee crank); landing now, runnable once the SBF toolchain attempt concludes (status in `plan.md` §8)
 
 ---
 
-Generated from `foliox_build_prompt.md` via solana.new superstack skills (`scaffold-project`, `build-defi-protocol`, `cso`).
+Generated from `foliox_build_prompt.md` via solana.new superstack skills (`scaffold-project`, `build-defi-protocol`, `cso`, `brand-design`) + orchestrated implementation waves (2026-09-01).

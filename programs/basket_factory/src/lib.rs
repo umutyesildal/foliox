@@ -1,12 +1,35 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use basket::program::Basket as BasketProgram;
+use anchor_spl::associated_token::{
+    self, get_associated_token_address_with_program_id, AssociatedToken, Create,
+};
+use anchor_spl::token_2022::spl_token_2022::instruction::AuthorityType;
+use anchor_spl::token_2022::ID as TOKEN_2022_PROGRAM_ID;
+use anchor_spl::token_interface::{
+    mint_to, set_authority, transfer_checked, Mint, MintTo, TokenAccount, TokenInterface,
+    TransferChecked, SetAuthority,
+};
 use basket::Basket as BasketAccount;
+use whitelist::WhitelistedMint;
 
 declare_id!("sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq");
 
 pub const FACTORY_SEED: &[u8] = b"factory";
 pub const BASKET_SEED: &[u8] = b"basket";
+/// Seed for the basket share mint PDA (spec §2.1: `b"share_mint", basket.key()`).
+pub const SHARE_MINT_SEED: &[u8] = b"share_mint";
+
+/// Basket share token decimals (spec §3.2 validation 9).
+pub const SHARE_MINT_DECIMALS: u8 = 6;
+
+/// Constituent count bounds (spec §3.2 validation 1).
+pub const MIN_CONSTITUENTS: usize = 2;
+pub const MAX_CONSTITUENTS: usize = 20;
+/// Weights are in basis points and must total 100% (spec §3.2 validation 3).
+pub const WEIGHTS_DENOMINATOR: u32 = 10_000;
+
+/// remaining_accounts layout, per constituent i in `constituents` order:
+/// `[whitelisted_mint_pda_i, mint_i, creator_ata_i, vault_ata_i]`.
+pub const ACCOUNTS_PER_CONSTITUENT: usize = 4;
 
 #[program]
 pub mod basket_factory {
@@ -30,8 +53,16 @@ pub mod basket_factory {
         Ok(())
     }
 
-    pub fn create_basket(
-        ctx: Context<CreateBasket>,
+    /// Deploys an immutable basket ATOMICALLY (spec §3.2): all arg validations,
+    /// per-constituent whitelist + mint + ATA validation, Basket PDA + Token-2022
+    /// share mint (6 decimals) + vault ATA creation, raw seed transfers
+    /// creator→vault, genesis 1_000_000 shares minted to the creator, and the
+    /// canonical vault-authority bump written into `basket.vault_bump`.
+    ///
+    /// remaining_accounts layout per constituent i (in `constituents` order):
+    /// `[WhitelistedMint PDA, mint, creator_ata, vault_ata]`.
+    pub fn create_basket<'info>(
+        ctx: Context<'_, '_, '_, 'info, CreateBasket<'info>>,
         nonce: u64,
         constituents: Vec<Pubkey>,
         weights_bps: Vec<u16>,
@@ -41,42 +72,129 @@ pub mod basket_factory {
         metadata_hash: [u8; 32],
         seed_amounts: Vec<u64>,
     ) -> Result<()> {
-        require!(constituents.len() == weights_bps.len(), FactoryError::LengthMismatch);
-        require!(constituents.len() == seed_amounts.len(), FactoryError::LengthMismatch);
-        require!(constituents.len() >= 2 && constituents.len() <= 20, FactoryError::InvalidConstituentCount);
-        require!(metadata_hash != [0u8; 32], FactoryError::EmptyMetadataHash);
+        // ---- pure arg validations (spec §3.2 validations 1-8) ----
+        check_lengths(&constituents, &weights_bps, &seed_amounts)?;
+        check_constituent_count(constituents.len())?;
+        check_no_duplicates(&constituents)?;
+        check_weights_sum(&weights_bps)?;
+        check_fee_caps(entry_fee_bps, exit_fee_bps, management_fee_bps, &ctx.accounts.factory)?;
+        check_metadata_hash(&metadata_hash)?;
+        check_seed_amounts(&seed_amounts)?;
+        // Validation 7: basket_count + 1 must not overflow.
+        let new_basket_count = ctx
+            .accounts
+            .factory
+            .basket_count
+            .checked_add(1)
+            .ok_or(FactoryError::BasketCountOverflow)?;
 
-        for i in 0..constituents.len() {
-            for j in (i + 1)..constituents.len() {
-                require!(constituents[i] != constituents[j], FactoryError::DuplicateMint);
-            }
+        let n = constituents.len();
+        let remaining = &ctx.remaining_accounts;
+        check_remaining_accounts_layout(remaining.len(), n)?;
+
+        let factory_key = ctx.accounts.factory.key();
+        let creator_key = ctx.accounts.creator.key();
+        let token_program = &ctx.accounts.token_program;
+        let token_program_key = token_program.key();
+        let share_mint_key = ctx.accounts.share_mint.key();
+
+        // The basket program's vault/share-mint authority PDA:
+        // seeds ["basket", basket.key()] under the BASKET program id (NOT the
+        // factory's), so a plain Anchor seeds constraint cannot be used here.
+        // The REAL bump is stored on the Basket account (spec §5).
+        let basket_key = ctx.accounts.basket.key();
+        let (vault_authority_key, vault_bump) = vault_authority_pda(&basket_key);
+        require_keys_eq!(
+            ctx.accounts.vault_authority.key(),
+            vault_authority_key,
+            FactoryError::InvalidVaultAuthority
+        );
+
+        // ---- per-constituent validation (no lazy trust, validate before act) ----
+        // 1. WhitelistedMint PDA: owned by the whitelist program, genuine PDA for
+        //    the constituent (checked against its stored canonical bump), mint
+        //    match, status Active, cached decimals == on-chain mint decimals.
+        // 2. Creator ATA: derived ATA of (creator, mint), owner == creator, minted
+        //    enough to cover the raw seed amount.
+        // 3. Vault ATA: derived ATA of (vault_authority, mint).
+        let mut constituents_decimals: Vec<u8> = Vec::with_capacity(n);
+        for i in 0..n {
+            let wl_ai = &remaining[i * ACCOUNTS_PER_CONSTITUENT];
+            let mint_ai = &remaining[i * ACCOUNTS_PER_CONSTITUENT + 1];
+            let creator_ata_ai = &remaining[i * ACCOUNTS_PER_CONSTITUENT + 2];
+            let vault_ata_ai = &remaining[i * ACCOUNTS_PER_CONSTITUENT + 3];
+
+            require!(wl_ai.owner == &whitelist::ID, FactoryError::InvalidWhitelistAccount);
+            let rec = {
+                let data = wl_ai.try_borrow_data()?;
+                decode_whitelisted_mint(&data)?
+            };
+            check_whitelisted_record(
+                &rec.mint,
+                rec.status,
+                rec.bump,
+                &constituents[i],
+                &wl_ai.key(),
+            )?;
+
+            require!(
+                mint_ai.owner == &token_program_key,
+                FactoryError::InvalidMintAccount
+            );
+            require_keys_eq!(mint_ai.key(), constituents[i], FactoryError::MintMismatch);
+            let mint_decimals = {
+                let data = mint_ai.try_borrow_data()?;
+                decode_mint_decimals(&data)?
+            };
+            require!(rec.decimals == mint_decimals, FactoryError::DecimalsMismatch);
+            constituents_decimals.push(mint_decimals);
+
+            require_keys_eq!(
+                creator_ata_ai.key(),
+                get_associated_token_address_with_program_id(
+                    &creator_key,
+                    &constituents[i],
+                    &token_program_key
+                ),
+                FactoryError::InvalidCreatorAta
+            );
+            let (ata_mint, ata_owner, ata_amount) = {
+                let data = creator_ata_ai.try_borrow_data()?;
+                let ata = TokenAccount::try_deserialize_unchecked(&mut &data[..])?;
+                (ata.mint, ata.owner, ata.amount)
+            };
+            require_keys_eq!(ata_mint, constituents[i], FactoryError::InvalidCreatorAta);
+            require_keys_eq!(ata_owner, creator_key, FactoryError::InvalidCreatorAta);
+            require!(
+                ata_amount >= seed_amounts[i],
+                FactoryError::InsufficientSeedBalance
+            );
+
+            require_keys_eq!(
+                vault_ata_ai.key(),
+                get_associated_token_address_with_program_id(
+                    &vault_authority_key,
+                    &constituents[i],
+                    &token_program_key
+                ),
+                FactoryError::InvalidVaultAta
+            );
         }
 
-        let sum: u32 = weights_bps.iter().map(|w| *w as u32).sum();
-        require!(sum == 10_000, FactoryError::WeightsNot10000);
-
-        require!(entry_fee_bps <= ctx.accounts.factory.entry_fee_cap_bps, FactoryError::FeeOverCap);
-        require!(exit_fee_bps <= ctx.accounts.factory.exit_fee_cap_bps, FactoryError::FeeOverCap);
-        require!(management_fee_bps <= ctx.accounts.factory.management_fee_cap_bps, FactoryError::FeeOverCap);
-
-        for amt in &seed_amounts { require!(*amt > 0, FactoryError::ZeroSeedAmount); }
-
-        // In production, remaining_accounts are WhitelistedMint PDAs; verify Active here.
-        // For V0 stub, we trust caller and emit only.
-
-        let basket = &mut ctx.accounts.basket;
-        basket.factory = ctx.accounts.factory.key();
-        basket.creator = ctx.accounts.creator.key();
-        basket.treasury = ctx.accounts.factory.treasury;
-        basket.share_mint = ctx.accounts.share_mint.key();
-        basket.nonce = nonce;
+        // ---- initialize the Basket PDA (immutable after this instruction) ----
         let clock = Clock::get()?;
+        let basket = &mut ctx.accounts.basket;
+        basket.factory = factory_key;
+        basket.creator = creator_key;
+        basket.treasury = ctx.accounts.factory.treasury;
+        basket.share_mint = share_mint_key;
+        basket.nonce = nonce;
         basket.created_at = clock.unix_timestamp;
         basket.last_fee_accrual_ts = clock.unix_timestamp;
         basket.metadata_hash = metadata_hash;
-        basket.num_constituents = constituents.len() as u8;
+        basket.num_constituents = n as u8;
         for i in 0..20 {
-            if i < constituents.len() {
+            if i < n {
                 basket.constituents[i] = constituents[i];
                 basket.target_weights_bps[i] = weights_bps[i];
             } else {
@@ -88,24 +206,256 @@ pub mod basket_factory {
         basket.exit_fee_bps = exit_fee_bps;
         basket.management_fee_bps = management_fee_bps;
         basket.bump = ctx.bumps.basket;
-        basket.vault_bump = 0;
+        // Canonical bump of the basket program's vault authority PDA — the value
+        // the basket program itself would derive (self-heal is no longer needed).
+        basket.vault_bump = vault_bump;
 
-        // Production: CPI transfer seed_amounts from creator ATAs -> vault ATAs and mint genesis shares
-        // Stub: just emit
+        // ---- per-constituent action: create vault ATA + RAW seed transfer ----
+        for i in 0..n {
+            let mint_ai = remaining[i * ACCOUNTS_PER_CONSTITUENT + 1].clone();
+            let creator_ata_ai = remaining[i * ACCOUNTS_PER_CONSTITUENT + 2].clone();
+            let vault_ata_ai = remaining[i * ACCOUNTS_PER_CONSTITUENT + 3].clone();
 
-        ctx.accounts.factory.basket_count = ctx.accounts.factory.basket_count.checked_add(1).unwrap();
+            // Vault ATA owned by the basket program's vault authority PDA.
+            associated_token::create_idempotent(CpiContext::new(
+                ctx.accounts.associated_token_program.to_account_info(),
+                Create {
+                    payer: ctx.accounts.creator.to_account_info(),
+                    associated_token: vault_ata_ai.clone(),
+                    authority: ctx.accounts.vault_authority.to_account_info(),
+                    mint: mint_ai.clone(),
+                    system_program: ctx.accounts.system_program.to_account_info(),
+                    token_program: token_program.to_account_info(),
+                },
+            ))?;
+            let (vault_mint, vault_owner) = {
+                let data = vault_ata_ai.try_borrow_data()?;
+                let ata = TokenAccount::try_deserialize_unchecked(&mut &data[..])?;
+                (ata.mint, ata.owner)
+            };
+            require_keys_eq!(vault_mint, constituents[i], FactoryError::InvalidVaultAta);
+            require_keys_eq!(vault_owner, vault_authority_key, FactoryError::InvalidVaultAta);
+
+            // RAW ONLY — Token-2022 raw seed amount creator → vault, decimals from
+            // the whitelist cache (== on-chain mint decimals, checked above).
+            // Atomic with basket creation — no init-then-seed two-step (§11 P2).
+            transfer_checked(
+                CpiContext::new(
+                    token_program.to_account_info(),
+                    TransferChecked {
+                        from: creator_ata_ai,
+                        mint: mint_ai,
+                        to: vault_ata_ai,
+                        authority: ctx.accounts.creator.to_account_info(),
+                    },
+                ),
+                seed_amounts[i],
+                constituents_decimals[i],
+            )?;
+        }
+
+        // ---- creator share ATA + genesis mint ----
+        // The share mint is initialized with the factory PDA as TEMPORARY mint
+        // authority: the basket program's vault authority PDA cannot sign CPIs
+        // from this program (it belongs to the basket program id), so within
+        // this single atomic tx the factory mints genesis and then hands the
+        // mint authority to the vault authority PDA — the permanent authority
+        // the basket program signs with (spec §3.2 validation 9/10).
+        require_keys_eq!(
+            ctx.accounts.creator_share_ata.key(),
+            get_associated_token_address_with_program_id(
+                &creator_key,
+                &share_mint_key,
+                &token_program_key
+            ),
+            FactoryError::InvalidShareAta
+        );
+        associated_token::create_idempotent(CpiContext::new(
+            ctx.accounts.associated_token_program.to_account_info(),
+            Create {
+                payer: ctx.accounts.creator.to_account_info(),
+                associated_token: ctx.accounts.creator_share_ata.to_account_info(),
+                authority: ctx.accounts.creator.to_account_info(),
+                mint: ctx.accounts.share_mint.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                token_program: token_program.to_account_info(),
+            },
+        ))?;
+        let (creator_ata_mint, creator_ata_owner) = {
+            let data = ctx.accounts.creator_share_ata.try_borrow_data()?;
+            let ata = TokenAccount::try_deserialize_unchecked(&mut &data[..])?;
+            (ata.mint, ata.owner)
+        };
+        require_keys_eq!(creator_ata_mint, share_mint_key, FactoryError::InvalidShareAta);
+        require_keys_eq!(creator_ata_owner, creator_key, FactoryError::InvalidShareAta);
+
+        {
+            let factory_bump_arr = [ctx.accounts.factory.bump];
+            let factory_signer_seeds: [&[u8]; 2] = [FACTORY_SEED, &factory_bump_arr];
+            let signer_seeds: &[&[&[u8]]] = &[&factory_signer_seeds];
+
+            // RAW ONLY — genesis share supply (basket::GENESIS_SHARES = 1_000_000,
+            // 6 decimals) minted to the creator; fixed amount = inflation-attack
+            // protection (spec §11 P1), independent of the seed size.
+            mint_to(
+                CpiContext::new_with_signer(
+                    token_program.to_account_info(),
+                    MintTo {
+                        mint: ctx.accounts.share_mint.to_account_info(),
+                        to: ctx.accounts.creator_share_ata.to_account_info(),
+                        authority: ctx.accounts.factory.to_account_info(),
+                    },
+                    signer_seeds,
+                ),
+                basket::GENESIS_SHARES,
+            )?;
+
+            // Hand the mint authority to the basket program's vault authority PDA.
+            set_authority(
+                CpiContext::new_with_signer(
+                    token_program.to_account_info(),
+                    SetAuthority {
+                        current_authority: ctx.accounts.factory.to_account_info(),
+                        account_or_mint: ctx.accounts.share_mint.to_account_info(),
+                    },
+                    signer_seeds,
+                ),
+                AuthorityType::MintTokens,
+                Some(vault_authority_key),
+            )?;
+        }
+
+        ctx.accounts.factory.basket_count = new_basket_count;
 
         emit!(BasketCreated {
             basket: basket.key(),
-            creator: ctx.accounts.creator.key(),
-            num_constituents: constituents.len() as u8,
-            share_mint: ctx.accounts.share_mint.key(),
+            creator: creator_key,
+            num_constituents: n as u8,
+            share_mint: share_mint_key,
             ts: clock.unix_timestamp,
         });
 
-        msg!("create_basket nonce={} constituents={:?} weights={:?} seed={:?}", nonce, constituents, weights_bps, seed_amounts);
+        msg!(
+            "create_basket nonce={} constituents={} genesis_shares={} vault_bump={}",
+            nonce,
+            n,
+            basket::GENESIS_SHARES,
+            vault_bump
+        );
         Ok(())
     }
+}
+
+// ===================== pure validation helpers (unit tested) =====================
+
+pub fn check_lengths(constituents: &[Pubkey], weights_bps: &[u16], seed_amounts: &[u64]) -> Result<()> {
+    require!(constituents.len() == weights_bps.len(), FactoryError::LengthMismatch);
+    require!(constituents.len() == seed_amounts.len(), FactoryError::LengthMismatch);
+    Ok(())
+}
+
+pub fn check_constituent_count(n: usize) -> Result<()> {
+    require!(
+        n >= MIN_CONSTITUENTS && n <= MAX_CONSTITUENTS,
+        FactoryError::InvalidConstituentCount
+    );
+    Ok(())
+}
+
+pub fn check_no_duplicates(constituents: &[Pubkey]) -> Result<()> {
+    for i in 0..constituents.len() {
+        for j in (i + 1)..constituents.len() {
+            require!(constituents[i] != constituents[j], FactoryError::DuplicateMint);
+        }
+    }
+    Ok(())
+}
+
+/// u128 accumulator — no overflow for any realistic weight vector.
+pub fn check_weights_sum(weights_bps: &[u16]) -> Result<()> {
+    let sum: u128 = weights_bps.iter().map(|w| *w as u128).sum();
+    require!(sum == WEIGHTS_DENOMINATOR as u128, FactoryError::WeightsNot10000);
+    Ok(())
+}
+
+pub fn check_fee_caps(
+    entry_fee_bps: u16,
+    exit_fee_bps: u16,
+    management_fee_bps: u16,
+    factory: &FactoryConfig,
+) -> Result<()> {
+    require!(entry_fee_bps <= factory.entry_fee_cap_bps, FactoryError::FeeOverCap);
+    require!(exit_fee_bps <= factory.exit_fee_cap_bps, FactoryError::FeeOverCap);
+    require!(
+        management_fee_bps <= factory.management_fee_cap_bps,
+        FactoryError::FeeOverCap
+    );
+    Ok(())
+}
+
+pub fn check_seed_amounts(seed_amounts: &[u64]) -> Result<()> {
+    for amt in seed_amounts {
+        require!(*amt > 0, FactoryError::ZeroSeedAmount);
+    }
+    Ok(())
+}
+
+pub fn check_metadata_hash(metadata_hash: &[u8; 32]) -> Result<()> {
+    require!(*metadata_hash != [0u8; 32], FactoryError::EmptyMetadataHash);
+    Ok(())
+}
+
+pub fn check_remaining_accounts_layout(remaining_len: usize, num_constituents: usize) -> Result<()> {
+    require!(
+        remaining_len == num_constituents * ACCOUNTS_PER_CONSTITUENT,
+        FactoryError::InvalidRemainingAccounts
+    );
+    Ok(())
+}
+
+/// Validates one `WhitelistedMint` record:
+/// - the record belongs to the expected constituent mint;
+/// - status is Active (paused mints cannot enter new baskets);
+/// - the PDA key matches the whitelist program's derivation for the constituent
+///   using the record's stored bump (proves the account is the genuine
+///   WhitelistedMint PDA, not a forged look-alike).
+pub fn check_whitelisted_record(
+    rec_mint: &Pubkey,
+    rec_status: u8,
+    rec_bump: u8,
+    expected_mint: &Pubkey,
+    pda_key: &Pubkey,
+) -> Result<()> {
+    require_keys_eq!(*rec_mint, *expected_mint, FactoryError::NotWhitelisted);
+    require!(
+        rec_status == whitelist::WhitelistStatus::Active as u8,
+        FactoryError::MintNotActive
+    );
+    let expected_pda = Pubkey::create_program_address(
+        &[whitelist::MINT_SEED, expected_mint.as_ref(), &[rec_bump]],
+        &whitelist::ID,
+    )
+    .map_err(|_| error!(FactoryError::InvalidWhitelistAccount))?;
+    require_keys_eq!(*pda_key, expected_pda, FactoryError::InvalidWhitelistAccount);
+    Ok(())
+}
+
+/// The basket program's vault/share-mint authority PDA:
+/// seeds `["basket", basket.key()]` derived under the BASKET program id.
+/// Returns (pda, real_bump) — the bump is the value written to `basket.vault_bump`.
+pub fn vault_authority_pda(basket_key: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[basket::BASKET_SEED, basket_key.as_ref()], &basket::ID)
+}
+
+/// Deserializes a Token-2022 mint (extension-aware) and returns its decimals.
+pub fn decode_mint_decimals(data: &[u8]) -> Result<u8> {
+    let mint = Mint::try_deserialize_unchecked(&mut &data[..])?;
+    Ok(mint.decimals)
+}
+
+/// Deserializes a `WhitelistedMint` PDA record (discriminator checked).
+pub fn decode_whitelisted_mint(data: &[u8]) -> Result<WhitelistedMint> {
+    WhitelistedMint::try_deserialize(&mut &data[..])
 }
 
 #[derive(Accounts)]
@@ -130,14 +480,38 @@ pub struct CreateBasket<'info> {
         bump
     )]
     pub basket: Account<'info, BasketAccount>,
-    #[account(mut)]
+    /// Basket share mint — Token-2022, 6 decimals, PDA seeds
+    /// `["share_mint", basket.key()]`. Initialized with the factory PDA as
+    /// TEMPORARY mint authority; `create_basket` mints the genesis supply in
+    /// the same atomic tx and then transfers the mint authority to the basket
+    /// program's vault authority PDA (see handler).
+    #[account(
+        init,
+        payer = creator,
+        mint::decimals = SHARE_MINT_DECIMALS,
+        mint::authority = factory.key(),
+        mint::token_program = token_program,
+        seeds = [SHARE_MINT_SEED, basket.key().as_ref()],
+        bump,
+    )]
     pub share_mint: InterfaceAccount<'info, Mint>,
-    #[account(mut)]
-    pub creator: Signer<'info>,
-    /// CHECK: creator share ATA stub
+    /// CHECK: the basket program's vault/share-mint authority PDA
+    /// (seeds `["basket", basket.key()]` under the basket program id — a plain
+    /// Anchor seeds constraint here would derive under the FACTORY program id).
+    /// Key equality with `vault_authority_pda()` is enforced in the handler.
+    pub vault_authority: UncheckedAccount<'info>,
+    /// CHECK: creator share ATA — validated in the handler (address == derived
+    /// ATA of (creator, share_mint, token_program)); created idempotently and
+    /// re-read (owner == creator, mint == share_mint) before the genesis mint.
     #[account(mut)]
     pub creator_share_ata: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    /// Only Token-2022 is accepted (spec §3.2/§11 — xStocks are Token-2022;
+    /// vault ATAs, creator ATAs and the share mint must all share one program).
+    #[account(constraint = token_program.key() == TOKEN_2022_PROGRAM_ID @ FactoryError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
@@ -183,6 +557,34 @@ pub enum FactoryError {
     FeeOverCap,
     #[msg("Invalid split")]
     InvalidSplit,
+    #[msg("Basket count overflow")]
+    BasketCountOverflow,
+    #[msg("Invalid remaining accounts — expected [whitelisted_mint_pda, mint, creator_ata, vault_ata] per constituent")]
+    InvalidRemainingAccounts,
+    #[msg("WhitelistedMint account is not a whitelist program PDA")]
+    InvalidWhitelistAccount,
+    #[msg("Constituent mint is not whitelisted")]
+    NotWhitelisted,
+    #[msg("Constituent mint whitelist status is not Active")]
+    MintNotActive,
+    #[msg("Whitelist cached decimals do not match the on-chain mint decimals")]
+    DecimalsMismatch,
+    #[msg("Mint account does not match a constituent")]
+    MintMismatch,
+    #[msg("Mint account is not owned by the passed token program")]
+    InvalidMintAccount,
+    #[msg("Creator constituent ATA is not the derived ATA / wrong owner or mint")]
+    InvalidCreatorAta,
+    #[msg("Creator ATA balance is below the raw seed amount")]
+    InsufficientSeedBalance,
+    #[msg("Vault ATA is not the derived ATA / wrong owner or mint")]
+    InvalidVaultAta,
+    #[msg("Vault authority account is not the basket program's vault authority PDA")]
+    InvalidVaultAuthority,
+    #[msg("Creator share ATA is not the derived ATA / wrong owner or mint")]
+    InvalidShareAta,
+    #[msg("Only the Token-2022 program is accepted")]
+    InvalidTokenProgram,
 }
 
 #[cfg(test)]
@@ -304,5 +706,237 @@ mod tests {
         assert_eq!(GENESIS, 1_000_000);
         // even with tiny seed 1 vs large 1e12, genesis same
         assert_eq!(GENESIS, GENESIS);
+    }
+
+    // ========== PURE VALIDATION HELPERS ==========
+    #[test]
+    fn test_check_lengths_helper() {
+        let m = pubkey(1);
+        assert!(check_lengths(&[m, pubkey(2)], &[5000, 5000], &[100, 100]).is_ok());
+        assert!(check_lengths(&[m], &[5000], &[100]).is_ok()); // count checked separately
+        assert!(check_lengths(&[m, m], &[5000], &[100, 100]).is_err());
+        assert!(check_lengths(&[m, m], &[5000, 5000], &[100]).is_err());
+    }
+    #[test]
+    fn test_check_constituent_count_helper() {
+        assert!(check_constituent_count(2).is_ok());
+        assert!(check_constituent_count(20).is_ok());
+        assert!(check_constituent_count(1).is_err());
+        assert!(check_constituent_count(0).is_err());
+        assert!(check_constituent_count(21).is_err());
+        assert!(check_constituent_count(100).is_err());
+    }
+    #[test]
+    fn test_check_no_duplicates_helper() {
+        assert!(check_no_duplicates(&[pubkey(1), pubkey(2), pubkey(3)]).is_ok());
+        assert!(check_no_duplicates(&[]).is_ok());
+        assert!(check_no_duplicates(&[pubkey(7), pubkey(7)]).is_err());
+        assert!(check_no_duplicates(&[pubkey(1), pubkey(2), pubkey(1)]).is_err());
+        // adjacent duplicates caught too
+        assert!(check_no_duplicates(&[pubkey(5), pubkey(5), pubkey(6), pubkey(7)]).is_err());
+    }
+    #[test]
+    fn test_check_weights_sum_helper() {
+        assert!(check_weights_sum(&[5000, 5000]).is_ok());
+        assert!(check_weights_sum(&[3333, 3333, 3334]).is_ok());
+        assert!(check_weights_sum(&[10_000]).is_ok());
+        assert!(check_weights_sum(&[4999, 5000]).is_err());
+        assert!(check_weights_sum(&[0; 20]).is_err());
+        // u128 accumulator: u16::MAX repeated never overflows, just != 10_000
+        assert!(check_weights_sum(&[u16::MAX; 20]).is_err());
+        assert!(check_weights_sum(&[]).is_err()); // 0 != 10_000
+    }
+    #[test]
+    fn test_check_fee_caps_helper() {
+        let f = FactoryConfig { authority: pubkey(1), treasury: pubkey(2), creator_fee_split_bps: 9000, entry_fee_cap_bps: 300, exit_fee_cap_bps: 100, management_fee_cap_bps: 300, basket_count: 0, bump: 0 };
+        assert!(check_fee_caps(0, 0, 0, &f).is_ok());
+        assert!(check_fee_caps(300, 100, 300, &f).is_ok()); // exactly at caps
+        assert!(check_fee_caps(299, 99, 299, &f).is_ok());
+        assert!(check_fee_caps(301, 0, 0, &f).is_err());
+        assert!(check_fee_caps(0, 101, 0, &f).is_err());
+        assert!(check_fee_caps(0, 0, 301, &f).is_err());
+        // a stricter factory caps harder (caps come from FactoryConfig)
+        let strict = FactoryConfig { authority: pubkey(1), treasury: pubkey(2), creator_fee_split_bps: 9000, entry_fee_cap_bps: 50, exit_fee_cap_bps: 10, management_fee_cap_bps: 50, basket_count: 0, bump: 0 };
+        assert!(check_fee_caps(100, 0, 0, &strict).is_err());
+    }
+    #[test]
+    fn test_check_seed_amounts_helper() {
+        assert!(check_seed_amounts(&[1]).is_ok());
+        assert!(check_seed_amounts(&[u64::MAX, 1]).is_ok());
+        assert!(check_seed_amounts(&[0]).is_err());
+        assert!(check_seed_amounts(&[100, 200, 0]).is_err());
+        assert!(check_seed_amounts(&[]).is_ok()); // no constituents => vacuously ok (count check covers)
+    }
+    #[test]
+    fn test_check_metadata_hash_helper() {
+        assert!(check_metadata_hash(&dummy_hash(1)).is_ok());
+        assert!(check_metadata_hash(&[0u8; 32]).is_err());
+    }
+    #[test]
+    fn test_check_remaining_accounts_layout_helper() {
+        assert!(check_remaining_accounts_layout(4 * 2, 2).is_ok());
+        assert!(check_remaining_accounts_layout(4 * 20, 20).is_ok());
+        assert!(check_remaining_accounts_layout(4 * 2 + 1, 2).is_err());
+        assert!(check_remaining_accounts_layout(4 * 2 - 1, 2).is_err());
+        assert!(check_remaining_accounts_layout(3 * 3, 3).is_err()); // triplet layout rejected
+    }
+
+    // ========== WHITELIST RECORD + PDA VALIDATION ==========
+    #[test]
+    fn test_whitelist_pda_derivation_deterministic() {
+        let m = pubkey(9);
+        let p1 = Pubkey::find_program_address(&[whitelist::MINT_SEED, m.as_ref()], &whitelist::ID).0;
+        let p2 = Pubkey::find_program_address(&[whitelist::MINT_SEED, m.as_ref()], &whitelist::ID).0;
+        assert_eq!(p1, p2);
+        assert_ne!(p1, Pubkey::find_program_address(&[whitelist::MINT_SEED, pubkey(10).as_ref()], &whitelist::ID).0);
+    }
+    #[test]
+    fn test_check_whitelisted_record_ok() {
+        let mint = pubkey(3);
+        let (pda, bump) = Pubkey::find_program_address(&[whitelist::MINT_SEED, mint.as_ref()], &whitelist::ID);
+        assert!(check_whitelisted_record(&mint, whitelist::WhitelistStatus::Active as u8, bump, &mint, &pda).is_ok());
+    }
+    #[test]
+    fn test_check_whitelisted_record_wrong_mint() {
+        let mint = pubkey(3);
+        let (pda, bump) = Pubkey::find_program_address(&[whitelist::MINT_SEED, mint.as_ref()], &whitelist::ID);
+        assert!(check_whitelisted_record(&pubkey(4), whitelist::WhitelistStatus::Active as u8, bump, &mint, &pda).is_err());
+    }
+    #[test]
+    fn test_check_whitelisted_record_paused() {
+        let mint = pubkey(3);
+        let (pda, bump) = Pubkey::find_program_address(&[whitelist::MINT_SEED, mint.as_ref()], &whitelist::ID);
+        assert!(check_whitelisted_record(&mint, whitelist::WhitelistStatus::PausedNewMints as u8, bump, &mint, &pda).is_err());
+    }
+    #[test]
+    fn test_check_whitelisted_record_forged_pda_fails() {
+        // right record fields but the passed "PDA" account is not the derived address
+        let mint = pubkey(3);
+        let (_, bump) = Pubkey::find_program_address(&[whitelist::MINT_SEED, mint.as_ref()], &whitelist::ID);
+        assert!(check_whitelisted_record(&mint, whitelist::WhitelistStatus::Active as u8, bump, &mint, &pubkey(42)).is_err());
+        // wrong bump cannot reconstruct the PDA either
+        let (pda, _) = Pubkey::find_program_address(&[whitelist::MINT_SEED, mint.as_ref()], &whitelist::ID);
+        assert!(check_whitelisted_record(&mint, whitelist::WhitelistStatus::Active as u8, bump.wrapping_add(1), &mint, &pda).is_err());
+    }
+    #[test]
+    fn test_decode_whitelisted_mint_roundtrip() {
+        use anchor_lang::{AnchorSerialize, Discriminator};
+        let wm = WhitelistedMint {
+            mint: pubkey(11),
+            decimals: 6,
+            multiplier_watermark: 1_000_000,
+            status: whitelist::WhitelistStatus::Active as u8,
+            price_source: "jupiter:TSLAx".to_string(),
+            bump: 200,
+        };
+        let mut buf = WhitelistedMint::discriminator().to_vec();
+        wm.serialize(&mut buf).unwrap();
+        let decoded = decode_whitelisted_mint(&buf).unwrap();
+        assert_eq!(decoded.mint, pubkey(11));
+        assert_eq!(decoded.decimals, 6);
+        assert_eq!(decoded.status, whitelist::WhitelistStatus::Active as u8);
+        assert_eq!(decoded.bump, 200);
+        // tampered discriminator must be rejected
+        let mut bad = buf.clone();
+        bad[0] ^= 0xFF;
+        assert!(decode_whitelisted_mint(&bad).is_err());
+        assert!(decode_whitelisted_mint(&[]).is_err());
+    }
+
+    // ========== TOKEN-2022 MINT DECODE ==========
+    #[test]
+    fn test_decode_mint_decimals_base_mint() {
+        // spl_token Mint layout: authority 0..36, supply 36..44, decimals 44,
+        // is_initialized 45, freeze_authority 46..82 (LEN = 82).
+        let mut buf = [0u8; 82];
+        buf[44] = 6;
+        buf[45] = 1;
+        assert_eq!(decode_mint_decimals(&buf).unwrap(), 6);
+        buf[44] = 9;
+        assert_eq!(decode_mint_decimals(&buf).unwrap(), 9);
+    }
+    #[test]
+    fn test_decode_mint_decimals_truncated_fails() {
+        let buf = [0u8; 40];
+        assert!(decode_mint_decimals(&buf).is_err());
+    }
+
+    // ========== VAULT AUTHORITY PDA (basket program id) ==========
+    #[test]
+    fn test_vault_authority_pda_uses_basket_program_id() {
+        // The vault authority must be derived under the BASKET program id.
+        // Deriving under the FACTORY program id gives a DIFFERENT address —
+        // which is why a plain Anchor seeds constraint would be wrong here.
+        let basket_key = pubkey(77);
+        let (pda, bump) = vault_authority_pda(&basket_key);
+        let (expected, expected_bump) = Pubkey::find_program_address(
+            &[basket::BASKET_SEED, basket_key.as_ref()],
+            &basket::ID,
+        );
+        assert_eq!(pda, expected);
+        assert_eq!(bump, expected_bump);
+        let factory_derived = Pubkey::find_program_address(
+            &[BASKET_SEED, basket_key.as_ref()],
+            &crate::ID,
+        );
+        assert_ne!(pda, factory_derived.0);
+        // deterministic across calls, distinct per basket
+        assert_eq!(vault_authority_pda(&basket_key).0, pda);
+        assert_ne!(vault_authority_pda(&pubkey(78)).0, pda);
+    }
+    #[test]
+    fn test_vault_bump_written_canonical() {
+        // gap #1: the factory must write the REAL derived bump (not 0).
+        for n in 0..8u8 {
+            let basket_key = pubkey(n);
+            let (_, real_bump) = vault_authority_pda(&basket_key);
+            let mut basket = BasketAccount {
+                factory: pubkey(1),
+                creator: pubkey(2),
+                treasury: pubkey(3),
+                share_mint: pubkey(4),
+                nonce: 0,
+                created_at: 0,
+                last_fee_accrual_ts: 0,
+                metadata_hash: [0u8; 32],
+                num_constituents: 2,
+                constituents: [Pubkey::default(); 20],
+                target_weights_bps: [0u16; 20],
+                entry_fee_bps: 0,
+                exit_fee_bps: 100,
+                management_fee_bps: 200,
+                bump: 254,
+                vault_bump: 0, // the old stub wrote 0
+            };
+            basket.vault_bump = real_bump; // what create_basket now writes
+            assert_eq!(basket.vault_bump, real_bump);
+            assert_eq!(
+                basket.vault_bump,
+                Pubkey::find_program_address(&[basket::BASKET_SEED, basket_key.as_ref()], &basket::ID).1
+            );
+        }
+    }
+
+    // ========== CONSTANTS ==========
+    #[test]
+    fn test_share_mint_constants() {
+        assert_eq!(SHARE_MINT_DECIMALS, 6);
+        assert_eq!(SHARE_MINT_SEED, b"share_mint");
+        assert_eq!(ACCOUNTS_PER_CONSTITUENT, 4);
+        assert_eq!(MIN_CONSTITUENTS, 2);
+        assert_eq!(MAX_CONSTITUENTS, 20);
+        assert_eq!(WEIGHTS_DENOMINATOR, 10_000);
+        assert_eq!(TOKEN_2022_PROGRAM_ID, anchor_spl::token_2022::ID);
+    }
+    #[test]
+    fn test_genesis_matches_basket_program_constant() {
+        // the genesis supply minted by the factory IS the basket program's
+        // GENESIS_SHARES (1_000_000) — single source of truth.
+        assert_eq!(basket::GENESIS_SHARES, 1_000_000);
+    }
+    #[test]
+    fn test_basket_account_size_covers_20_constituents() {
+        // 32*4 keys + 8*3 numerics + 32 hash + 1 count + 32*20 + 2*20 + 2*3 + 2 bumps
+        assert!(std::mem::size_of::<BasketAccount>() >= 820);
     }
 }

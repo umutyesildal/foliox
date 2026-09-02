@@ -176,11 +176,11 @@ export function ChartBrushLayout({
   const progressRight = len > 1 ? (endIdx / (len - 1)) * 100 : 100;
   const visibleCount = Math.abs(safe[1] - safe[0]) + 1;
 
-  // date labels for footer
+  // date labels for footer (en-US — the adapter is English-language)
   const startDate = len ? getDate(data[startIdx], xDataKey) : null;
   const endDate = len ? getDate(data[endIdx], xDataKey) : null;
-  const startLabel = startDate ? startDate.toLocaleDateString("tr-TR") : "";
-  const endLabel = endDate ? endDate.toLocaleDateString("tr-TR") : "";
+  const startLabel = startDate ? startDate.toLocaleDateString("en-US") : "";
+  const endLabel = endDate ? endDate.toLocaleDateString("en-US") : "";
 
   return (
     <div className={cn("flex flex-col gap-2 h-full", className)}>
@@ -228,30 +228,11 @@ export function ChartBrushLayout({
               className="absolute inset-0 w-full h-4 opacity-0 cursor-pointer"
               aria-label="Brush end"
             />
-            {/* visible native sliders for accessibility fallback - hidden visually but keep for keyboard */}
-            <div className="flex gap-2 w-full opacity-0 pointer-events-none h-0 overflow-hidden">
-              <input
-                type="range"
-                min={0}
-                max={Math.max(0, len - 1)}
-                value={safe[0]}
-                onChange={(e) => setStart(parseInt(e.target.value))}
-                className="w-full accent-primary h-1"
-              />
-              <input
-                type="range"
-                min={0}
-                max={Math.max(0, len - 1)}
-                value={safe[1]}
-                onChange={(e) => setEnd(parseInt(e.target.value))}
-                className="w-full accent-primary h-1"
-              />
-            </div>
           </div>
 
           <div className="flex gap-2 mt-1">
             <div className="flex-1 flex items-center gap-1.5 rounded border bg-card px-2 py-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-hidden="true" />
               <input
                 type="range"
                 min={0}
@@ -259,10 +240,11 @@ export function ChartBrushLayout({
                 value={safe[0]}
                 onChange={(e) => setStart(parseInt(e.target.value))}
                 className="w-full accent-primary h-1"
+                aria-label="Brush start (visible slider)"
               />
             </div>
             <div className="flex-1 flex items-center gap-1.5 rounded border bg-card px-2 py-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-hidden="true" />
               <input
                 type="range"
                 min={0}
@@ -270,6 +252,7 @@ export function ChartBrushLayout({
                 value={safe[1]}
                 onChange={(e) => setEnd(parseInt(e.target.value))}
                 className="w-full accent-primary h-1"
+                aria-label="Brush end (visible slider)"
               />
             </div>
           </div>
@@ -279,7 +262,7 @@ export function ChartBrushLayout({
       <div className="flex justify-between text-[10px] text-muted-foreground px-1">
         <span>{startLabel}</span>
         <span className="font-mono">
-          {visibleCount}/{len} mum · sürükle-zoom · Brush: {startIdx}-{endIdx}
+          {visibleCount}/{len} candles · drag to zoom · range {startIdx}-{endIdx}
         </span>
         <span>{endLabel}</span>
       </div>

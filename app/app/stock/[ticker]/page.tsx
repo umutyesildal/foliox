@@ -1,63 +1,258 @@
- // @ts-nocheck
-import StockChart from "./StockChart";
+import type { Metadata } from "next";
+import Link from "next/link";
+
 import CandleVolumeChart from "./CandleVolumeChart";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import StockChart from "./StockChart";
+import { FreshnessBadge } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
-async function getChart(ticker: string, range="1mo") {
-  try {
-    const r = await fetch(`${process.env.NEXT_PUBLIC_API || "http://localhost:3001"}/api/v1/prices/chart?ticker=${ticker}&range=${range}`, { cache: "no-store" });
-    return r.json();
-  } catch { return { data: null }; }
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatUsd, truncateAddress } from "@/lib/format";
+
+const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
+
+const RANGES = ["1mo", "3mo", "6mo", "1y"] as const;
+
+interface Candle {
+  ts: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
 }
+
+interface ChartPayload {
+  data?: {
+    ticker?: string;
+    mint?: string;
+    yahoo?: { symbol?: string; candles?: Candle[] } | null;
+    xStock?: { symbol?: string; candles?: Candle[] } | null;
+    nasdaq?: { symbol?: string; candles?: Candle[] } | null;
+  } | null;
+}
+
+interface ComparePayload {
+  data?: {
+    ticker: string;
+    mint: string;
+    jupiter: number | null;
+    yahoo: number | null;
+    diffBps: number | null;
+  }[];
+}
+
+async function getChart(ticker: string, range: string): Promise<ChartPayload["data"]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/prices/chart?ticker=${encodeURIComponent(ticker)}&range=${encodeURIComponent(range)}`,
+      { cache: "no-store", signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const payload = (await res.json()) as ChartPayload;
+    return payload.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function getCompare(ticker: string) {
   try {
-    const r = await fetch(`${process.env.NEXT_PUBLIC_API || "http://localhost:3001"}/api/v1/prices/compare?tickers=${ticker}`, { cache: "no-store" });
-    const j = await r.json();
-    return j.data?.[0] || null;
-  } catch { return null; }
+    const res = await fetch(
+      `${API_BASE}/api/v1/prices/compare?tickers=${encodeURIComponent(ticker)}`,
+      { cache: "no-store", signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const payload = (await res.json()) as ComparePayload;
+    return payload.data?.[0] ?? null;
+  } catch {
+    return null;
+  }
 }
-export default async function StockPage({ params, searchParams }: { params: { ticker: string }, searchParams: { range?: string } }) {
-  const ticker = decodeURIComponent(params.ticker);
-  const range = searchParams?.range || "1mo";
-  const chart = await getChart(ticker, range);
-  const compare = await getCompare(ticker);
-  const yahooSym = ticker.replace("x","").replace("X","");
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ ticker: string }>;
+}): Promise<Metadata> {
+  const { ticker: rawTicker } = await params;
+  const ticker = decodeURIComponent(rawTicker);
+  return {
+    title: `${ticker} — xStock vs real equity — FolioX`,
+    description: `Normalized price comparison for ${ticker}: xStock token vs the real equity vs the Nasdaq benchmark, plus OHLC candles and volume.`,
+  };
+}
+
+export default async function StockPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ ticker: string }>;
+  searchParams?: Promise<{ range?: string }>;
+}) {
+  const { ticker: rawTicker } = await params;
+  const sp = (await searchParams) ?? {};
+  const ticker = decodeURIComponent(rawTicker);
+  const range = RANGES.includes(sp.range as (typeof RANGES)[number]) ? (sp.range as string) : "1mo";
+
+  const [chart, compare] = await Promise.all([getChart(ticker, range), getCompare(ticker)]);
+
+  const yahooSymbol = chart?.yahoo?.symbol ?? ticker.replace(/^x/i, "");
+  const yahooCandles = chart?.yahoo?.candles ?? [];
+  const asOf = yahooCandles.length ? yahooCandles[yahooCandles.length - 1].ts : undefined;
+  const hasChart = Boolean(
+    chart && [chart.yahoo, chart.xStock, chart.nasdaq].some((s) => (s?.candles?.length ?? 0) >= 2),
+  );
+
+  const diffBps = compare?.diffBps ?? null;
+  const depeg = diffBps !== null && Math.abs(diffBps) > 200;
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight font-mono">{ticker} <span className="text-sm text-muted-foreground font-sans">→ {yahooSym} (real) vs Nasdaq QQQ</span></h1>
-      <div className="mt-2 flex flex-wrap gap-2 text-xs">
-        {["1mo","3mo","6mo","1y"].map(r=>(
-          <a key={r} href={`/stock/${ticker}?range=${r}`} className={`rounded px-2 py-1 border ${r===range?"bg-primary text-primary-foreground border-primary":"border-border text-muted-foreground"}`}>{r}</a>
-        ))}
-        <a href="/providers" className="ml-2 underline text-muted-foreground">Providers</a>
-        <a href="/market" className="underline text-muted-foreground">Market</a>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <h1 className="font-mono text-3xl font-semibold tracking-tight">{ticker}</h1>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            xStock token vs the real equity ({yahooSymbol}) vs the Nasdaq benchmark. Chart data:{" "}
+            <Link href="/providers" className="underline underline-offset-4 hover:text-foreground">
+              Yahoo Finance + Jupiter
+            </Link>
+            .
+          </p>
+        </div>
+        <FreshnessBadge source="Yahoo Finance via /api/v1/prices/chart" asOf={asOf} />
       </div>
 
-      {compare && (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Card><CardHeader className="pb-2"><CardDescription>xStock (Jupiter)</CardDescription><CardTitle className="text-lg font-mono">{compare.jupiter?.toFixed(2) ?? "—"} $</CardTitle><CardDescription className="font-mono text-xs truncate">{compare.mint?.slice(0,12)}…</CardDescription></CardHeader></Card>
-          <Card><CardHeader className="pb-2"><CardDescription>Real ({yahooSym} · Yahoo)</CardDescription><CardTitle className="text-lg font-mono">{compare.yahoo?.toFixed(2) ?? "—"} $</CardTitle></CardHeader></Card>
-          <Card className={compare.diffBps!=null && Math.abs(compare.diffBps)>200 ? "border-amber-600 bg-amber-950/20" : ""}><CardHeader className="pb-2"><CardDescription>Diff</CardDescription><CardTitle className={`text-lg font-mono ${compare.diffBps!=null && compare.diffBps>=0?"text-green-500":"text-destructive"}`}>{compare.diffBps!=null? (compare.diffBps/100).toFixed(2)+"%":"—"}</CardTitle><CardDescription>{compare.diffBps!=null && Math.abs(compare.diffBps)>200 ? "⚠ Depeg >2%":"✓ Aligned"} <Badge variant="outline" className="ml-1 text-[10px]">bklit</Badge></CardDescription></CardHeader></Card>
-        </div>
-      )}
+      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Range</span>
+        {RANGES.map((r) => (
+          <Link
+            key={r}
+            href={`/stock/${ticker}?range=${r}`}
+            aria-current={r === range ? "true" : undefined}
+            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+              r === range
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            {r}
+          </Link>
+        ))}
+        <Button render={<Link href="/market" />} variant="outline" size="xs" className="ml-2">
+          Market overview
+        </Button>
+      </nav>
 
-      <Card className="mt-6">
-        <CardHeader><CardTitle className="text-sm">Price Comparison — {range} (normalized 100)</CardTitle><CardDescription className="text-xs">Blue = xStock, Green = Real, Gray = Nasdaq QQQ — <span className="font-mono bg-muted px-1 rounded">bklit AreaChart + Brush</span> drag to zoom</CardDescription></CardHeader>
-        <CardContent className="h-[380px]">
-          {chart.data ? <StockChart data={chart.data} /> : <div className="text-sm text-muted-foreground">Loading…</div>}
+      {compare ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>xStock (Jupiter)</CardDescription>
+              <CardTitle className="font-mono text-lg tabular-nums">
+                {compare.jupiter !== null ? formatUsd(compare.jupiter) : "—"}
+              </CardTitle>
+              <CardDescription className="font-mono text-xs">
+                mint {compare.mint ? truncateAddress(compare.mint, 6, 4) : "—"}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Real ({yahooSymbol} · Yahoo)</CardDescription>
+              <CardTitle className="font-mono text-lg tabular-nums">
+                {compare.yahoo !== null ? formatUsd(compare.yahoo) : "—"}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Token vs equity</CardDescription>
+              <CardTitle
+                className={`font-mono text-lg tabular-nums ${
+                  diffBps === null
+                    ? ""
+                    : depeg
+                      ? "text-[hsl(var(--status-caution))]"
+                      : diffBps >= 0
+                        ? "text-[hsl(var(--status-positive))]"
+                        : "text-destructive"
+                }`}
+              >
+                {diffBps !== null ? `${(diffBps / 100).toFixed(2)}%` : "—"}
+              </CardTitle>
+              <CardDescription className="flex items-center gap-2">
+                {diffBps === null ? (
+                  <span>Difference not computable</span>
+                ) : depeg ? (
+                  <Badge
+                    variant="outline"
+                    className="border-[hsl(var(--status-caution))]/50 text-[hsl(var(--status-caution))]"
+                  >
+                    Depeg &gt; 2%
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="border-[hsl(var(--status-positive))]/50 text-[hsl(var(--status-positive))]"
+                  >
+                    Aligned
+                  </Badge>
+                )}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      ) : null}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium">Price comparison — {range} (normalized 100)</CardTitle>
+          <CardDescription className="text-xs leading-relaxed">
+            Blue = xStock token (simulated in V0 — see the note below), green = real equity, gray
+            dashed = Nasdaq QQQ. Zoom with the brush sliders; the y-scale follows the visible window.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="min-h-[380px]">
+          {hasChart ? (
+            <StockChart data={chart as NonNullable<ChartPayload["data"]>} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No chart series available for this ticker and range. The backend may be unreachable or
+              Yahoo returned no candles — retry another range.
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {chart.data?.yahoo?.candles?.length > 1 && (
-        <Card className="mt-6">
-          <CardHeader><CardTitle className="text-sm">Candlestick + Volume — {yahooSym} (Yahoo OHLCV)</CardTitle><CardDescription className="text-xs">Real equity candles + daily volume — <span className="font-mono bg-muted px-1 rounded">bklit Candlestick + BarChart + Brush</span></CardDescription></CardHeader>
-          <CardContent className="h-[480px]">
-            <CandleVolumeChart candles={chart.data.yahoo.candles} />
+      {yahooCandles.length >= 2 ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium">
+              Candlestick + volume — {yahooSymbol} (Yahoo OHLCV)
+            </CardTitle>
+            <CardDescription className="text-xs leading-relaxed">
+              Daily candles for the real equity with volume bars. The brush selection drives both
+              panels.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="min-h-[480px]">
+            <CandleVolumeChart candles={yahooCandles} />
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
-      <div className="mt-3 text-xs text-muted-foreground">Note: xStock line is mocked with 0.5% jitter over Yahoo in V0.1 (will be real Jupiter price_snapshots when live). LEGAL_REVIEW_REQUIRED: xStocks are Backed structured instruments.</div>
+      <div className="space-y-1 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
+        <p>
+          The xStock series is simulated in V0 (jitter around the Yahoo close); it is replaced by real
+          Jupiter price snapshots once the indexer stores them. It is labeled simulated above and must
+          not be read as a token price feed.
+        </p>
+        <p>
+          LEGAL_REVIEW_REQUIRED: xStocks are Backed Finance structured instruments — holders carry
+          issuer and depeg risk, and the token is not the underlying share.
+        </p>
+      </div>
     </div>
   );
 }

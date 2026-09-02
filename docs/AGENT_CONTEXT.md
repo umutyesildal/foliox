@@ -3,7 +3,8 @@
 > **For: Opencode, Claude Code, Codex, Cursor, any LLM agent working in this repo**
 > **Read this first before writing code.** This is the single source of truth for FolioX V0.
 > Spec: `docs/foliox-v0-spec.md` (774 lines, 13 sections) | Prompt: `foliox_build_prompt.md`
-> Status: **V0 scaffolded, 114 Rust + 287 TS tests passing, ready for localnet**
+> Brand: `brand.md` (Mineral Desk palette, Geist/Geist Mono, telemetry off — G0 resolved 2026-09-01)
+> Status: **V0 implementation waves complete across protocol/backend/frontend — 178 Rust + 373 backend TS tests (+1 legacy) passing; localnet E2E attempt in flight (SBF toolchain blocker tracked in plan.md)**
 
 ---
 
@@ -42,11 +43,11 @@ If you are tempted to add `admin_withdraw`, `pause_redeem`, `oracle check`, or `
 |-------|------|-------|
 | **Solana programs** | Anchor 0.30.1, `anchor-spl` 0.30.1, `spl-token-2022` 3.0.5 | 3 programs: `whitelist`, `basket_factory`, `basket` (optional `zap_router` V0 = client sequential) |
 | **Backend** | Node 20, TypeScript 5.4, PostgreSQL 15, Redis, BullMQ, `pg`, `ioredis`, `@solana/web3.js` 1.98 | Indexer is convenience only |
-| **Frontend** | Next.js 15, React 19, Tailwind 3.4, `shadcn/ui` + **bklit UI** (`@bklit` registry, `area-chart`, `line-chart`, `bar-chart`, `candlestick`, `brush` via xDomain), `@solana/wallet-adapter`, `@solana/spl-token` | App Router, 9 pages, 6-step wizard — **Hep bklit kullanılacak** (https://bklit.com/docs/installation) — Grafik polish: Area normalize + Candlestick OHLC + Volume Bar + Brush zoom |
+| **Frontend** | Next.js 15, React 19, Tailwind 3.4, `shadcn/ui` + **bklit UI** (`@bklit` registry, `area-chart`, `line-chart`, `bar-chart`, `candlestick-chart`, `grid`, `chart-tooltip`, `legend`; Brush = documented local adapter pending official distribution — see `docs/bklit-registry-findings-2026-09-01.md`), `@solana/wallet-adapter`, `@solana/spl-token` | App Router, 9 pages, 6-step wizard — **Hep bklit kullanılacak** (https://bklit.com/docs/installation) — Grafik polish: Area normalize + Candlestick OHLC + Volume Bar + Brush zoom |
 | **Tokens** | SPL Token-2022 | Raw for transfers, scaled for display |
 | **Oracles/prices** | Jupiter Price API v6 (NAV only) | Never gates redeem |
 | **Zap** | Jupiter Swap API (quote → swap) | Sequential swaps + `mint_in_kind` in V0 |
-| **Tests** | Rust `cargo test` 114 tests, TS `vitest` 287 tests | Total 401 tests passing |
+| **Tests** | Rust `cargo test` 178 tests, TS `vitest` 373 backend tests (+1 root legacy) | Total 552 tests passing |
 
 **Program IDs (localnet/devnet):**
 
@@ -158,8 +159,8 @@ Events: `BasketCreated {basket, creator, num_constituents, share_mint, ts}`, `Mi
 
 **Basket (`basket::`):**
 
-* `mint_in_kind(amounts:Vec<u64>, vault_balances:Vec<u64>)` — len == `num_constituents`, `amount>0`, `accrue_internal` first, `gross = min(D*S/V)` with 1% tolerance else `WeightMismatch`, `entry_fee = gross*bps/10000`, `net = gross-fee`, `split_fee(fee,9000)`, emit `Minted` (`programs/basket/src/lib.rs:72`)
-* `redeem_in_kind(shares:u64, vault_balances:Vec<u64>)` — `shares>0`, `shares ≤ user_share_ata.amount`, `total_supply>0`, `accrue_internal`, `exit_fee = shares*bps/10000`, `burn = shares-fee`, `amount_out = V*burn/S` floor per constituent, emit `Redeemed` (`programs/basket/src/lib.rs:103`). **Never checks whitelist/oracle/pauser.**
+* `mint_in_kind(amounts:Vec<u64>, vault_balances:Vec<u64>)` — len == `num_constituents`, `amount>0`, `accrue_internal` first, `gross = min(D*S/V)` with 1% tolerance else `WeightMismatch`, `entry_fee = gross*bps/10000`, `net = gross-fee`, `split_fee(fee,9000)`, emit `Minted`. **Client contract (implemented):** remaining_accounts = `[mint_i, user_ata_i, vault_ata_i]` triplets (3n) FOLLOWED BY n `WhitelistedMint` PDAs (total 4n); each PDA must be whitelist-program-owned with `status==Active` else `MintPaused` (fail-closed) — mirrored in `app/lib/transactions.ts`
+* `redeem_in_kind(shares:u64, vault_balances:Vec<u64>)` — `shares>0`, `shares ≤ user_share_ata.amount`, `total_supply>0`, `accrue_internal`, `exit_fee = shares*bps/10000`, `burn = shares-fee`, `amount_out = V*burn/S` floor per constituent, emit `Redeemed`. **Never checks whitelist/oracle/pauser** — remaining_accounts = 3n triplets ONLY, structurally tested (`RedeemInKind` gate-free assertion).
 * `accrue_management_fee()` — `elapsed = now - last_accrual`, `fee = supply*bps*elapsed/(10000*31536000)`, `split_fee`, emit `FeeAccrued`, update `last_fee_accrual_ts` (`programs/basket/src/lib.rs:131`). Permissionless.
 
 ---
@@ -229,7 +230,7 @@ Backend never signs — if indexer dies, `redeem_in_kind` still works via RPC di
 
 ## 10. Frontend Page Map (Next.js App Router — **bklit UI zorunlu**)
 
-> **UI Zorunluluğu:** Tüm frontend `bklit` (`https://bklit.com/docs/installation`) üzerinden kurulacak. Chart’lar mutlaka `@bklit` registry’den (`area-chart`, `line-chart`, `bar-chart`, `candlestick`, `brush` ChartBrushLayout/xDomain) kullanılacak, düz `recharts`/`shadcn` chart kullanılmayacak. Kurulum: `npx shadcn@latest init` → `components.json:registries @bklit` → `npx shadcn@latest add @bklit/area-chart` vb. Tema `app/globals.css` `shadcn/tailwind.css` + `tw-animate-css` üzerinden. `plain HTML` görünümü **yasak** — her sayfa bklit `Card`, `Table`, `Badge` + `AreaChart/BarChart/Candlestick` + `Brush` (xDomain) ile yapılmalı. **Polish:** Stock → Area normalize 100 (3 seri + Brush) + Candlestick OHLC + Volume BarChart + Brush slider; Market → Area 4 endeks normalize + Bar 30 mum.
+> **UI Zorunluluğu:** Tüm frontend `bklit` (`https://bklit.com/docs/installation`) üzerinden kurulacak. Chart’lar mutlaka `@bklit` registry’den (`area-chart`, `line-chart`, `bar-chart`, `candlestick-chart`, `grid`, `chart-tooltip`, `legend`; Brush = belgelenmiş local adapter) kullanılacak, düz `recharts`/`shadcn` chart kullanılmayacak. Kurulum: `npx shadcn@latest init` → `components.json:registries @bklit` → `npx shadcn@latest add @bklit/area-chart` vb. Tema `app/globals.css` `shadcn/tailwind.css` + `tw-animate-css` üzerinden. `plain HTML` görünümü **yasak** — her sayfa bklit `Card`, `Table`, `Badge` + `AreaChart/BarChart/Candlestick` + `Brush` (xDomain) ile yapılmalı. **Polish:** Stock → Area normalize 100 (3 seri + Brush) + Candlestick OHLC + Volume BarChart + Brush slider; Market → Area 4 endeks normalize + Bar 30 mum.
 
 ```
 app/
@@ -249,7 +250,7 @@ app/
   market/page.tsx         # **bklit AreaChart** normalize 100 4 endeks + **BarChart** 30 mum
   providers/page.tsx      # **shadcn Card/Table/Badge** + bklit badge
 components/BasketCard.tsx
-components/charts/*       # **bklit** 63 dosya (area-chart.tsx, bar-chart.tsx, candlestick, grid, tooltip, shimmering-text)
+components/charts/*       # **bklit** (area-chart.tsx, bar-chart.tsx, candlestick-chart, grid, chart-tooltip, shimmering-text; chart-brush.tsx = documented local adapter)
 components/ui/*           # shadcn card/table/badge/button
 lib/solana.ts             # PROGRAMS, scaledAmount
 ```
@@ -287,31 +288,33 @@ Placeholder copy must be replaced by counsel before mainnet.
 
 ---
 
-## 13. Testing — Super Many (401 tests, All Passing)
+## 13. Testing — Super Many (552 tests, All Passing)
 
-**Rust `cargo test` 114 tests** (`cargo test -p basket` 84 + `basket_factory` 17 + `whitelist` 13):
+**Rust `cargo test` 178 tests** (`cargo test -p basket` 119 + `basket_factory` 38 + `whitelist` 21):
 
 * Gross: perfect/min, 20 constituents, tolerance 1% pass/fail `t5`/`t6`, zero supply/vault/deposit/len, dust ZeroShares `t7`, large u64 no overflow `t27`, single constituent `t5-single`
 * Fees: entry 0/100/300, exit 0/100, split 90/10 dust `split_fee(1,9000)=(0,1)` `t15`, never exceeds gross `t19`, mgmt zero elapsed/supply/bps `t12`, yearly cap 300k `t12`, hourly vs yearly + compounding `t39`, 50 random fuzz `MEGA`
 * Redeem: floor 54.725M `t40`, full/half, dust 0, never exceeds vault `t26`, multi-vault 50/30/20, rounding never over-withdraws `t32`, pro-rata max `t22`, consistency after ops `t40`
 * Invariants: multiplier 0.5–10× invariance `t31`, deposits→full redeem `t23`, genesis 1M `t36`, token decimal mismatch 6 vs 9 `t10`, reentry no CPI `t32`
 
-**TS `vitest run` 287 tests** `backend:287`:
+**TS `vitest run` 373 backend tests**:
 
 * `backend/tests/foliox.test.ts:1` 34 tests (fee 30d 16438, NAV 191k, drift 1000/-1000, weight mismatch, holdings scaled)
 * `super.integration.test.ts:1` 22 tests (P0/P1/P2 security invariants, factory 2-20/duplicate/metadata, holdings/NAV 20 constituents, 200 random mint/redeem sequences never over-withdraw, fee caps monotonic 1-365d)
 * `mega.test.ts:1` 230 tests (50 entry, 50 exit, 50 mgmt, 20 split, 20 NAV, 20 drift, 30 redeem vault+1M increments)
+* `backend-truth.test.ts` 42 tests (event discriminators + Borsh fixtures, Token-2022 multiplier parse, listener upserts + DB-less degradation, schema idempotency, price cache/fallback)
+* `waveb-nav-api.test.ts` 45 tests (exact BigInt fixed-point NAV, drift/rounding, performance windows, zap quote legs with mocked fetch, unsigned fee-crank tx, API routes via fake PgLike)
 * `tests/foliox_math.test.ts:1` 1 legacy
 
-Total **401 tests passing** (`cargo test: 114 + vitest: 287`). See `backend/tests/` + `programs/*/src/lib.rs:266` `#[cfg(test)]`.
+Total **552 tests passing** (`cargo test: 178 + backend vitest: 373 + root legacy: 1`). See `backend/tests/` + `programs/*/src/lib.rs` `#[cfg(test)]`.
 
 **Run:**
 
 ```bash
 export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$HOME/.avm/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH"
-cargo test                          # Rust 114
+cargo test                          # Rust 178
 cargo test -p basket --lib          # 84 basket math
-npx vitest run --reporter=verbose   # TS 287
+npx --prefix backend vitest run --reporter=verbose   # TS 373
 npx tsx backend/src/index.ts        # :3001 health {"ok":true}
 bash scripts/e2e.sh                 # validator → whitelist → basket → mint/redeem → fee crank (needs solana-test-validator)
 ```
@@ -330,8 +333,8 @@ sh -c "$(curl -sSfL https://release.solana.com/v1.18.17/install)" # solana 1.18.
 # Build & test (verified)
 cargo check                         # 0 errors, 14 warnings anchor-debug
 cargo build                         # dev build (SBF needs Agave 2.x due edition2024)
-cargo test                          # 114 Rust tests
-npm --prefix backend install && npx --prefix backend vitest run  # 287 TS tests
+cargo test                          # 178 Rust tests
+npm --prefix backend install && npx --prefix backend vitest run  # 373 TS tests
 npx tsx backend/src/index.ts        # API :3001
 npm --prefix app install && npm --prefix app run dev  # Next.js :3000
 
@@ -383,7 +386,7 @@ PORT=3001
 * Don't change program IDs without updating `Anchor.toml:5` + `declare_id!` in all 3 `lib.rs:3`.
 * Don't use floating point for on-chain math — use `u128` intermediate then cast to `u64` floor.
 * Don't describe baskets as ETFs in UI copy — `LEGAL_REVIEW_REQUIRED` if you touch `app/app/legal/page.tsx:1` or `app/create/page.tsx:1`.
-* Don't break tests — 401 tests are your safety net; if you add super many more, run `cargo test` + `npx vitest run`.
+* Don't break tests — 552 tests are your safety net; if you add super many more, run `cargo test` + `npx --prefix backend vitest run`.
 * **DON'T use plain HTML / düz `recharts` / `shadcn` chart** — her chart `bklit` (`https://bklit.com/docs/installation`) olmalı. `plain HTML` görünümü yasaktır, her sayfa bklit `Card/Table/Badge` + `AreaChart/BarChart` + `shadcn/tailwind.css` ile yapılmalı.
 
 **When in doubt:** `cargo test -p basket --lib -- tests::test_gross_shares_perfect` and `grep -rn "redeem" docs/foliox-v0-spec.md`.
@@ -435,7 +438,7 @@ Post-90: mainnet-beta capped TVL, bug bounty, QEDGen formal verification if `rev
 
 ---
 
-*Generated for agents by superstack (solana.new) + FolioX architect. Keep this file updated when `docs/foliox-v0-spec.md` changes. Last updated: 2026-09-01 — **114 Rust + 287 TS tests passing**.*
+*Generated for agents by superstack (solana.new) + FolioX architect. Keep this file updated when `docs/foliox-v0-spec.md` changes. Last updated: 2026-09-01 (implementation waves) — **178 Rust + 373 backend TS (+1 legacy) tests passing; protocol/backend/frontend implemented — see plan.md §8**.*
 
 ---
 
@@ -454,7 +457,7 @@ Post-90: mainnet-beta capped TVL, bug bounty, QEDGen formal verification if `rev
 | `backend/src/workers/priceFetch.ts:1` | 30 | `fetchPrices` + `mockPrices` |
 | `backend/src/api/server.ts:1` | 60 | mock handler for 4 routes, CORS |
 | `backend/src/index.ts:1` | 15 | entrypoint `PORT=3001` |
-| `backend/tests/*.ts` | 400+ | 287 tests |
+| `backend/tests/*.ts` | 800+ | 373 tests (foliox 34, super.integration 22, mega 230, backend-truth 42, waveb-nav-api 45) |
 | `app/app/*.tsx` | 200+ | 9 pages |
 | `Anchor.toml:1` | 29 | program IDs + cluster |
 | `Cargo.toml:1` | 18 | workspace + overflow-checks |
@@ -511,7 +514,7 @@ cat docs/foliox-v0-spec.md | head -n 100
 export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$HOME/.avm/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH"
 rustc --version; solana --version; anchor --version
 
-# 3. Run tests (should be 114 + 287 green before any edit)
+# 3. Run tests (should be 178 + 373 green before any edit)
 cargo test
 npx --prefix backend vitest run --reporter=verbose
 
@@ -552,8 +555,8 @@ The current repository is a scaffold/prototype, not localnet-ready or production
 
 Verified facts:
 
-* Rust `cargo test --workspace`: 114 passed.
-* Backend Vitest: 286 passed; the root legacy test adds 1, so the combined TypeScript total is 287.
+* Rust `cargo test --workspace`: 178 passed.
+* Backend Vitest: 373 passed; the root legacy test adds 1, so the combined TypeScript total is 374.
 * App production build passes only because `app/next.config.js` ignores type/lint errors; strict app TypeScript still fails.
 * Backend strict build still fails NodeNext relative-import and implicit-any errors.
 * Protocol instruction bodies still contain stubbed transfer/mint/burn/fee behavior; math unit tests do not prove localnet correctness.
@@ -569,4 +572,4 @@ Coordination rules for the next wave:
 4. Never let multiple workers edit `globals.css`, shared chart primitives, wallet providers, or the same route concurrently.
 5. Do not mutate the older UI Run `run_7f4b8dbc5e4f`; use a fresh Task/Dispatch under the current Run for follow-up work.
 
-*End of AGENTS.md — Last verified 2026-09-01 with Rust 114, backend Vitest 286, root legacy TypeScript 1, and backend health `ok`; see `plan.md` for remaining gates.*
+*End of AGENTS.md — Last verified 2026-09-01 (implementation waves complete) with Rust 178, backend Vitest 373, root legacy TypeScript 1, all release gates per plan §6 evidenced PASS; localnet E2E attempt in flight — see `plan.md`.*

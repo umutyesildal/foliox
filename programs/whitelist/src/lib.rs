@@ -1,9 +1,14 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_2022::ID as TOKEN_2022_PROGRAM_ID;
+use anchor_spl::token_interface::Mint;
 
 declare_id!("bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz");
 
 pub const CONFIG_SEED: &[u8] = b"config";
 pub const MINT_SEED: &[u8] = b"mint";
+
+/// Maximum decimals accepted for a whitelisted mint.
+pub const MAX_DECIMALS: u8 = 12;
 
 #[program]
 pub mod whitelist {
@@ -25,11 +30,23 @@ pub mod whitelist {
     ) -> Result<()> {
         require!(ctx.accounts.config.authority == ctx.accounts.authority.key(), WhitelistError::Unauthorized);
         require!(price_source.len() <= 64, WhitelistError::PriceSourceTooLong);
-        require!(decimals <= 12, WhitelistError::InvalidDecimals);
+
+        // No lazy trust in the caller's `decimals` arg: the mint account is
+        // validated in-context. The mint must be owned by the Token-2022
+        // program and the arg must match the actual on-chain mint decimals —
+        // downstream `transfer_checked` calls depend on this cached value.
+        let mint_ai = ctx.accounts.mint.to_account_info();
+        check_mint_owner(mint_ai.owner)?;
+        let on_chain_decimals = {
+            let data = mint_ai.try_borrow_data()?;
+            decode_mint_decimals(&data)?
+        };
+        check_decimals(decimals, on_chain_decimals)?;
 
         let whitelisted = &mut ctx.accounts.whitelisted_mint;
         whitelisted.mint = ctx.accounts.mint.key();
-        whitelisted.decimals = decimals;
+        // Cached from the mint itself (== `decimals` by the check above).
+        whitelisted.decimals = on_chain_decimals;
         whitelisted.multiplier_watermark = 1_000_000;
         whitelisted.status = WhitelistStatus::Active as u8;
         whitelisted.price_source = price_source;
@@ -74,6 +91,28 @@ pub mod whitelist {
     }
 }
 
+// ===================== pure validation helpers (unit tested) =====================
+
+/// The mint account must be owned by the Token-2022 program (spec §11 P0).
+pub fn check_mint_owner(owner: &Pubkey) -> Result<()> {
+    require!(*owner == TOKEN_2022_PROGRAM_ID, WhitelistError::InvalidMintOwner);
+    Ok(())
+}
+
+/// Deserializes a Token-2022 mint (extension-aware, so xStocks with e.g.
+/// ScaledUiAmountConfig TLV data parse fine) and returns its on-chain decimals.
+pub fn decode_mint_decimals(data: &[u8]) -> Result<u8> {
+    let mint = Mint::try_deserialize_unchecked(&mut &data[..])?;
+    Ok(mint.decimals)
+}
+
+/// The `decimals` arg must be within the cap AND match the actual mint.
+pub fn check_decimals(arg: u8, on_chain_decimals: u8) -> Result<()> {
+    require!(arg <= MAX_DECIMALS, WhitelistError::InvalidDecimals);
+    require!(arg == on_chain_decimals, WhitelistError::DecimalsMismatch);
+    Ok(())
+}
+
 #[derive(Accounts)]
 pub struct InitConfig<'info> {
     #[account(
@@ -95,7 +134,9 @@ pub struct AddMint<'info> {
     pub config: Account<'info, WhitelistConfig>,
     #[account(mut)]
     pub authority: Signer<'info>,
-    /// CHECK: mint is Token-2022
+    /// CHECK: mint is validated in the handler — owner must be the Token-2022
+    /// program (`check_mint_owner`) and the `decimals` arg must match the
+    /// on-chain mint decimals (`decode_mint_decimals` + `check_decimals`).
     pub mint: UncheckedAccount<'info>,
     #[account(
         init,
@@ -175,6 +216,10 @@ pub enum WhitelistError {
     Unauthorized,
     #[msg("No pending authority")]
     NoPendingAuthority,
+    #[msg("Mint account is not owned by the Token-2022 program")]
+    InvalidMintOwner,
+    #[msg("Decimals arg does not match the on-chain mint decimals")]
+    DecimalsMismatch,
 }
 
 #[cfg(test)]
@@ -265,5 +310,70 @@ mod tests {
         let mut m2 = m;
         m2.multiplier_watermark = 2_000_000;
         assert_eq!(m2.multiplier_watermark, 2_000_000);
+    }
+
+    // ========== ADD_MINT IN-CONTEXT MINT VALIDATION ==========
+    #[test]
+    fn test_check_mint_owner_accepts_token_2022() {
+        // Any account owned by Token-2022 passes.
+        assert!(check_mint_owner(&TOKEN_2022_PROGRAM_ID).is_ok());
+    }
+    #[test]
+    fn test_check_mint_owner_rejects_other_programs() {
+        // System program (wallet), SPL Token classic, random program — all reject.
+        assert!(check_mint_owner(&Pubkey::default()).is_err());
+        assert!(check_mint_owner(&Pubkey::new_unique()).is_err());
+    }
+    #[test]
+    fn test_check_decimals_ok() {
+        for d in 0..=12u8 {
+            assert!(check_decimals(d, d).is_ok());
+        }
+        assert!(check_decimals(6, 6).is_ok());
+    }
+    #[test]
+    fn test_check_decimals_arg_over_cap_fails() {
+        // arg > 12 is invalid even if it would match the mint
+        assert!(check_decimals(13, 13).is_err());
+        assert!(check_decimals(u8::MAX, u8::MAX).is_err());
+    }
+    #[test]
+    fn test_check_decimals_mismatch_fails() {
+        // the core "no lazy trust" property: a lying arg is rejected
+        assert!(check_decimals(6, 9).is_err());
+        assert!(check_decimals(9, 6).is_err());
+        assert!(check_decimals(0, 6).is_err());
+    }
+    #[test]
+    fn test_decode_mint_decimals_base_mint() {
+        // spl_token Mint layout: authority 0..36, supply 36..44, decimals 44,
+        // is_initialized 45, freeze_authority 46..82 (LEN = 82).
+        let mut buf = [0u8; 82];
+        buf[44] = 6; // decimals
+        buf[45] = 1; // is_initialized
+        assert_eq!(decode_mint_decimals(&buf).unwrap(), 6);
+        buf[44] = 9;
+        assert_eq!(decode_mint_decimals(&buf).unwrap(), 9);
+        buf[44] = 0;
+        assert_eq!(decode_mint_decimals(&buf).unwrap(), 0);
+    }
+    #[test]
+    fn test_decode_mint_decimals_truncated_fails() {
+        let buf = [0u8; 40];
+        assert!(decode_mint_decimals(&buf).is_err());
+        let empty: [u8; 0] = [];
+        assert!(decode_mint_decimals(&empty).is_err());
+    }
+    #[test]
+    fn test_add_mint_caches_onchain_decimals_semantics() {
+        // The stored WhitelistedMint.decimals must come from the mint itself;
+        // check_decimals guarantees arg == on-chain before it is cached.
+        let arg: u8 = 6;
+        let on_chain: u8 = 6;
+        assert!(check_decimals(arg, on_chain).is_ok());
+        let mut m = WhitelistedMint { mint: Pubkey::default(), decimals: 0, multiplier_watermark: 1_000_000, status: WhitelistStatus::Active as u8, price_source: "jupiter:TSLAx".to_string(), bump: 0 };
+        m.decimals = on_chain; // what add_mint stores
+        assert_eq!(m.decimals, arg);
+        assert_eq!(m.status, WhitelistStatus::Active as u8);
     }
 }

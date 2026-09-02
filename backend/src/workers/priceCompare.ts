@@ -1,5 +1,5 @@
-import { fetchPrices, mockPrices } from "./priceFetch";
-import { fetchYahooSeries, fetchYahooPrice } from "./yahooFetch";
+import { fetchPrices, mockPrices } from "./priceFetch.js";
+import { fetchYahooSeries, fetchYahooPrice } from "./yahooFetch.js";
 
 export interface CompareTick { ticker: string; mint: string; jupiter: number|null; yahoo: number|null; diffBps: number|null; }
 

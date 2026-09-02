@@ -1,164 +1,269 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AreaChart, Area } from "@/components/charts/area-chart";
-import { Grid } from "@/components/charts/grid";
-import { XAxis } from "@/components/charts/x-axis";
-import { YAxis } from "@/components/charts/y-axis";
-import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-async function getOverview(range="1mo") {
-  try {
-    const r = await fetch(`${process.env.NEXT_PUBLIC_API || "http://localhost:3001"}/api/v1/market/overview?range=${range}`, { cache: "no-store" });
-    return r.json();
-  } catch { return { data: [] }; }
+import MarketChart, { type MarketSeriesMeta } from "./market-chart";
+import { FreshnessBadge } from "@/components/states";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = {
+  title: "Market overview — FolioX",
+  description:
+    "QQQ, SPY, DIA and the Nasdaq Composite normalized to 100, with a 30-candle benchmark volume view.",
+};
+
+const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
+
+const RANGES = ["1mo", "3mo", "6mo", "1y"] as const;
+
+interface YahooCandle {
+  ts: number;
+  close: number;
+  volume: number;
 }
 
-const RANGES = ["1mo","3mo","6mo","1y"] as const;
+interface OverviewSeries {
+  symbol: string;
+  first: number;
+  last: number;
+  changePct: number;
+  candles: YahooCandle[];
+  count: number;
+}
 
-const LEGEND = [
-  { key: "QQQ", label: "QQQ", color: "hsl(var(--chart-1))" },
-  { key: "SPY", label: "SPY", color: "hsl(var(--chart-2))" },
-  { key: "DIA", label: "DIA", color: "hsl(var(--chart-3))" },
-  { key: "IXIC", label: "IXIC", color: "hsl(var(--chart-4))", dashed: true },
-] as const;
+interface OverviewPayload {
+  data?: OverviewSeries[];
+  range?: string;
+}
 
-export default async function MarketPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
-  const sp = await searchParams;
-  const range = sp?.range || "1mo";
-  const data = await getOverview(range);
-  const combined = (() => {
-    const len = Math.max(...(data.data||[]).map((o:any)=>o.candles?.length||0),0);
-    if (!len) return [];
-    const rows:any[] = [];
-    for (let i=0;i<len;i++) {
-      const row:any = {};
-      let date:any = null;
-      for (const o of data.data||[]) {
-        const c = o.candles?.[i];
-        if (!c) continue;
-        const first = o.candles?.[0]?.close || 1;
-        if (!date) date = new Date(c.ts);
-        const key = o.symbol === "^IXIC" ? "IXIC" : o.symbol;
-        row[key] = Number(((c.close / first) * 100).toFixed(2));
-      }
-      if (date) { row.date = date; rows.push(row); }
+const SERIES_COLORS: Record<string, string> = {
+  QQQ: "hsl(var(--chart-1))",
+  SPY: "hsl(var(--chart-2))",
+  DIA: "hsl(var(--chart-4))",
+  IXIC: "hsl(var(--chart-3))",
+};
+
+const SERIES_LABELS: Record<string, string> = {
+  QQQ: "QQQ (Invesco Nasdaq 100)",
+  SPY: "SPY (SPDR S&P 500)",
+  DIA: "DIA (SPDR Dow Jones)",
+  IXIC: "^IXIC (Nasdaq Composite, benchmark)",
+};
+
+async function getOverview(range: string): Promise<OverviewPayload | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/market/overview?range=${encodeURIComponent(range)}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as OverviewPayload;
+  } catch {
+    return null;
+  }
+}
+
+/** Deterministic stand-in used only when the API is unreachable — always labeled demo. */
+function fixtureRows(): Record<string, unknown>[] {
+  const shape: Record<string, { slope: number; amp: number; phase: number }> = {
+    QQQ: { slope: 6, amp: 1.2, phase: 0 },
+    SPY: { slope: 4.5, amp: 1.0, phase: 1 },
+    DIA: { slope: 2.2, amp: 0.6, phase: 2 },
+    IXIC: { slope: 8.5, amp: 1.6, phase: 0.5 },
+  };
+  return Array.from({ length: 30 }, (_, i) => {
+    const row: Record<string, unknown> = {
+      date: new Date(Date.UTC(2026, 6, 30) + i * 86_400_000),
+    };
+    for (const [key, s] of Object.entries(shape)) {
+      const t = i / 29;
+      row[key] = Number((100 + s.slope * t + s.amp * Math.sin(i / 3 + s.phase)).toFixed(2));
     }
-    return rows;
-  })();
+    return row;
+  });
+}
+
+function fixtureVolume(): { date: Date; volume: number }[] {
+  return Array.from({ length: 30 }, (_, i) => ({
+    date: new Date(Date.UTC(2026, 6, 30) + i * 86_400_000),
+    volume: Math.round((6_200_000 + 1_800_000 * Math.sin(i / 2.6) + 900_000 * Math.cos(i / 1.3)) / 10_000) * 10_000,
+  }));
+}
+
+function buildNormalizedRows(data: OverviewSeries[]): {
+  rows: Record<string, unknown>[];
+  series: MarketSeriesMeta[];
+} {
+  const usable = data
+    .map((o) => {
+      const key = o.symbol === "^IXIC" ? "IXIC" : o.symbol;
+      return { ...o, key };
+    })
+    .filter((o) => SERIES_COLORS[o.key] !== undefined && (o.candles?.length ?? 0) >= 2);
+
+  const len = Math.min(...usable.map((o) => o.candles.length));
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 0; i < len; i++) {
+    const row: Record<string, unknown> = { date: new Date(usable[0].candles[i].ts) };
+    for (const o of usable) {
+      const base = o.candles[0].close || 1;
+      row[o.key] = Number(((o.candles[i].close / base) * 100).toFixed(2));
+    }
+    rows.push(row);
+  }
+
+  // Benchmark (^IXIC) last, so it maps to the dashed gray series.
+  usable.sort((a, b) => (a.key === "IXIC" ? 1 : b.key === "IXIC" ? -1 : 0));
+  const series: MarketSeriesMeta[] = usable.map((o) => ({
+    key: o.key,
+    label: SERIES_LABELS[o.key] ?? o.key,
+    color: SERIES_COLORS[o.key],
+    dashed: o.key === "IXIC",
+  }));
+
+  return { rows, series };
+}
+
+function StatChip({ label, change }: { label: string; change: number }) {
+  const positive = change >= 0;
+  return (
+    <span className="inline-flex items-baseline gap-1.5 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={`font-mono tabular-nums ${
+          positive ? "text-[hsl(var(--status-positive))]" : "text-destructive"
+        }`}
+      >
+        {positive ? "+" : ""}
+        {change.toFixed(2)}%
+      </span>
+    </span>
+  );
+}
+
+export default async function MarketPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ range?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const range = RANGES.includes(sp.range as (typeof RANGES)[number]) ? (sp.range as string) : "1mo";
+  const payload = await getOverview(range);
+
+  const liveSeries = payload?.data ?? [];
+  const hasLive = liveSeries.some((o) => (o.candles?.length ?? 0) >= 2);
+
+  let rows: Record<string, unknown>[];
+  let series: MarketSeriesMeta[];
+  let volume: { date: Date; volume: number }[];
+  let volumeLabel: string;
+  let asOf: number | undefined;
+  let changes: { label: string; change: number }[];
+
+  if (hasLive) {
+    const built = buildNormalizedRows(liveSeries);
+    rows = built.rows;
+    series = built.series;
+    const benchmark =
+      liveSeries.find((o) => o.symbol === "^IXIC" && (o.candles?.length ?? 0) >= 2) ??
+      liveSeries.find((o) => (o.candles?.length ?? 0) >= 2);
+    volume = (benchmark?.candles ?? []).slice(-30).map((c) => ({ date: new Date(c.ts), volume: c.volume }));
+    volumeLabel = benchmark ? (benchmark.symbol === "^IXIC" ? "^IXIC" : benchmark.symbol) : "Benchmark";
+    asOf = Math.max(...liveSeries.map((o) => o.candles[o.candles.length - 1]?.ts ?? 0));
+    changes = liveSeries
+      .filter((o) => (o.candles?.length ?? 0) >= 2)
+      .map((o) => ({ label: o.symbol === "^IXIC" ? "^IXIC" : o.symbol, change: o.changePct }));
+  } else {
+    rows = fixtureRows();
+    series = ["QQQ", "SPY", "DIA", "IXIC"].map((key) => ({
+      key,
+      label: SERIES_LABELS[key],
+      color: SERIES_COLORS[key],
+      dashed: key === "IXIC",
+    }));
+    volume = fixtureVolume();
+    volumeLabel = "^IXIC (fixture)";
+    asOf = Date.UTC(2026, 7, 28);
+    changes = series.map((s) => {
+      const values = rows.map((r) => Number(r[s.key]));
+      const change = (values[values.length - 1] ?? 100) - 100;
+      return { label: s.key, change };
+    });
+  }
+
+  const demo = !hasLive;
 
   return (
-    <div className="space-y-5">
-      <div className="space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">Market Overview</h1>
-        <p className="text-sm text-muted-foreground">
-          Nasdaq benchmark — QQQ / SPY / DIA / IXIC last {range} performance. Base for comparing xStock baskets. Charts with <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">bklit</span>
-        </p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <h1 className="text-3xl font-semibold tracking-tight">Market overview</h1>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            Nasdaq benchmarks normalized to 100 — the base for comparing xStocks-backed strategy
+            baskets against the underlying equity indices.
+          </p>
+        </div>
+        <FreshnessBadge
+          source={demo ? "fixture" : "Yahoo Finance via /api/v1/market/overview"}
+          asOf={asOf}
+          demo={demo}
+        />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {RANGES.map((r)=>(
-          <a
+      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Range</span>
+        {RANGES.map((r) => (
+          <Link
             key={r}
             href={`/market?range=${r}`}
-            className={`inline-flex items-center justify-center rounded-full px-3.5 py-1.5 border text-xs font-medium transition-colors ${
-              r===range
-                ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                : "bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-current={r === range ? "true" : undefined}
+            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+              r === range
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
             {r}
-          </a>
+          </Link>
+        ))}
+      </nav>
+
+      {demo ? (
+        <p className="rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 px-3 py-2 text-sm text-muted-foreground">
+          The market API is unreachable, so this view renders a static fixture. It is labeled demo
+          and must not be read as live index data.
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {changes.map((c) => (
+          <StatChip key={c.label} label={c.label} change={c.change} />
         ))}
       </div>
 
-      {combined.length > 1 ? (
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3 space-y-1.5">
-            <CardTitle className="text-sm tracking-tight">Normalized Comparison — 100 base</CardTitle>
-            <CardDescription className="text-xs leading-relaxed">All indices normalized to 100 at start — co-movement (bklit AreaChart)</CardDescription>
-            <div className="flex flex-wrap items-center gap-2 pt-1.5">
-              {LEGEND.map((item)=>(
-                <Badge
-                  key={item.key}
-                  variant="outline"
-                  className="inline-flex items-center gap-1.5 bg-card px-2.5 py-1 font-mono text-[11px] font-medium"
-                >
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{
-                      background: item.color,
-                      // for IXIC muted gray dash: show as dashed border circle to hint style
-                      border: item.dashed ? `1px dashed ${item.color}` : undefined,
-                    }}
-                  />
-                  {item.label}
-                  {item.dashed && <span className="ml-0.5 text-[10px] font-sans text-muted-foreground">dash</span>}
-                </Badge>
-              ))}
-              <span className="text-[11px] text-muted-foreground">· bklit AreaChart</span>
-            </div>
-          </CardHeader>
-          <CardContent className="h-[300px] px-2 pb-2 pt-0">
-            <AreaChart
-              data={combined}
-              xDataKey="date"
-              margin={{ top: 12, right: 16, bottom: 28, left: 48 }}
-              className="h-full w-full"
-            >
-              <Grid horizontal />
-              {/* QQQ — chart-1 primary, most opaque */}
-              <Area dataKey="QQQ" fill="hsl(var(--chart-1))" stroke="hsl(var(--chart-1))" fillOpacity={0.22} strokeWidth={2} />
-              {/* SPY — chart-2 emerald */}
-              <Area dataKey="SPY" fill="hsl(var(--chart-2))" stroke="hsl(var(--chart-2))" fillOpacity={0.14} strokeWidth={2} />
-              {/* DIA — chart-3 amber */}
-              <Area dataKey="DIA" fill="hsl(var(--chart-3))" stroke="hsl(var(--chart-3))" fillOpacity={0.10} strokeWidth={1.5} />
-              {/* IXIC — chart-4 muted gray dash, no fill to avoid clash */}
-              <Area dataKey="IXIC" fill="hsl(var(--chart-4))" stroke="hsl(var(--chart-4))" fillOpacity={0} strokeWidth={1.5} dashFromIndex={0} dashArray="6 4" />
-              <XAxis />
-              <YAxis />
-              <ChartTooltip />
-            </AreaChart>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No market data — backend may be starting, try refresh in 3s</Card>
-      )}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium">Normalized comparison — 100 base</CardTitle>
+          <CardDescription className="text-xs leading-relaxed">
+            Four index series over {range}. The benchmark series is dashed. Drag the brush (or use
+            the range sliders) to zoom the x-domain; the y-scale tweens to the visible window.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MarketChart rows={rows} series={series} volume={volume} volumeLabel={volumeLabel} />
+        </CardContent>
+      </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {(data.data||[]).map((o:any)=>{
-          const first = o.candles?.[0]?.close || 1;
-          const chartData = (o.candles||[]).slice(-20).map((c:any)=>({ date: new Date(c.ts), value: Number(((c.close/first)*100).toFixed(2)) }));
-          const up = o.changePct>=0;
-          return (
-            <Card key={o.symbol} className="overflow-hidden">
-              <CardHeader className="pb-2 space-y-1">
-                <CardTitle className="flex items-center justify-between font-mono text-sm tracking-tight">
-                  <span>{o.symbol}</span>
-                  <Badge variant={up?"default":"destructive"} className="text-xs tabular-nums">{up?"+":""}{o.changePct?.toFixed(2)}%</Badge>
-                </CardTitle>
-                <CardDescription className="font-mono text-xs tabular-nums">{o.first?.toFixed(2)} → {o.last?.toFixed(2)} · {o.count} candles</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[120px] px-2 pb-2 pt-0">
-                {chartData.length > 1 ? (
-                  <AreaChart
-                    data={chartData}
-                    xDataKey="date"
-                    margin={{ top: 8, right: 12, bottom: 20, left: 36 }}
-                    className="h-full w-full"
-                  >
-                    <Area dataKey="value" fill={up ? "hsl(var(--chart-2))" : "hsl(var(--destructive))"} stroke={up ? "hsl(var(--chart-2))" : "hsl(var(--destructive))"} fillOpacity={0.18} strokeWidth={1.5} />
-                    <XAxis />
-                    <ChartTooltip />
-                  </AreaChart>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No data</div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          Source: Yahoo Finance (30-minute cache on the backend). xStock token prices come from
+          Jupiter; the difference to the real equity is the depeg.
+        </span>
+        <Button render={<Link href="/providers" />} variant="outline" size="xs">
+          Data providers
+        </Button>
       </div>
-      <div className="text-xs text-muted-foreground">Source: Yahoo Finance — 30 min cache. Real Nasdaq; xStock price from Jupiter, diff = depeg.</div>
     </div>
   );
 }

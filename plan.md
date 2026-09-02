@@ -44,20 +44,26 @@ The current baseline is not localnet-ready or production-ready even though older
 
 ## 3. Decision gates before implementation
 
-### G0 — brand and telemetry
+### G0 — brand and telemetry — RESOLVED 2026-09-01
 
-The repository has no root `brand.md`. Before frontend components are written, choose one:
+Resolved by user decision: run `brand-design` (full interview + previews), telemetry **off**. Outcome applied to the repo:
 
-- Run `brand-design` and create a deliberate palette, typography, and voice.
-- Defer brand setup and explicitly document the provisional neutral theme.
+- Palette **Mineral Desk** (warm near-black canvas, mineral-mint primary `#66ccba`, sage/clay/ochre semantic statuses) — picked from 6 AA-verified candidates; user pick recorded.
+- Typography **Geist + Geist Mono** via `next/font/google` — user pick recorded.
+- No brand gradients (audit anti-slop rule stands).
+- `brand.md` written at repo root; `app/app/globals.css` tokens applied (backup `app/app/globals.css.bak`); `app/app/layout.tsx` + `app/tailwind.config.js` wired.
+- Telemetry config set to off (`~/.superstack/config.json`); no telemetry events are written.
 
-The recommended provisional direction is the design-audit palette: warm near-black canvas, warm raised surfaces, restrained mineral-mint action accent, sage/clay/ochre semantic statuses, Geist for UI copy, and Geist Mono for numeric/onchain data. These values are a proposal, not an approved brand until the user decides.
+### G1 — registry provenance — RESOLVED 2026-09-01
 
-The frontend skill also requires a one-time telemetry choice: anonymous or off. Do not write a brand file or change telemetry configuration implicitly.
+Verified live against the official registry (every `/r/{name}.json` endpoint status-checked, 14 payloads byte-diffed against local sources). Full evidence in `docs/bklit-registry-findings-2026-09-01.md`. Findings:
 
-### G1 — registry provenance
+1. Local `app/components/charts/*` ARE official Bklit source — official charts are themselves `@visx`-backed (`@visx/*@4.0.1-alpha.0` + `motion`, matching `app/package.json`). candlestick-chart, grid, x-axis, chart-animation byte-identical; area/line/bar/tooltip near-identical with tiny local edits.
+2. **Brush is the true gap:** `/r/brush.json` and `/r/chart-brush.json` are 404 and no payload ships ChartBrush source, although docs document the API. The local `chart-brush.tsx` stays as a **justified, documented local adapter** — never labeled official.
+3. Naming corrections: official items are `@bklit/candlestick-chart` and `@bklit/chart-tooltip` (AGENTS.md's `candlestick`/`tooltip` names 404). Official `@bklit/legend` exists but is not installed locally — install `npx shadcn@latest add @bklit/legend` in a Wave C worker.
+4. Root `recharts@^3.10.1` has zero imports repo-wide and no Bklit component depends on it — removed by the coordinator (Phase 3 task 5 closed).
 
-Confirm the exact Bklit registry sources and generated files before claiming Bklit compliance. `app/components.json` contains the `@bklit` registry namespace, but the current source tree is mostly local implementations backed by `@visx`; the local brush component is explicitly a placeholder and the audit found the official brush endpoint unavailable. Use the official registry where available, document any supported local adapter, and never label a local substitute as an official Bklit component without evidence.
+The frozen chart contract: AreaChart/LineChart/BarChart/Candlestick/Grid/Tooltip/Animation = official Bklit (local copies verified); Brush = documented local adapter pending official distribution; Legend = official, to be installed.
 
 ### G2 — protocol/API truthfulness
 
@@ -229,16 +235,18 @@ After every phase or material decision:
 | 2026-09-01 | Use dark-native quiet research terminal direction as provisional design direction | coordinator/worker | Done (superseded by G0 below) |
 | 2026-09-01 | Do not claim current app is localnet-ready; record protocol/backend/frontend gaps | coordinator | Done |
 | 2026-09-01 | No frontend implementation before brand/telemetry decision and Bklit registry verification | coordinator | G0/G1 in progress |
-| 2026-09-01 | G0 resolved by user: run `brand-design` now to create the deliberate brand; telemetry = off; brand.md is written before design tokens | user | Decided |
-| 2026-09-01 | G2 resolved by user: localnet end-to-end milestone first; no actionable mint/redeem UI before protocol truth | user | Decided |
-| 2026-09-01 | Orchestration moved to ZCode coordinator with Agent subagents in waves (A foundation, B protocol/backend, C pages, D QA); disjoint file ownership enforced per wave | user/coordinator | Active |
+| 2026-09-01 | G0 resolved by user: run `brand-design` now to create the deliberate brand; telemetry = off; brand.md is written before design tokens | user | Done — Mineral Desk + Geist applied, `brand.md` written |
+| 2026-09-01 | G2 resolved by user: localnet end-to-end milestone first; no actionable mint/redeem UI before protocol truth | user | Decided — governs Wave B/C ordering |
+| 2026-09-01 | Orchestration moved to ZCode coordinator with Agent subagents in waves (A foundation, B protocol/backend, C pages, D QA); disjoint file ownership enforced per wave; rolling concurrency ~2 workers due to account limit | user/coordinator | Active |
 
 ## 8. Immediate next actions
 
 Status as of 2026-09-01 (user decisions recorded in §7):
 
-1. ~~User chooses brand/telemetry~~ — Done: `brand-design` now, telemetry **off** (G0 decided).
-2. Coordinator runs `brand-design`, writes `brand.md`, then dispatches the Wave A tokens worker against it.
-3. ~~G2 choice~~ — Done: **localnet E2E first**; Wave B protocol/backend truth workers run before any actionable transaction UI.
-4. Wave A (parallel, disjoint scopes): design tokens from `brand.md`, app strict typing/build gate, backend build gate, G1 registry provenance research. Protocol workers (programs/*) dispatch in parallel — disjoint from app/backend scopes.
-5. Wave B-backend workers dispatch only after the backend build gate is green; Wave C page workers only after the foundation and ownership map are stable.
+1. ~~User chooses brand/telemetry~~ — Done: `brand-design` run, **Mineral Desk** palette + **Geist/Geist Mono** applied (`brand.md`, `app/app/globals.css`, layout/tailwind wired), telemetry **off** (G0 closed).
+2. ~~G2 choice~~ — Done: **localnet E2E first**; Wave B protocol/backend truth workers run before any actionable transaction UI.
+3. **Wave A progress (rolling, ~2 concurrent workers):** app strict typing — **PASS** (tsc 0 errors from 52; build green without ignore flags; @ts-nocheck removed; Next 15 Promise params fixed); backend build gate — **PASS** (NodeNext `.js` imports fixed; build clean; 286/286 tests green). G1 — **RESOLVED** (§3 above; recharts removed; naming corrections synced to AGENTS.md/CLAUDE.md/CONTEXT.md).
+4. **Wave B — COMPLETE (protocol + backend truth):** basket CPI **PASS** (all instructions real; pause-gate shipped — `mint_in_kind` remaining_accounts is now 4n: 3n token triplets + n WhitelistedMint PDAs, `PausedNewMints` → `MintPaused`; redeem byte-identical, structurally proven gate-free; **178 Rust tests**). Whitelist+factory **PASS** (atomic seeds, genesis 1M with temp-authority handoff, real vault_bump). Backend DB/indexer **PASS** (normative §7 schema live-verified, event decode, holdings sync + f64 multiplier, 328 TS tests). Backend NAV/API **PASS** (exact BigInt fixed-point NAV, all §8-9 routes real with `source`/`asOf` markers, zap quotes honest-503, fee crank builds unsigned txs — backend never signs; **373 TS tests**). Rust 178 + TS 373 (+1 legacy) = 552 tests green.
+5. **Wave C — foundation done, page groups rolling:** shell/wallet/states/format foundation **PASS** (12 routes, wallet states complete). Running: C-research (Explore/Market/Stock/Providers + @types/d3-* durable fix + optional @bklit/legend) and C-basket (detail/Buy/Redeem + client-side Anchor instruction builders mirroring program source incl. the 4n contract). Queued: C-onboarding (Create wizard/Portfolio/Landing/Legal/Creator), E2E scripts worker.
+6. **Wave D static QA — PASS:** regression green (178 Rust + 373 backend TS + app tsc 0 errors + 12-route build); 9 a11y findings fixed (focus traps, APG tabs, focus return, slider token); anti-slop sweep clean (product `transition-all` 0, hardcoded colors 0, dead BasketCard removed, chart-brush English + de-duplicated); release-gate table (§6) 8/8 evidenced PASS. Pending final integration: wave-boundary `npm install` (phantom/solflare/buffer declarations landed in manifests), legend wiring decision, ESLint config, browser QA pass, commits.
+7. **In flight:** localnet E2E + SBF toolchain worker (G2) — the last implementation worker. Documentation synced: AGENTS.md/CLAUDE.md/CONTEXT.md/docs/AGENT_CONTEXT.md (552-test status, 4n contract), README.md + app/README.md (operator truth), spec Amendment 2.

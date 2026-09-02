@@ -776,3 +776,12 @@ Post-90: mainnet-beta with capped TVL, bug bounty, formal verification via QEDGe
 This specification remains the normative product and security contract. The repository has since been scaffolded, but the current implementation is not localnet-ready: protocol transfer/mint/burn paths, backend/indexer wiring, wallet flows, and strict frontend typing still have known gaps. The execution order and verified findings are recorded in `plan.md` and `docs/ui-discovery-2026-09-01.md`.
 
 Do not interpret the passing unit-test counts as proof of end-to-end protocol correctness. Before devnet/mainnet work, complete the real-account localnet flow and the P0/P1 security checklist in this document.
+
+### Amendment 2 — 2026-09-01 (implementation waves complete)
+
+The gaps listed above have been closed in an orchestrated implementation wave (details and evidence in `plan.md` §6-§8):
+
+- §3 instructions are fully implemented with real Token-2022 CPIs (`transfer_checked`/`burn`/`mint_to`, RAW only). `mint_in_kind` carries the whitelist pause gate via a **4n remaining-accounts contract** (3n `[mint, user_ata, vault_ata]` triplets + n `WhitelistedMint` PDAs, fail-closed `MintPaused`); `redeem_in_kind` remains 3n and structurally tested as gate-free. Factory performs atomic seed transfers and mints genesis 1M via a temporary mint authority handed to the basket vault-authority PDA within the same transaction.
+- §4 multiplier reads: the installed `spl-token` 0.4.15 encodes `ScaledUiAmountConfig.multiplier` as **f64** (not the u64 fixed-point sketch in §4.3); the indexer reads f64 with fallback 1.0.
+- §7-8 backend: normative schema live-applied, event decoding, holdings sync, exact BigInt fixed-point NAV, and all §8 routes serve real indexed data with `source`/`asOf` markers; empty/unavailable states are explicit, never fabricated. The backend builds unsigned fee-crank transactions only — it never signs (§2 constraint 5).
+- Tests at amendment time: 178 Rust + 373 backend TS (+1 root legacy). CPI execution paths remain unverified on a live validator until the SBF toolchain blocker (edition2024 platform-tools) is resolved — see `plan.md` §8 localnet E2E status. This supersedes none of the normative constraints; §11 P0/P1 evidence is recorded in the `plan.md` §6 gate table.

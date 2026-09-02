@@ -203,14 +203,14 @@ function StatusLine({
     case "awaiting-signature":
     case "confirming":
       return (
-        <p role="status" className="font-mono text-xs tabular-nums text-[hsl(var(--status-info))]">
+        <p role="status" className="font-mono text-xs tabular-nums text-muted-foreground">
           {statusLabel(state.status)}
         </p>
       );
     case "confirmed":
       return (
         <div role="status" className="space-y-1">
-          <p className="text-xs font-medium text-[hsl(var(--status-positive))]">Confirmed.</p>
+          <p className="text-xs font-medium text-foreground">Confirmed.</p>
           {explorerHref ? (
             <a
               href={explorerHref}

@@ -4,81 +4,79 @@
 
 @layer base {
   :root {
-    /* Light mode — Mineral Desk (brand-design 2026-09-01): warm paper canvas, deep teal ink
-       Designer-critique token changes (2026-09-02, Mineral Desk system):
-       + --border-strong (light 62% / dark 28% L) — card headers + structural dividers;
-         dark value passes 2:1 contrast against --card.
-       ~ --card (dark) raised 6.7% -> 8.0% lightness — primary panels one visible
-         elevation step above the canvas (still below --popover 8.4%). */
-    --border-strong: 36.9 11.3% 62.0%;
-    --background: 33.3 47.4% 96.3%;
-    --foreground: 38.2 40.7% 5.3%;
+    /* Monochrome (user decision 2026-09-02) — replaces Mineral Desk; single accent retired;
+       destructive red is the only color, errors only. */
+    --border-strong: 0.0 0.0% 62.0%;
+    --background: 0.0 0.0% 100.0%;
+    --foreground: 0.0 0.0% 3.9%;
     --card: 0.0 0.0% 100.0%;
-    --card-foreground: 38.2 40.7% 5.3%;
+    --card-foreground: 0.0 0.0% 3.9%;
     --popover: 0.0 0.0% 100.0%;
-    --popover-foreground: 38.2 40.7% 5.3%;
-    --primary: 172.1 100.0% 17.8%;
-    --primary-foreground: 0.0 0.0% 97.3%;
-    --secondary: 32.0 31.9% 90.8%;
-    --secondary-foreground: 38.2 40.7% 5.3%;
-    --muted: 33.3 23.1% 92.4%;
-    --muted-foreground: 34.7 11.5% 32.4%;
-    --accent: 40.0 27.3% 89.2%;
-    --accent-foreground: 38.2 40.7% 5.3%;
-    --destructive: 352.0 91.9% 43.3%;
-    --destructive-foreground: 0.0 0.0% 97.3%;
-    --border: 36.9 11.3% 77.5%;
-    --input: 33.3 27.3% 93.5%;
-    --ring: 172.1 100.0% 17.8%;
-    --status-positive: 132.9 30.8% 58.6%;
-    --status-caution: 40.9 50.7% 58.6%;
-    --status-info: 210.8 41.3% 63.9%;
-    --chart-1: 217.2 57.7% 75.9%;
-    --chart-2: 130.9 25.3% 65.9%;
-    --chart-3: 42.9 2.9% 52.0%;
-    --chart-4: 40.9 50.7% 58.6%;
-    --chart-5: 210.8 41.3% 63.9%;
+    --popover-foreground: 0.0 0.0% 3.9%;
+    --primary: 0.0 0.0% 9.0%;
+    --primary-foreground: 0.0 0.0% 98.0%;
+    --secondary: 0.0 0.0% 96.1%;
+    --secondary-foreground: 0.0 0.0% 9.0%;
+    --muted: 0.0 0.0% 96.1%;
+    --muted-foreground: 0.0 0.0% 45.1%;
+    --accent: 0.0 0.0% 96.1%;
+    --accent-foreground: 0.0 0.0% 9.0%;
+    --destructive: 0.0 84.2% 60.2%;
+    --destructive-foreground: 0.0 0.0% 98.0%;
+    --border: 0.0 0.0% 89.8%;
+    --input: 0.0 0.0% 89.8%;
+    --ring: 0.0 0.0% 9.0%;
+    --status-positive: 0.0 0.0% 35.0%;
+    --status-caution: 0.0 0.0% 45.0%;
+    --status-info: 0.0 0.0% 55.0%;
+    /* Chart series are grayscale: distinguished by lightness (+ dash pattern
+       for the benchmark series in chart components). */
+    --chart-1: 0.0 0.0% 9.0%;
+    --chart-2: 0.0 0.0% 30.0%;
+    --chart-3: 0.0 0.0% 50.0%;
+    --chart-4: 0.0 0.0% 68.0%;
+    --chart-5: 0.0 0.0% 84.0%;
     --radius: 0.625rem;
-    --chart-background: 33.3 47.4% 96.3%;
-    --chart-foreground: 38.2 40.7% 5.3%;
-    --chart-grid: 36.9 11.3% 77.5%;
+    --chart-background: 0.0 0.0% 100.0%;
+    --chart-foreground: 0.0 0.0% 3.9%;
+    --chart-grid: 0.0 0.0% 89.8%;
     --chart-line-primary: hsl(var(--chart-1));
     --chart-line-secondary: hsl(var(--chart-2));
   }
   .dark {
-    /* Dark mode — Mineral Desk (brand-design 2026-09-01): warm near-black canvas, mineral-mint ink */
-    --border-strong: 35.0 10.0% 28.0%;
-    --background: 34.3 46.7% 2.9%;
-    --foreground: 33.3 25.7% 93.1%;
-    --card: 36.0 29.4% 8.0%;
-    --card-foreground: 33.3 25.7% 93.1%;
-    --popover: 32.7 25.6% 8.4%;
-    --popover-foreground: 33.3 25.7% 93.1%;
-    --primary: 169.4 50.0% 60.0%;
-    --primary-foreground: 0.0 0.0% 1.2%;
-    --secondary: 34.7 38.8% 9.6%;
-    --secondary-foreground: 33.3 25.7% 93.1%;
-    --muted: 32.7 25.6% 8.4%;
-    --muted-foreground: 37.5 3.5% 55.7%;
-    --accent: 42.4 29.8% 11.2%;
-    --accent-foreground: 33.3 25.7% 93.1%;
-    --destructive: 359.0 93.9% 61.6%;
-    --destructive-foreground: 0.0 0.0% 97.3%;
-    --border: 30.0 12.7% 18.4%;
-    --input: 36.0 29.4% 6.7%;
-    --ring: 169.4 50.0% 60.0%;
-    --status-positive: 132.9 30.8% 58.6%;
-    --status-caution: 40.9 50.7% 58.6%;
-    --status-info: 210.8 41.3% 63.9%;
-    --chart-1: 217.2 57.7% 75.9%;
-    --chart-2: 130.9 25.3% 65.9%;
-    --chart-3: 42.9 2.9% 52.0%;
-    --chart-4: 40.9 50.7% 58.6%;
-    --chart-5: 210.8 41.3% 63.9%;
+    /* Monochrome dark — near-black neutral canvas, white primary (classic shadcn dark). */
+    --border-strong: 0.0 0.0% 28.0%;
+    --background: 0.0 0.0% 3.9%;
+    --foreground: 0.0 0.0% 98.0%;
+    --card: 0.0 0.0% 7.0%;
+    --card-foreground: 0.0 0.0% 98.0%;
+    --popover: 0.0 0.0% 9.0%;
+    --popover-foreground: 0.0 0.0% 98.0%;
+    --primary: 0.0 0.0% 98.0%;
+    --primary-foreground: 0.0 0.0% 9.0%;
+    --secondary: 0.0 0.0% 14.0%;
+    --secondary-foreground: 0.0 0.0% 98.0%;
+    --muted: 0.0 0.0% 14.0%;
+    --muted-foreground: 0.0 0.0% 63.0%;
+    --accent: 0.0 0.0% 16.0%;
+    --accent-foreground: 0.0 0.0% 98.0%;
+    --destructive: 0.0 72.0% 50.0%;
+    --destructive-foreground: 0.0 0.0% 98.0%;
+    --border: 0.0 0.0% 14.9%;
+    --input: 0.0 0.0% 14.9%;
+    --ring: 0.0 0.0% 98.0%;
+    --status-positive: 0.0 0.0% 85.0%;
+    --status-caution: 0.0 0.0% 70.0%;
+    --status-info: 0.0 0.0% 55.0%;
+    --chart-1: 0.0 0.0% 100.0%;
+    --chart-2: 0.0 0.0% 85.0%;
+    --chart-3: 0.0 0.0% 65.0%;
+    --chart-4: 0.0 0.0% 45.0%;
+    --chart-5: 0.0 0.0% 30.0%;
     --radius: 0.625rem;
-    --chart-background: 34.3 46.7% 2.9%;
-    --chart-foreground: 33.3 25.7% 93.1%;
-    --chart-grid: 30.0 12.7% 18.4%;
+    --chart-background: 0.0 0.0% 3.9%;
+    --chart-foreground: 0.0 0.0% 98.0%;
+    --chart-grid: 0.0 0.0% 18.0%;
     --chart-line-primary: hsl(var(--chart-1));
     --chart-line-secondary: hsl(var(--chart-2));
   }
@@ -86,23 +84,4 @@
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
-}
-
-@layer utilities {
-  /* Hero-only 1px grid texture (landing spec A4): ≤4% foreground lines via
-     color-mix — no hardcoded hex, rendered nowhere else. */
-  .foliox-hero-grid {
-    background-image:
-      linear-gradient(
-        to right,
-        color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        to bottom,
-        color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
-        transparent 1px
-      );
-    background-size: 32px 32px;
-  }
 }

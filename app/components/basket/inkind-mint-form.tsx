@@ -272,7 +272,7 @@ export function InKindMintForm({
             fee first and re-reads supply.
           </p>
         ) : (
-          <p role="alert" className="text-[hsl(var(--status-caution))]">
+          <p role="alert" className="text-muted-foreground">
             {weightError?.kind === "WeightMismatch"
               ? `WeightMismatch — deposits are off the vault ratios by more than 1%. Leg ${
                   weightError.minIndex + 1
@@ -349,7 +349,7 @@ export function InKindMintForm({
           flow.state.mintPaused ? (
             <div
               role="alert"
-              className="mt-4 rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-3 text-xs leading-relaxed"
+              className="mt-4 rounded-md border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed"
             >
               <p className="font-medium">MintPaused — the on-chain whitelist gate stopped this mint</p>
               <p className="mt-1 text-muted-foreground">

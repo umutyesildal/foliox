@@ -383,7 +383,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                 Missing constituent ATAs are created for you inside the transaction (you pay the
                 rent). Rounding dust stays in the vault and favors remaining holders.
               </p>
-              <p className="rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-2 text-[hsl(var(--status-caution))]">
+              <p className="rounded-md border border-border/60 bg-muted/40 p-2 text-muted-foreground">
                 IRREVERSIBLE — burned shares cannot be re-minted, and the pro-rata underlying is
                 transferred immediately on confirmation. Review the account list before signing.
                 LEGAL_REVIEW_REQUIRED: not investment advice; xStocks are Backed Finance

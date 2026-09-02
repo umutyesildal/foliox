@@ -86,7 +86,7 @@ function ChangeCell({ value }: { value: number | null }) {
   return (
     <span
       className={`font-mono text-xs tabular-nums ${
-        positive ? "text-[hsl(var(--status-positive))]" : "text-destructive"
+        positive ? "text-foreground" : "text-muted-foreground"
       }`}
     >
       {positive ? "+" : ""}

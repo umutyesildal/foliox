@@ -68,10 +68,10 @@ export function SiteHeader() {
           href="/"
           className="flex items-center rounded-sm font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          {/* 10px mint mark — pure CSS, no mascot (B4) */}
+          {/* Plain monochrome mark — pure CSS, no mascot */}
           <span
             aria-hidden="true"
-            className="mr-2 inline-block size-2.5 shrink-0 rounded-[2px] bg-primary"
+            className="mr-2 inline-block size-2.5 shrink-0 rounded-[2px] bg-foreground/40"
           />
           FolioX
           <span className="hidden font-normal text-muted-foreground sm:inline">

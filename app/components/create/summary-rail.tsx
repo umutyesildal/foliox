@@ -67,15 +67,15 @@ export function SummaryRail({
         <dt className="text-muted-foreground">Constituents</dt>
         <dd className="text-right font-mono tabular-nums">
           {summary.constituentCount}{" "}
-          <span className={validity.selection ? "text-[hsl(var(--status-positive))]" : "text-[hsl(var(--status-caution))]"}>2-20</span>
+          <span className={validity.selection ? "text-foreground" : "text-muted-foreground"}>2-20</span>
         </dd>
         <dt className="text-muted-foreground">Weight sum</dt>
         <dd
           className={cn(
             "text-right font-mono tabular-nums",
             validity.weights
-              ? "text-[hsl(var(--status-positive))]"
-              : "text-[hsl(var(--status-caution))]",
+              ? "text-foreground"
+              : "text-muted-foreground",
           )}
         >
           {summary.weightSum.toLocaleString()} / 10,000 bps
@@ -106,7 +106,7 @@ export function SummaryRail({
         <dd
           className={cn(
             "text-right",
-            validity.legal ? "text-[hsl(var(--status-positive))]" : "text-[hsl(var(--status-caution))]",
+            validity.legal ? "text-foreground" : "text-muted-foreground",
           )}
         >
           {validity.legal ? "Acknowledged" : "4 checks required"}
@@ -135,7 +135,7 @@ export function SummaryRail({
         <dd
           className={cn(
             "text-right font-mono tabular-nums",
-            txSize > 1232 && "text-[hsl(var(--status-caution))]",
+            txSize > 1232 && "text-muted-foreground",
           )}
           title="v0 transaction, no address lookup tables; the 1232-byte packet limit applies"
         >
@@ -163,7 +163,7 @@ export function SummaryRail({
                   className={cn(
                     "font-mono tabular-nums",
                     valid
-                      ? "text-[hsl(var(--status-positive))]"
+                      ? "text-foreground"
                       : "text-muted-foreground/60",
                   )}
                 >

@@ -274,7 +274,7 @@ export function DeployPanel({
   if (phase === "confirmed" && signature) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-lg border border-[hsl(var(--status-positive))]/40 bg-[hsl(var(--status-positive))]/10 p-4">
+        <div className="rounded-lg border border-border/60 bg-muted/40 p-4">
           <p className="text-sm font-medium">Basket deployed</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
             create_basket confirmed. Genesis {GENESIS_SHARES.toLocaleString()} shares were minted
@@ -351,7 +351,7 @@ export function DeployPanel({
           <span className="text-muted-foreground">(entry / exit / mgmt)</span>
         </dd>
         <dt className="text-muted-foreground">Est. tx size</dt>
-        <dd className={`font-mono tabular-nums ${overLimit ? "text-[hsl(var(--status-caution))]" : ""}`}>
+        <dd className={`font-mono tabular-nums ${overLimit ? "text-muted-foreground" : ""}`}>
           ~{estSize.toLocaleString()} B {overLimit ? `— exceeds the ${PACKET_LIMIT} B packet limit without lookup tables` : ""}
         </dd>
       </dl>
@@ -388,7 +388,7 @@ export function DeployPanel({
         />
       )}
       {overLimit && !blocked && (
-        <p className="rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-2.5 text-xs leading-5 text-muted-foreground">
+        <p className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
           This basket touches {9 + constituents.length * 4} accounts, so the
           serialized transaction is ~{estSize.toLocaleString()} bytes — over the
           {` ${PACKET_LIMIT} `}byte Solana packet limit without address lookup
@@ -559,7 +559,7 @@ export function DeployPanel({
                   })}
                 </ul>
               ) : (
-                <p className="mt-2 font-mono text-xs text-[hsl(var(--status-positive))]">
+                <p className="mt-2 font-mono text-xs text-foreground">
                   All creator ATAs cover the raw seed amounts.
                 </p>
               )}

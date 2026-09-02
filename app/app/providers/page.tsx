@@ -95,7 +95,7 @@ function RoleBadge({ type }: { type: string }) {
     return (
       <Badge
         variant="outline"
-        className="border-[hsl(var(--status-info))]/50 text-[hsl(var(--status-info))]"
+        className="border-border/60 text-muted-foreground"
       >
         issuer
       </Badge>
@@ -121,8 +121,8 @@ function HealthBadge({ healthy, label }: { healthy: boolean | null; label: strin
       variant="outline"
       className={
         healthy
-          ? "border-[hsl(var(--status-positive))]/50 text-[hsl(var(--status-positive))]"
-          : "border-[hsl(var(--status-caution))]/50 text-[hsl(var(--status-caution))]"
+          ? "border-border/60 text-foreground"
+          : "border-border/60 text-muted-foreground"
       }
     >
       {label}
@@ -245,8 +245,8 @@ export default async function ProvidersPage() {
                           variant="outline"
                           className={
                             p.status === "Active"
-                              ? "border-[hsl(var(--status-positive))]/50 text-[hsl(var(--status-positive))]"
-                              : "border-[hsl(var(--status-caution))]/50 text-[hsl(var(--status-caution))]"
+                              ? "border-border/60 text-foreground"
+                              : "border-border/60 text-muted-foreground"
                           }
                         >
                           {p.status}

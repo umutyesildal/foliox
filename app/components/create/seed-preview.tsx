@@ -94,8 +94,8 @@ export function SeedPreview({
       </div>
 
       {missingPrices && (
-        <p className="flex items-start gap-2 rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-2.5 text-xs leading-5 text-muted-foreground">
-          <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-[hsl(var(--status-caution))]" aria-hidden="true" />
+        <p className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
+          <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           {priceStatus === "loading"
             ? "Loading reference prices…"
             : "No reference price for at least one constituent. Enter raw amounts directly — the USD column is omitted where no price exists."}
@@ -173,7 +173,7 @@ export function SeedPreview({
       </div>
 
       {zeroSeeds && (
-        <p className="flex items-start gap-2 rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-2.5 text-xs leading-5 text-[hsl(var(--status-caution))]">
+        <p className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
           <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
           Every seed amount must be greater than zero — the factory reverts on
           ZeroSeedAmount, and the atomic seed transfer is what prevents empty

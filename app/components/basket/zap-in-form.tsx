@@ -355,7 +355,7 @@ export function ZapInForm({
           {/* verbatim backend warning — always inline for zap quotes */}
           <div
             role="note"
-            className="rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-3 text-xs leading-relaxed text-[hsl(var(--status-caution))]"
+            className="rounded-md border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground"
           >
             {quote.warning}
           </div>
@@ -435,7 +435,7 @@ export function ZapInForm({
           flow.state.mintPaused ? (
             <div
               role="alert"
-              className="mt-4 rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-3 text-xs leading-relaxed"
+              className="mt-4 rounded-md border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed"
             >
               <p className="font-medium">MintPaused — the on-chain whitelist gate stopped this mint</p>
               <p className="mt-1 text-muted-foreground">

@@ -134,7 +134,7 @@ function StatChip({ label, change }: { label: string; change: number }) {
       <span className="text-muted-foreground">{label}</span>
       <span
         className={`font-mono tabular-nums ${
-          positive ? "text-[hsl(var(--status-positive))]" : "text-destructive"
+          positive ? "text-foreground" : "text-muted-foreground"
         }`}
       >
         {positive ? "+" : ""}
@@ -233,7 +233,7 @@ export default async function MarketPage({
       </nav>
 
       {demo ? (
-        <p className="rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 px-3 py-2 text-sm text-muted-foreground">
+        <p className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           The market API is unreachable, so this view renders a static fixture. It is labeled demo
           and must not be read as live index data.
         </p>

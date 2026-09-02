@@ -323,8 +323,8 @@ export default function BasketDetailPage({
                         : drift === 0
                           ? "text-muted-foreground"
                           : drift > 0
-                            ? "text-[hsl(var(--status-positive))]"
-                            : "text-[hsl(var(--status-caution))]";
+                            ? "text-foreground"
+                            : "text-muted-foreground";
                     return (
                       <TableRow key={mint}>
                         <TableCell className="pl-4 font-mono text-xs tabular-nums">
@@ -419,7 +419,7 @@ export default function BasketDetailPage({
                   it works over any RPC even if this indexer is offline. The whitelist pause
                   blocks <span className="font-mono">mint</span> only, never redeem.
                 </p>
-                <p className="rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-2 text-[hsl(var(--status-caution))]">
+                <p className="rounded-md border border-border/60 bg-muted/40 p-2 text-muted-foreground">
                   Redeem is irreversible once confirmed: burned shares cannot be re-minted and the
                   pro-rata output is transferred immediately. LEGAL_REVIEW_REQUIRED — not
                   investment advice; xStocks are Backed Finance structured instruments with issuer

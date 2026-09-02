@@ -30,7 +30,7 @@ export function NetworkIndicator({ className }: { className?: string }) {
         aria-hidden="true"
         className={cn(
           "size-1.5 shrink-0 rounded-full",
-          health === "reachable" && "bg-primary",
+          health === "reachable" && "bg-foreground/60",
           health === "unreachable" && "bg-destructive",
           (health === "checking" || health === "idle") &&
             "animate-pulse bg-muted-foreground motion-reduce:animate-none",

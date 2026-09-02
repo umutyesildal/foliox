@@ -120,7 +120,7 @@ export function FeesEditor({
           fees are paid in basket shares — the vault never pays out underlying
           for fees.
         </p>
-        <p className="rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-2.5 text-[11px] leading-4 text-muted-foreground">
+        <p className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-[11px] leading-4 text-muted-foreground">
           The 90/10 split is creator compensation and is disclosed pre-mint.
           LEGAL_REVIEW_REQUIRED — placeholder copy pending counsel review.
         </p>

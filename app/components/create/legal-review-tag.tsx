@@ -9,7 +9,7 @@ export function LegalReviewTag({ className }: { className?: string }) {
       role="note"
       aria-label="Placeholder copy pending legal review"
       className={
-        "inline-flex items-center rounded-[4px] border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-[hsl(var(--status-caution))] " +
+        "inline-flex items-center rounded-[4px] border border-border/60 bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-muted-foreground " +
         (className ?? "")
       }
     >

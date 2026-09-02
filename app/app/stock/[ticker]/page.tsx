@@ -178,9 +178,9 @@ export default async function StockPage({
                   diffBps === null
                     ? ""
                     : depeg
-                      ? "text-[hsl(var(--status-caution))]"
+                      ? "text-muted-foreground"
                       : diffBps >= 0
-                        ? "text-[hsl(var(--status-positive))]"
+                        ? "text-foreground"
                         : "text-destructive"
                 }`}
               >
@@ -192,14 +192,14 @@ export default async function StockPage({
                 ) : depeg ? (
                   <Badge
                     variant="outline"
-                    className="border-[hsl(var(--status-caution))]/50 text-[hsl(var(--status-caution))]"
+                    className="border-border/60 text-muted-foreground"
                   >
                     Depeg &gt; 2%
                   </Badge>
                 ) : (
                   <Badge
                     variant="outline"
-                    className="border-[hsl(var(--status-positive))]/50 text-[hsl(var(--status-positive))]"
+                    className="border-border/60 text-foreground"
                   >
                     Aligned
                   </Badge>

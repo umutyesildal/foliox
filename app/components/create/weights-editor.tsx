@@ -125,8 +125,8 @@ export function WeightsEditor({
           className={cn(
             "ml-auto rounded-full border px-2.5 py-1 font-mono text-xs tabular-nums",
             valid
-              ? "border-[hsl(var(--status-positive))]/40 bg-[hsl(var(--status-positive))]/10 text-[hsl(var(--status-positive))]"
-              : "border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 text-[hsl(var(--status-caution))]",
+              ? "border-border/60 bg-muted/40 text-foreground"
+              : "border-border/60 bg-muted/40 text-muted-foreground",
           )}
         >
           {sum.toLocaleString()} / 10,000 bps
@@ -160,7 +160,7 @@ export function WeightsEditor({
       </ul>
 
       {!valid && (
-        <p className="flex items-start gap-2 rounded-md border border-[hsl(var(--status-caution))]/40 bg-[hsl(var(--status-caution))]/10 p-2.5 text-xs leading-5 text-[hsl(var(--status-caution))]">
+        <p className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
           <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
           The program reverts unless weights sum to exactly 10,000 bps
           (WeightsNot10000). Drag a slider or run Normalize.

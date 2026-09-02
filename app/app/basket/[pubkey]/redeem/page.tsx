@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
+import { SiteFooter } from "@/components/shell";
 import { AccrueCrankButton } from "@/components/basket/accrue-crank";
 import { computeRedeemPreview, formatRawShares6, parseRawInput } from "@/components/basket/basket-math";
 import {
@@ -467,6 +468,8 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
           />
         </>
       ) : null}
+
+      <SiteFooter />
     </div>
   );
 }

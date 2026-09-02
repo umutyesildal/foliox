@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SiteFooter } from "@/components/shell";
 import { truncateAddress } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -367,6 +368,8 @@ export default async function ProvidersPage() {
         </p>
         <p>LEGAL_REVIEW_REQUIRED: issuer disclosure must be approved by counsel before mainnet.</p>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

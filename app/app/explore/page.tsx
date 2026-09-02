@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { SiteFooter } from "@/components/shell";
 import ExploreClient from "./explore-client";
 
 export const metadata: Metadata = {
@@ -9,5 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default function ExplorePage() {
-  return <ExploreClient />;
+  return (
+    <>
+      <ExploreClient />
+      <SiteFooter />
+    </>
+  );
 }

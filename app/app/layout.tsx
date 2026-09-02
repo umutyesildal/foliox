@@ -2,7 +2,6 @@ import "./globals.css";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
 import { AppProviders } from "./providers";
 
@@ -26,7 +25,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
               {children}
             </main>
-            <SiteFooter />
+            {/* SiteFooter is included per page (not here) so the landing page
+                ships without it. Pages that include it: explore, market,
+                providers, basket/[pubkey] (+ buy/redeem), create, portfolio,
+                legal, creator/[pubkey], stock/[ticker]. */}
           </div>
         </AppProviders>
       </body>

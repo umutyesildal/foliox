@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PublicKey } from "@solana/web3.js";
 
+import { SiteFooter } from "@/components/shell";
 import { EmptyState, ErrorState, FreshnessBadge, TableRowSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import {
@@ -285,6 +286,8 @@ export default function CreatorPage() {
           </p>
         </>
       )}
+
+      <SiteFooter />
     </div>
   );
 }

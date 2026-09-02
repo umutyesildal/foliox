@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import MarketChart, { type MarketSeriesMeta } from "./market-chart";
+import { SiteFooter } from "@/components/shell";
 import { FreshnessBadge } from "@/components/states";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -268,6 +269,8 @@ export default async function MarketPage({
           Data providers
         </Button>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

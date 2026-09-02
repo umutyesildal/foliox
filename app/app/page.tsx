@@ -1,10 +1,26 @@
+import Image from "next/image";
 import Link from "next/link";
 
 /**
+ * Hero product visual — a real product screenshot. To swap it later, replace
+ * the file at app/public/brand/market-hero.png (keep the path) or edit this
+ * single constant: src / alt / width / height. Recommended export: 1600×900
+ * (16:9) PNG, monochrome UI screenshot. Update the alt text to describe the
+ * new image honestly.
+ */
+const HERO_IMAGE = {
+  src: "/brand/market-hero.png",
+  alt: "FolioX Market page — live Nasdaq benchmarks normalized to 100",
+  width: 1600,
+  height: 900,
+} as const;
+
+/**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02):
- * a badge line, h1, one subline, two CTAs, then one quiet Create → Mint →
- * Redeem row and the footer. No texture, stats, devices, or data fetch —
- * details live on the other pages.
+ * a badge line, h1, one subline, two CTAs, then the real product visual, one
+ * quiet Create → Mint → Redeem row and a single muted disclosure line. No
+ * texture, stats, devices, or data fetch — details live on the other pages.
+ * The landing deliberately renders no SiteFooter; footers are per-page.
  */
 export default function LandingPage() {
   return (
@@ -36,6 +52,24 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Real product visual — framed screenshot, captioned with source honesty. */}
+      <section
+        aria-label="Product preview"
+        className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6"
+      >
+        <Image
+          src={HERO_IMAGE.src}
+          alt={HERO_IMAGE.alt}
+          width={HERO_IMAGE.width}
+          height={HERO_IMAGE.height}
+          priority
+          className="h-auto w-full rounded-lg border border-border/80 ring-1 ring-border"
+        />
+        <p className="mt-2 text-center font-mono text-[11px] text-muted-foreground">
+          Live market view · Yahoo Finance · as-of labeled
+        </p>
+      </section>
+
       {/* Single quiet section — three one-liners, no snippets. */}
       <section
         aria-label="How FolioX works"
@@ -56,6 +90,17 @@ export default function LandingPage() {
           </li>
         </ul>
       </section>
+
+      {/* Not a footer block — one tiny muted disclosure line. */}
+      <p className="mx-auto w-full max-w-3xl px-4 pb-10 text-center text-[11px] text-muted-foreground sm:px-6">
+        Not investment advice · xStocks are structured instruments ·{" "}
+        <Link
+          href="/legal"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Risks &amp; Disclosures
+        </Link>
+      </p>
     </div>
   );
 }

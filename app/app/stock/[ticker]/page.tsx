@@ -7,6 +7,7 @@ import { FreshnessBadge } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SiteFooter } from "@/components/shell";
 import { CopyButton } from "@/components/ui/copy-button";
 import { formatUsd } from "@/lib/format";
 
@@ -259,6 +260,8 @@ export default async function StockPage({
           issuer and depeg risk, and the token is not the underlying share.
         </p>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

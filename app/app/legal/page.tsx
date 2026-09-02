@@ -1,3 +1,4 @@
+import { SiteFooter } from "@/components/shell";
 import { LegalReviewTag } from "@/components/create/legal-review-tag";
 
 interface Section {
@@ -125,6 +126,8 @@ export default function LegalPage() {
           review status: <LegalReviewTag />.
         </p>
       </footer>
+
+      <SiteFooter />
     </div>
   );
 }

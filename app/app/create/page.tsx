@@ -27,6 +27,7 @@ import {
   type LegalAcknowledgments,
   type WhitelistRow,
 } from "@/components/create/types";
+import { SiteFooter } from "@/components/shell";
 import { sha256Hex } from "@/lib/create-basket";
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
@@ -453,6 +454,8 @@ export default function CreatePage() {
           {whitelistSource ? `whitelist source: ${whitelistSource}` : ""}
         </p>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

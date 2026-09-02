@@ -7,7 +7,7 @@ use anchor_spl::token_interface::{
     TransferChecked,
 };
 
-declare_id!("37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1");
+declare_id!("6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k");
 
 /// Seed for both the `Basket` account PDA (with factory/creator/nonce) and the
 /// vault/share-mint authority PDA (with the basket key).
@@ -25,7 +25,7 @@ pub const CREATOR_FEE_SPLIT_BPS: u16 = 9000;
 /// PDA. Env-free constant on purpose (no dev override may weaken the gate) and
 /// cross-checked against `declare_id!` in programs/whitelist/src/lib.rs:5 and
 /// Anchor.toml's `whitelist` entry.
-pub const WHITELIST_PROGRAM_ID: Pubkey = pubkey!("bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz");
+pub const WHITELIST_PROGRAM_ID: Pubkey = pubkey!("FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS");
 
 /// 8-byte Anchor account discriminator of the whitelist program's
 /// `WhitelistedMint` account: `sha256("account:WhitelistedMint")[..8]`.
@@ -1760,7 +1760,7 @@ mod paused_gate_tests {
         // and Anchor.toml's `whitelist` entry.
         assert_eq!(
             WHITELIST_PROGRAM_ID.to_string(),
-            "bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz"
+            "FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS"
         );
     }
 

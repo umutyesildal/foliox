@@ -5,13 +5,13 @@ use anchor_spl::associated_token::{
 use anchor_spl::token_2022::spl_token_2022::instruction::AuthorityType;
 use anchor_spl::token_2022::ID as TOKEN_2022_PROGRAM_ID;
 use anchor_spl::token_interface::{
-    mint_to, set_authority, transfer_checked, Mint, MintTo, TokenAccount, TokenInterface,
-    TransferChecked, SetAuthority,
+    find_mint_account_size, initialize_mint2, mint_to, set_authority, transfer_checked, InitializeMint2,
+    Mint, MintTo, TokenAccount, TokenInterface, TransferChecked, SetAuthority,
 };
 use basket::Basket as BasketAccount;
 use whitelist::WhitelistedMint;
 
-declare_id!("sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq");
+declare_id!("3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF");
 
 pub const FACTORY_SEED: &[u8] = b"factory";
 pub const BASKET_SEED: &[u8] = b"basket";
@@ -109,6 +109,23 @@ pub mod basket_factory {
             vault_authority_key,
             FactoryError::InvalidVaultAuthority
         );
+
+        // Create the Token-2022 share mint PDA (moved out of the context's
+        // `init` constraint to keep `try_accounts` under the SBF stack limit —
+        // the seeds/bump constraint already proved the address above is the
+        // genuine `["share_mint", basket.key()]` PDA). This is the same
+        // create_account + initialize_mint2 the Anchor init used to emit, so
+        // the on-chain result is identical (6 decimals, mint authority =
+        // factory PDA, no freeze authority). Failures revert the whole tx.
+        init_share_mint(
+            &ctx.accounts.creator,
+            &ctx.accounts.share_mint,
+            &ctx.accounts.system_program,
+            token_program,
+            &factory_key,
+            ctx.bumps.share_mint,
+            &basket_key,
+        )?;
 
         // ---- per-constituent validation (no lazy trust, validate before act) ----
         // 1. WhitelistedMint PDA: owned by the whitelist program, genuine PDA for
@@ -458,6 +475,57 @@ pub fn decode_whitelisted_mint(data: &[u8]) -> Result<WhitelistedMint> {
     WhitelistedMint::try_deserialize(&mut &data[..])
 }
 
+/// Creates the Token-2022 share mint PDA: system `create_account` (extension
+/// -less spl_token_2022 Mint length, rent-exempt) + `initialize_mint2` with
+/// the factory PDA as mint authority and no freeze authority — the same
+/// on-chain effect as the former Anchor `init, mint::decimals/authority/
+/// token_program` constraint. Lives here (not in the `#[derive(Accounts)]`
+/// context) so Anchor does not inline the mint-initialization code into
+/// `CreateBasket::try_accounts`, whose stack frame must stay under the 4 KB
+/// SBF limit. `share_mint_bump` is the PDA bump verified by the context's
+/// seeds constraint; `basket_key` completes the PDA signer seeds so the
+/// factory program can sign for the mint PDA.
+#[inline(never)]
+pub fn init_share_mint<'info>(
+    payer: &Signer<'info>,
+    share_mint: &UncheckedAccount<'info>,
+    system_program: &Program<'info, System>,
+    token_program: &Interface<'info, TokenInterface>,
+    mint_authority: &Pubkey,
+    share_mint_bump: u8,
+    basket_key: &Pubkey,
+) -> Result<()> {
+    let space = find_mint_account_size(None)? as u64;
+    let lamports = Rent::get()?.minimum_balance(space as usize);
+    let bump_arr = [share_mint_bump];
+    let signer_seeds: &[&[&[u8]]] = &[&[SHARE_MINT_SEED, basket_key.as_ref(), &bump_arr]];
+    anchor_lang::system_program::create_account(
+        CpiContext::new_with_signer(
+            system_program.to_account_info(),
+            anchor_lang::system_program::CreateAccount {
+                from: payer.to_account_info(),
+                to: share_mint.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        lamports,
+        space,
+        &token_program.key(),
+    )?;
+    initialize_mint2(
+        CpiContext::new(
+            token_program.to_account_info(),
+            InitializeMint2 {
+                mint: share_mint.to_account_info(),
+            },
+        ),
+        SHARE_MINT_DECIMALS,
+        mint_authority,
+        None,
+    )?;
+    Ok(())
+}
+
 #[derive(Accounts)]
 pub struct InitFactory<'info> {
     #[account(init, payer = authority, space = 8 + FactoryConfig::SIZE, seeds = [FACTORY_SEED], bump)]
@@ -481,20 +549,16 @@ pub struct CreateBasket<'info> {
     )]
     pub basket: Account<'info, BasketAccount>,
     /// Basket share mint — Token-2022, 6 decimals, PDA seeds
-    /// `["share_mint", basket.key()]`. Initialized with the factory PDA as
-    /// TEMPORARY mint authority; `create_basket` mints the genesis supply in
-    /// the same atomic tx and then transfers the mint authority to the basket
-    /// program's vault authority PDA (see handler).
-    #[account(
-        init,
-        payer = creator,
-        mint::decimals = SHARE_MINT_DECIMALS,
-        mint::authority = factory.key(),
-        mint::token_program = token_program,
-        seeds = [SHARE_MINT_SEED, basket.key().as_ref()],
-        bump,
-    )]
-    pub share_mint: InterfaceAccount<'info, Mint>,
+    /// `["share_mint", basket.key()]`. Created in-handler by `init_share_mint`
+    /// with the factory PDA as TEMPORARY mint authority; `create_basket` mints
+    /// the genesis supply in the same atomic tx and then transfers the mint
+    /// authority to the basket program's vault authority PDA (see handler).
+    /// The `init` itself lives in the handler (not in this context) because the
+    /// Token-2022 mint-initialization code Anchor otherwise inlines into the
+    /// generated `try_accounts` overflows the 4 KB SBF stack frame limit.
+    /// The seeds/bump constraint still verifies the PDA address here.
+    #[account(mut, seeds = [SHARE_MINT_SEED, basket.key().as_ref()], bump)]
+    pub share_mint: UncheckedAccount<'info>,
     /// CHECK: the basket program's vault/share-mint authority PDA
     /// (seeds `["basket", basket.key()]` under the basket program id — a plain
     /// Anchor seeds constraint here would derive under the FACTORY program id).

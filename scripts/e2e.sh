@@ -84,9 +84,9 @@ echo "== FolioX localnet E2E =="
 echo "repo:      $REPO_ROOT"
 echo "rpc:       $RPC_URL"
 echo "state dir: $STATE_DIR"
-echo "programs:  whitelist bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz"
-echo "           factory  sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq"
-echo "           basket   37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1"
+echo "programs:  whitelist FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS"
+echo "           factory  3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF"
+echo "           basket   6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k"
 
 # ---------------- 1. preflight ----------------
 STEP="preflight"
@@ -103,6 +103,7 @@ fi
 
 # ---------------- 2. validator (fresh ledger) ----------------
 STEP="validator (fresh ledger)"
+export COPYFILE_DISABLE=1  # macOS AppleDouble ._genesis.bin tar bug
 if solana-test-validator \
      --ledger "$LEDGER_DIR" \
      --rpc-port "$RPC_PORT" \
@@ -142,15 +143,18 @@ if [[ $DEPLOY_READY -eq 0 ]]; then
   echo "  blocked: program binaries/keypairs absent. Known blockers B1 (SBF toolchain) and B2 (declared program ids are off-curve -> undeployable; needs declare_id! regeneration) — see file header."
 else
   KP_MISMATCH=0
-  declare -A DECLARED=(
-    [whitelist]="bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz"
-    [basket_factory]="sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq"
-    [basket]="37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1"
-  )
+  # bash-3.2 compatible (macOS stock bash): associative arrays unsupported.
+  declared_id() {
+    case "$1" in
+      whitelist)      echo "FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS" ;;
+      basket_factory) echo "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF" ;;
+      basket)         echo "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k" ;;
+    esac
+  }
   for prog in whitelist basket_factory basket; do
     kp_addr="$(solana-keygen pubkey "target/deploy/$prog-keypair.json" 2>/dev/null || echo "")"
-    if [[ "$kp_addr" != "${DECLARED[$prog]}" ]]; then
-      echo "  $prog keypair $kp_addr != declared ${DECLARED[$prog]}"
+    if [[ "$kp_addr" != "$(declared_id "$prog")" ]]; then
+      echo "  $prog keypair $kp_addr != declared $(declared_id "$prog")"
       KP_MISMATCH=1
     fi
   done
@@ -184,6 +188,9 @@ fi
 export FOLIOX_E2E_PAYER="$STATE_DIR/payer.json"
 # Independent treasury wallet so the 90/10 fee split is on-chain observable.
 export FOLIOX_E2E_TREASURY="$STATE_DIR/treasury.json"
+# Generate the treasury keypair up front: createBasket.ts loads it strictly
+# via keypairFromFile (it never signs or holds SOL).
+solana-keygen new --no-bip39-passphrase -o "$FOLIOX_E2E_TREASURY" --force --silent
 
 # Generate the payer keypair up front (funded by the scripts themselves).
 npx -y tsx -e 'import { payerKeypair } from "./scripts/lib.ts"; console.log("payer:", payerKeypair().publicKey.toBase58());' 2>&1 | tail -1

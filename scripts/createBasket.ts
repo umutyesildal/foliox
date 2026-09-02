@@ -24,7 +24,7 @@
  * treasury, fees, weights, seedAmounts.
  */
 
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
@@ -139,26 +139,34 @@ async function main() {
       for (const m of mints) {
         console.log(`    ${m.toBase58()} wl=${deriveWhitelistedMint(m).toBase58()}`);
       }
-      await send(
-        conn,
-        "create_basket",
-        [
-          ixCreateBasket({
-            creator,
-            nonce: NONCE,
-            constituents: mints,
-            weightsBps: WEIGHTS,
-            entryFeeBps: ENTRY_FEE_BPS,
-            exitFeeBps: EXIT_FEE_BPS,
-            managementFeeBps: MGMT_FEE_BPS,
-            metadataHash,
-            seedAmounts: SEED_AMOUNTS,
-            shareMint,
-            basket,
-          }),
-        ],
-        [payer],
-      );
+      const createIx = ixCreateBasket({
+        creator,
+        nonce: NONCE,
+        constituents: mints,
+        weightsBps: WEIGHTS,
+        entryFeeBps: ENTRY_FEE_BPS,
+        exitFeeBps: EXIT_FEE_BPS,
+        managementFeeBps: MGMT_FEE_BPS,
+        metadataHash,
+        seedAmounts: SEED_AMOUNTS,
+        shareMint,
+        basket,
+      });
+      try {
+        await send(conn, "create_basket", [createIx], [payer]);
+      } catch (err) {
+        // A failed tx has no on-chain effect, so re-simulating reproduces the
+        // failure and surfaces the program logs (silent 3xxx codes otherwise).
+        console.error(`  create_basket send failed: ${err}`);
+        try {
+          const sim = await conn.simulateTransaction(new Transaction().add(createIx), [payer]);
+          console.error(`  simulation err: ${JSON.stringify(sim.value.err)}`);
+          for (const line of sim.value.logs ?? []) console.error(`    ${line}`);
+        } catch (simErr) {
+          console.error(`  simulation itself failed: ${simErr}`);
+        }
+        throw err;
+      }
     },
   );
 

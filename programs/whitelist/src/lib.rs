@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_2022::ID as TOKEN_2022_PROGRAM_ID;
 use anchor_spl::token_interface::Mint;
 
-declare_id!("bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz");
+declare_id!("FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS");
 
 pub const CONFIG_SEED: &[u8] = b"config";
 pub const MINT_SEED: &[u8] = b"mint";

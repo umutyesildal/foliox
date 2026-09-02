@@ -39,15 +39,15 @@ import path from "path";
 
 /** programs/whitelist — declare_id! (programs/whitelist/src/lib.rs:5). */
 export const WHITELIST_PROGRAM_ID = new PublicKey(
-  "bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz",
+  "FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS",
 );
 /** programs/basket_factory — declare_id! (programs/basket_factory/src/lib.rs:15). */
 export const FACTORY_PROGRAM_ID = new PublicKey(
-  "sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq",
+  "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF",
 );
 /** programs/basket — declare_id! (programs/basket/src/lib.rs:5). */
 export const BASKET_PROGRAM_ID = new PublicKey(
-  "37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1",
+  "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k",
 );
 /** Canonical Token-2022 program. */
 export const TOKEN_2022_PROGRAM_ID = new PublicKey(

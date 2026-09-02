@@ -53,9 +53,9 @@ If you are tempted to add `admin_withdraw`, `pause_redeem`, `oracle check`, or `
 
 ```toml
 # Anchor.toml:5
-whitelist      = "bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz" # programs/whitelist/src/lib.rs:3
-basket_factory = "sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq" # programs/basket_factory/src/lib.rs:6
-basket         = "37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1" # programs/basket/src/lib.rs:4
+whitelist      = "FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS" # programs/whitelist/src/lib.rs:3
+basket_factory = "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF" # programs/basket_factory/src/lib.rs:6
+basket         = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k" # programs/basket/src/lib.rs:4
 ```
 
 **Toolchain (verified):** `rustc 1.98`, `cargo 1.98`, `solana-cli 1.18.17`, `anchor-cli 0.30.1` via `avm 1.1.2` (`~/.cargo/bin`, `~/.avm/bin`, `~/.local/share/solana`). `anchor build` SBF currently blocked by `edition2024` crates on `rustc 1.75` platform-tools — `cargo check`/`cargo test` is authoritative (`scripts/e2e.sh:12` documents). Set `overflow-checks = true` in `Cargo.toml:9`.
@@ -358,9 +358,9 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/foliox
 REDIS_URL=redis://localhost:6379
 RPC_URL=https://api.devnet.solana.com
 HELIUS_API_KEY=
-PROGRAM_WHITELIST=bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz
-PROGRAM_FACTORY=sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq
-PROGRAM_BASKET=37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1
+PROGRAM_WHITELIST=FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS
+PROGRAM_FACTORY=3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF
+PROGRAM_BASKET=6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k
 PORT=3001
 ```
 

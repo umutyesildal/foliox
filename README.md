@@ -26,9 +26,9 @@ npm --prefix app run build                  # 13 routes, no ignored errors
 
 | Program | ID (localnet/devnet) | State |
 |---------|----------------------|-------|
-| `whitelist` | `bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz` | Real; `add_mint` verifies Token-2022 ownership + decimals (extension-aware) |
-| `basket_factory` | `sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq` | Real; full §3.2 validations, atomic seed, genesis mint, real `vault_bump` |
-| `basket` | `37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1` | Real; `mint_in_kind` (4n remaining-accounts contract, pause-gated), `redeem_in_kind` (3n, never gated), `accrue_management_fee` |
+| `whitelist` | `FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS` | Real; `add_mint` verifies Token-2022 ownership + decimals (extension-aware) |
+| `basket_factory` | `3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF` | Real; full §3.2 validations, atomic seed, genesis mint, real `vault_bump` |
+| `basket` | `6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k` | Real; `mint_in_kind` (4n remaining-accounts contract, pause-gated), `redeem_in_kind` (3n, never gated), `accrue_management_fee` |
 
 See `docs/foliox-v0-spec.md` §2-6 for account model, instruction args, mint/redeem math, fee math. Client instruction builders live in `app/lib/transactions.ts` + `app/lib/create-basket.ts` (mirrored from program source, discriminators cross-verified).
 

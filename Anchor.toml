@@ -3,14 +3,14 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-whitelist = "bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz"
-basket_factory = "sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq"
-basket = "37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1"
+whitelist = "FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS"
+basket_factory = "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF"
+basket = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k"
 
 [programs.devnet]
-whitelist = "bdEDPr9KGtkSABS8Sg3gWeJKyQEaTQVaBRvCu38YMNz"
-basket_factory = "sXShikYX7G5n3S3qp78RWQBxh2YJARLvufiCoaxjAyq"
-basket = "37VPGtd57kXJ1HvH1xvdZr1y3s4KXj9pP2o6GdYLgbb1"
+whitelist = "FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS"
+basket_factory = "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF"
+basket = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k"
 
 [registry]
 url = "https://api.apr.dev"

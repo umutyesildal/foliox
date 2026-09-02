@@ -551,16 +551,16 @@ export function DeployPanel({
                       <li key={c.mint} className="font-mono text-xs text-destructive">
                         {c.ticker}: balance{" "}
                         {balance === null
-                          ? "no ATA"
+                          ? "no token account"
                           : formatRawAsTokenUnits(balance, c.decimals)}{" "}
-                        &lt; seed {c.seedRaw.toString()} raw
+                        &lt; seed {formatRawAsTokenUnits(c.seedRaw, c.decimals)}
                       </li>
                     );
                   })}
                 </ul>
               ) : (
                 <p className="mt-2 font-mono text-xs text-foreground">
-                  All creator ATAs cover the raw seed amounts.
+                  All creator token balances cover the seed amounts.
                 </p>
               )}
             </section>

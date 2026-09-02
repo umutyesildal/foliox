@@ -253,10 +253,8 @@ export default async function MarketPage({
         </CardHeader>
         <CardContent>
           <MarketChart rows={rows} series={series} volume={volume} volumeLabel={volumeLabel} />
-          {/* Interaction instructions live in a muted footer line, not the card header (B10). */}
           <p className="mt-4 border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">
-            Four index series over {range}; the benchmark is dashed. Drag the brush to zoom the
-            x-domain — the y-scale tweens to the visible window.
+            Four index series over {range}; the benchmark is dashed, shown at full range.
           </p>
         </CardContent>
       </Card>

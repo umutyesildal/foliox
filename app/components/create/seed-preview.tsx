@@ -51,11 +51,17 @@ export function SeedPreview({
     (c) => c.priceRef === null || c.priceRef === undefined || !Number.isFinite(c.priceRef ?? NaN),
   );
   const zeroSeeds = constituents.some((c) => c.seedRaw <= 0n);
-  const totalUsd = budgetUsable && !missingPrices
-    ? constituents.reduce(
-        (acc, c) => acc + ((budget * c.weightBps) / 10_000),
-        0,
-      )
+  // Live consequence of the typed amounts: each row's estimated value is
+  // amount × reference price; the totals update as you type.
+  const rows = constituents.map((c) => {
+    const units = Number(c.seedRaw) / 10 ** c.decimals;
+    const hasPrice =
+      c.priceRef !== null && c.priceRef !== undefined && Number.isFinite(c.priceRef);
+    return { c, units, hasPrice, value: hasPrice ? units * (c.priceRef as number) : null };
+  });
+  const totalTokens = rows.reduce((acc, r) => acc + r.units, 0);
+  const totalValue = rows.every((r) => r.value !== null)
+    ? rows.reduce((acc, r) => acc + (r.value ?? 0), 0)
     : null;
 
   return (
@@ -69,7 +75,12 @@ export function SeedPreview({
 
       <div className="flex flex-wrap items-end gap-3">
         <TextField
-          label="Budget (USD, estimate — not a quote)"
+          label={
+            <>
+              Estimated cost{" "}
+              <span className="font-normal text-muted-foreground/60">(estimate)</span>
+            </>
+          }
           value={budgetUsd}
           onChange={onBudgetChange}
           inputMode="decimal"
@@ -82,7 +93,7 @@ export function SeedPreview({
           variant="outline"
           size="sm"
           onClick={onRecomputeProportional}
-          title="Recompute the token amounts proportional to your weights, using the budget and reference prices"
+          title="Recompute the token amounts proportional to your weights, using the estimated cost and current prices"
         >
           <RefreshCw className="size-3.5" aria-hidden="true" />
           Recompute proportional
@@ -104,8 +115,8 @@ export function SeedPreview({
         <p className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
           <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           {priceStatus === "loading"
-            ? "Loading reference prices…"
-            : "Some tokens have no reference price yet — their USD column shows a dash, so type the amount directly."}
+            ? "Loading prices…"
+            : "Some tokens have no price yet — their Estimated value shows “price unavailable”, so type the amount directly."}
         </p>
       )}
 
@@ -115,20 +126,13 @@ export function SeedPreview({
             <TableRow className="hover:bg-transparent">
               <TableHead className="text-xs">Ticker</TableHead>
               <TableHead className="text-right text-xs">Weight</TableHead>
-              <TableHead className="text-right text-xs">USD (est.)</TableHead>
-              <TableHead className="text-right text-xs">Ref. price</TableHead>
+              <TableHead className="text-right text-xs">Estimated value</TableHead>
+              <TableHead className="text-right text-xs">Price</TableHead>
               <TableHead className="text-xs">Amount (tokens)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {constituents.map((constituent) => {
-              const hasPrice =
-                constituent.priceRef !== null &&
-                constituent.priceRef !== undefined &&
-                Number.isFinite(constituent.priceRef);
-              const usd = hasPrice && budgetUsable
-                ? (budget * constituent.weightBps) / 10_000
-                : null;
+            {rows.map(({ c: constituent, units, hasPrice, value }) => {
               return (
                 <TableRow key={constituent.mint}>
                   <TableCell className="font-mono text-xs font-medium">
@@ -138,7 +142,13 @@ export function SeedPreview({
                     {constituent.weightBps.toLocaleString()} bps
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {usd === null ? "—" : formatUsd(usd)}
+                    {value !== null ? (
+                      formatUsd(value)
+                    ) : priceStatus === "loading" ? (
+                      "…"
+                    ) : (
+                      <span className="text-muted-foreground">price unavailable</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs tabular-nums">
                     {hasPrice ? `$${constituent.priceRef?.toFixed(2)}` : "—"}
@@ -148,8 +158,8 @@ export function SeedPreview({
                       label={`Amount of ${constituent.ticker} to seed`}
                       hideLabel
                       value={formatRawAsTokenUnits(constituent.seedRaw, constituent.decimals)}
-                      onChange={(value) => {
-                        const raw = parseTokenUnitsToRaw(value, constituent.decimals);
+                      onChange={(input) => {
+                        const raw = parseTokenUnitsToRaw(input, constituent.decimals);
                         if (raw !== null) onRawChange(constituent.mint, raw);
                       }}
                       inputMode="decimal"
@@ -160,15 +170,22 @@ export function SeedPreview({
                 </TableRow>
               );
             })}
-            {totalUsd !== null && (
+            {rows.length > 0 && (
               <TableRow className="hover:bg-transparent">
                 <TableCell className="text-xs font-medium" colSpan={2}>
                   Total
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {formatUsd(totalUsd)}
+                  {totalValue !== null ? (
+                    formatUsd(totalValue)
+                  ) : (
+                    <span className="text-muted-foreground">price unavailable</span>
+                  )}
                 </TableCell>
-                <TableCell colSpan={2} />
+                <TableCell />
+                <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {totalTokens.toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens
+                </TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -186,7 +203,7 @@ export function SeedPreview({
       <p className="text-xs leading-5 text-muted-foreground">
         These amounts are transferred to the basket vault in the same
         transaction that creates the basket — there is no separate deposit
-        step. You type whole tokens; the exact on-chain math is handled for you.
+        step. Exact on-chain precision is handled for you.
       </p>
     </div>
   );

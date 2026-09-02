@@ -29,7 +29,7 @@ interface ConstituentLike {
 interface BasketRow {
   pubkey: string;
   creator?: string | null;
-  /** Not carried by the list feed today; parsed defensively if the backend adds it. */
+  /** Off-chain name/description JSON from the indexer list feed (backend selects metadata_json). */
   metadata_json?: string | Record<string, unknown> | null;
   /** Mint pubkeys (indexer feed, positional with weights_bps) or richer objects. */
   constituents?: (ConstituentLike | string)[] | null;
@@ -108,7 +108,7 @@ function metaObj(mj: BasketRow["metadata_json"]): Record<string, unknown> | null
   return obj && typeof obj === "object" ? (obj as Record<string, unknown>) : null;
 }
 
-/** Basket display name from metadata_json when present; the list feed carries no name today. */
+/** Basket display name from metadata_json.name when present, e.g. "Tech Duo". */
 function nameOf(b: BasketRow): string | null {
   const name = metaObj(b.metadata_json)?.name;
   return typeof name === "string" && name.trim() ? name.trim() : null;
@@ -138,7 +138,7 @@ function constituentWeightPct(c: ConstituentLike): number | null {
 const MAX_COMPOSITION_PARTS = 4;
 
 /**
- * Composition string for the card top row, e.g. "AAPLx 50 · TSLAx 50".
+ * Composition string for the card's secondary line, e.g. "AAPLx 50 · TSLAx 50".
  * Mint-pubkey constituents are resolved through the whitelist ticker map;
  * falls back to metadata constituents, then null (card shows name/pubkey).
  */
@@ -175,11 +175,6 @@ function compositionOf(b: BasketRow, mintTickers: Map<string, string>): string |
     : shown;
 }
 
-/** Card headline: composition string when available, else metadata name, else truncated pubkey. */
-function headlineOf(b: BasketRow, mintTickers: Map<string, string>): string {
-  return compositionOf(b, mintTickers) ?? nameOf(b) ?? truncateAddress(b.pubkey, 6, 4);
-}
-
 /** Basket return minus SPY return over the same window. Gray +/-, sign always shown. */
 function DeltaCell({ value, window: win }: { value: number | null; window: "24h" | "30d" }) {
   if (value === null) {
@@ -214,8 +209,9 @@ interface BasketCardProps {
 
 /**
  * One basket in the /explore grid — same card treatment as /stocks:
- * whole card is a link to /basket/[pubkey], mono headline = what's inside,
- * big mono share price, AUM muted, bottom row 24h change + vs SPY delta.
+ * whole card is a link to /basket/[pubkey], name headline with the mono
+ * composition as the secondary line, big mono share price, AUM muted,
+ * bottom row 24h change + vs SPY delta.
  */
 function BasketCard({ b, bench, showVs24, mintTickers }: BasketCardProps) {
   const change = num(b.return_24h);
@@ -226,6 +222,9 @@ function BasketCard({ b, bench, showVs24, mintTickers }: BasketCardProps) {
   const nav = num(b.nav);
   /** No NAV/price indexed yet — muted price plus an explicit "not indexed" chip. */
   const unavailable = sharePrice === null;
+  const name = nameOf(b);
+  const composition = compositionOf(b, mintTickers);
+  const headline = name ?? composition ?? truncateAddress(b.pubkey, 6, 4);
 
   return (
     <Link
@@ -234,12 +233,19 @@ function BasketCard({ b, bench, showVs24, mintTickers }: BasketCardProps) {
       className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <div className="flex items-start justify-between gap-2">
-        <span
-          className="min-w-0 break-words font-mono text-sm font-medium tracking-tight text-foreground"
-          title={b.pubkey}
-        >
-          {headlineOf(b, mintTickers)}
-        </span>
+        <div className="min-w-0">
+          <span
+            className="block break-words text-sm font-medium tracking-tight text-foreground"
+            title={b.pubkey}
+          >
+            {headline}
+          </span>
+          {name && composition ? (
+            <span className="mt-1 block break-words font-mono text-xs text-muted-foreground">
+              {composition}
+            </span>
+          ) : null}
+        </div>
         {unavailable ? (
           <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
             not indexed
@@ -287,7 +293,7 @@ function BasketCard({ b, bench, showVs24, mintTickers }: BasketCardProps) {
 
 export default function ExploreClient() {
   const [baskets, setBaskets] = useState<BasketRow[]>([]);
-  const [payloadMeta, setPayloadMeta] = useState<{ source: string; asOf: string | null; note?: string } | null>(null);
+  const [payloadMeta, setPayloadMeta] = useState<{ asOf: string | null } | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorInfo, setErrorInfo] = useState<{ message: string; code?: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -320,11 +326,7 @@ export default function ExploreClient() {
           return;
         }
         setBaskets(payload.data ?? []);
-        setPayloadMeta({
-          source: payload.source ?? "onchain-indexed",
-          asOf: payload.asOf ?? null,
-          note: payload.note,
-        });
+        setPayloadMeta({ asOf: payload.asOf ?? null });
         setStatus("ready");
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -543,21 +545,17 @@ export default function ExploreClient() {
         />
       ) : (
         <>
-          {/* Controls — search / sort, client-side over the fetched list. Freshness for the whole feed lives here, not per card. */}
+          {/* Controls — search / sort, client-side over the fetched list. FreshnessBadge keeps the honest as-of; no provenance source line. */}
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="flex flex-1 flex-col gap-1">
-              <label htmlFor="explore-search" className="text-xs font-medium text-muted-foreground">
-                Search by basket, creator, or share mint
-              </label>
-              <input
-                id="explore-search"
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g. pubkey prefix or creator"
-                className="h-9 w-full max-w-sm rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
-              />
-            </div>
+            <input
+              id="explore-search"
+              type="search"
+              aria-label="Search baskets"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search baskets"
+              className="h-9 w-full max-w-sm rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+            />
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1">
                 <label htmlFor="explore-sort" className="text-xs font-medium text-muted-foreground">
@@ -578,7 +576,7 @@ export default function ExploreClient() {
               </div>
               {payloadMeta ? (
                 <FreshnessBadge
-                  source={`feed: ${payloadMeta.source}`}
+                  source={payloadMeta.asOf ? "as of" : ""}
                   asOf={payloadMeta.asOf ?? undefined}
                 />
               ) : null}

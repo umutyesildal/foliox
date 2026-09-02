@@ -3,13 +3,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { EtfGrid, EtfGridSkeleton, type EtfRow } from "@/components/etfs/etf-grid";
-import { TraditionalVsTokenized } from "@/components/etfs/traditional-vs-tokenized";
 import { EmptyState, FreshnessBadge } from "@/components/states";
 
 export const metadata: Metadata = {
   title: "Tokenized ETFs — FolioX",
-  description:
-    "How tokenized ETFs differ from the traditional wrapper, and the tokenized ETF tickers listed on FolioX today.",
+  description: "The tokenized ETF tickers listed on FolioX today.",
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
@@ -63,7 +61,7 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
- * Section 1 body: fetch the instrument registry, keep only ETF-type tickers,
+ * Listing body: fetch the instrument registry, keep only ETF-type tickers,
  * attach the live token price (Jupiter) and the 24h change (Yahoo daily
  * close-to-close — never the simulated xStock series). Renders its own header
  * so the FreshnessBadge only appears once real metadata exists.
@@ -166,24 +164,16 @@ export default function EtfsPage() {
       <header className="pb-8">
         <h1 className="text-3xl font-semibold tracking-tight">Tokenized ETFs</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          The category, the differences that matter, and the tokenized ETF tickers FolioX lists
-          today.
+          The tokenized ETF tickers FolioX lists today.
         </p>
       </header>
 
-      {/* Section 1 — live listing, right under the intro; streams after the fetches resolve. */}
+      {/* Live listing, right under the intro; streams after the fetches resolve.
+          The Traditional vs tokenized comparison lives on the home landing now. */}
       <section aria-label="Tokenized ETFs on FolioX" className="border-t border-border py-8">
         <Suspense fallback={<EtfGridSkeleton />}>
           <EtfListing />
         </Suspense>
-      </section>
-
-      {/* Section 2 — education (static, no data dependency), kept below the listing.
-          No trailing bridge: the header Create button covers basket composition. */}
-      <section aria-label="Traditional vs tokenized ETFs" className="border-t border-border py-8">
-        <div className="max-w-3xl">
-          <TraditionalVsTokenized />
-        </div>
       </section>
     </div>
   );

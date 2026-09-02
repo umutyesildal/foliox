@@ -40,6 +40,8 @@ export function FeesEditor({
     exit: exitFeeBps,
     management: managementFeeBps,
   };
+  const pct = (bps: number) =>
+    `${(bps / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -59,6 +61,12 @@ export function FeesEditor({
           </span>
         </RangeField>
       ))}
+
+      <p className="text-xs leading-5 text-muted-foreground">
+        Example: 1,000 USDC in → the {entryFeeBps} bps entry fee takes {pct(entryFeeBps)} in
+        shares; the {exitFeeBps} bps exit fee takes {pct(exitFeeBps)} on redemption; the{" "}
+        {managementFeeBps} bps management fee accrues {pct(managementFeeBps)} per year.
+      </p>
 
       <p className="text-xs leading-5 text-muted-foreground">
         Fees are charged in basket shares and split 90% to you (creator) / 10%

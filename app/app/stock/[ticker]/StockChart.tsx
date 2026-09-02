@@ -1,19 +1,16 @@
 "use client";
 
 import { Area, AreaChart } from "@/components/charts/area-chart";
-import { ChartBrush, ChartBrushLayout } from "@/components/charts/chart-brush";
 import { Grid } from "@/components/charts/grid";
 import { XAxis } from "@/components/charts/x-axis";
 import { YAxis } from "@/components/charts/y-axis";
 import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
 import type { TooltipRow } from "@/components/charts/tooltip/tooltip-content";
 import { Badge } from "@/components/ui/badge";
-import VolumeBars from "./VolumeBars";
 
 interface Candle {
   ts: number;
   close: number;
-  volume?: number;
 }
 
 export interface StockChartSeries {
@@ -37,10 +34,10 @@ function normalize(candles: Candle[] | undefined): { ts: number; v: number }[] {
 }
 
 /**
- * Chart data colors per user decision — UI chrome stays monochrome.
- * xStock (token, simulated in V0) = chart-1 green, real equity = chart-2 red,
- * Nasdaq benchmark = gray (muted-foreground, dashed). Legend order matches
- * the Area render order below.
+ * Chart data colors per user decision — ethereal palette tokens (soft,
+ * desaturated); UI chrome stays monochrome. chart-1 = xStock token
+ * (simulated in V0), chart-2 = real equity, Nasdaq benchmark = muted gray
+ * (dashed). Legend order matches the Area render order below.
  */
 const SERIES = [
   { key: "xStock", label: "xStock (simulated)", color: "hsl(var(--chart-1))" },
@@ -61,14 +58,12 @@ function tooltipRows(point: Record<string, unknown>): TooltipRow[] {
 }
 
 /**
- * Three-series normalized-to-100 comparison: xStock (green), the real equity
- * (red), and the Nasdaq benchmark (gray, dashed). xDomain zoom uses the local
- * Brush adapter implementing the documented Bklit ChartBrush/ChartBrushLayout
- * API (not official registry source).
+ * Three-series normalized-to-100 comparison: xStock token, the real equity,
+ * and the Nasdaq benchmark (gray, dashed). One clean full-range chart — no
+ * brush, no volume strip; y-scale fits the whole window via fitYDomain.
  */
 export default function StockChart({ data }: StockChartProps) {
-  const yahooCandles = data.yahoo?.candles ?? [];
-  const yahooNorm = normalize(yahooCandles);
+  const yahooNorm = normalize(data.yahoo?.candles);
   const xStockNorm = normalize(data.xStock?.candles);
   const nasdaqNorm = normalize(data.nasdaq?.candles);
 
@@ -80,7 +75,6 @@ export default function StockChart({ data }: StockChartProps) {
     xStock: xStockNorm[i]?.v ?? null,
     real: yahooNorm[i]?.v ?? null,
     nasdaq: nasdaqNorm[i]?.v ?? null,
-    volume: yahooCandles[i]?.volume ?? null,
   })).filter((r) => r.xStock !== null || r.real !== null || r.nasdaq !== null);
 
   if (rows.length < 2) {
@@ -91,7 +85,6 @@ export default function StockChart({ data }: StockChartProps) {
     );
   }
 
-  const hasVolume = rows.some((r) => typeof r.volume === "number" && r.volume > 0);
   const rowsForChart = rows as unknown as Record<string, unknown>[];
 
   return (
@@ -120,91 +113,40 @@ export default function StockChart({ data }: StockChartProps) {
       </div>
 
       <div className="min-h-[320px] flex-1">
-        <ChartBrushLayout
+        <AreaChart
           data={rowsForChart}
           xDataKey="date"
-          enabled
-          height={56}
-          brushStrip={(layout) => (
-            <AreaChart
-              data={rowsForChart}
-              xDataKey="date"
-              style={{ height: 56 }}
-              margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
-              className="h-full"
-            >
-              <Area
-                dataKey="real"
-                fill="hsl(var(--chart-2))"
-                stroke="hsl(var(--chart-2))"
-                fillOpacity={0}
-                strokeWidth={1}
-              />
-              <ChartBrush
-                initialSelection={layout.brushSelection ?? undefined}
-                onSelectionChange={layout.onBrushSelectionChange}
-              />
-            </AreaChart>
-          )}
+          fitYDomain
+          margin={{ top: 12, right: 12, bottom: 24, left: 48 }}
+          className="h-full w-full"
         >
-          {(layout) => (
-            <div className="flex h-full flex-col gap-2">
-              <div className="min-h-[240px] flex-1">
-                <AreaChart
-                  data={rowsForChart}
-                  xDataKey="date"
-                  xDomain={layout.xDomain}
-                  xDomainSlotCount={layout.xDomainSlotCount}
-                  tweenYDomainOnXDomainChange
-                  fitYDomain
-                  margin={{ top: 12, right: 12, bottom: 24, left: 48 }}
-                  className="h-full w-full"
-                >
-                  {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
-                      fading to 0 by ~40% height; secondary/benchmark line-only. */}
-                  <Grid
-                    horizontal
-                    highlightRowValues={[100]}
-                    highlightRowStroke="hsl(var(--chart-grid))"
-                    highlightRowStrokeDasharray="0"
-                    highlightRowStrokeWidth={1}
-                  />
-                  {SERIES.map((s) => (
-                    <Area
-                      key={s.key}
-                      dataKey={s.key}
-                      fill={s.color}
-                      stroke={s.color}
-                      fillOpacity={s.key === "xStock" ? 0.06 : 0}
-                      gradientSpan={s.key === "xStock" ? 0.4 : undefined}
-                      strokeWidth={s.key === "nasdaq" ? 1.5 : 2}
-                      dashFromIndex={s.key === "nasdaq" ? 0 : undefined}
-                      dashArray={s.key === "nasdaq" ? "6 4" : undefined}
-                    />
-                  ))}
-                  <XAxis numTicks={5} />
-                  <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
-                  <ChartTooltip rows={tooltipRows} />
-                </AreaChart>
-              </div>
-              {hasVolume ? (
-                <div className="h-20 shrink-0" aria-hidden="true">
-                  <AreaChart
-                    data={rowsForChart}
-                    xDataKey="date"
-                    xDomain={layout.xDomain}
-                    xDomainSlotCount={layout.xDomainSlotCount}
-                    tweenYDomainOnXDomainChange
-                    margin={{ top: 2, right: 12, bottom: 0, left: 48 }}
-                    className="h-full w-full"
-                  >
-                    <VolumeBars volumeKey="volume" />
-                  </AreaChart>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </ChartBrushLayout>
+          {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
+              fading to 0 by ~40% height; secondary/benchmark line-only. Soft
+              1.5px strokes for the ethereal look. */}
+          <Grid
+            horizontal
+            highlightRowValues={[100]}
+            highlightRowStroke="hsl(var(--chart-grid))"
+            highlightRowStrokeDasharray="0"
+            highlightRowStrokeWidth={1}
+          />
+          {SERIES.map((s) => (
+            <Area
+              key={s.key}
+              dataKey={s.key}
+              fill={s.color}
+              stroke={s.color}
+              fillOpacity={s.key === "xStock" ? 0.06 : 0}
+              gradientSpan={s.key === "xStock" ? 0.4 : undefined}
+              strokeWidth={1.5}
+              dashFromIndex={s.key === "nasdaq" ? 0 : undefined}
+              dashArray={s.key === "nasdaq" ? "6 4" : undefined}
+            />
+          ))}
+          <XAxis numTicks={5} />
+          <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
+          <ChartTooltip rows={tooltipRows} />
+        </AreaChart>
       </div>
     </div>
   );

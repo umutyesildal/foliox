@@ -22,7 +22,7 @@ export function TextField({
   className,
   invalid = false,
 }: {
-  label: string;
+  label: ReactNode;
   hint?: ReactNode;
   /** Visually hide the label while keeping it for screen readers. */
   hideLabel?: boolean;
@@ -63,9 +63,9 @@ export function TextField({
 /**
  * Labeled single-value range slider on a native <input type="range"> — the
  * base-ui Slider renders without a visible track/thumb in this app, so the
- * wizard uses this plain control instead: thin monochrome track, solid thumb,
- * keyboard operable. `children` fills the value slot on the label row (mono
- * readout or editable number input).
+ * wizard uses this plain control instead: slim 2px monochrome track, 12px
+ * solid thumb, ~32px compact row, keyboard operable. `children` fills the
+ * value slot on the label row (mono readout or editable number input).
  */
 export function RangeField({
   label,
@@ -88,8 +88,8 @@ export function RangeField({
 }) {
   const id = useId();
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <div className="flex items-center justify-between gap-2 text-xs">
+    <div className={cn("flex flex-col gap-1", className)}>
+      <div className="flex h-4 items-center justify-between gap-2 text-xs">
         <label htmlFor={id} className="font-medium text-foreground">
           {label}
         </label>
@@ -104,9 +104,14 @@ export function RangeField({
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
         className={cn(
-          "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted",
-          "[&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-border [&::-webkit-slider-thumb]:bg-foreground",
-          "[&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-foreground",
+          "h-3 w-full cursor-pointer appearance-none bg-transparent",
+          // WebKit: 2px track, 12px thumb centered on it via -5px offset.
+          "[&::-webkit-slider-runnable-track]:h-0.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-muted",
+          "[&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:-mt-[5px]",
+          // Firefox: same geometry (thumb auto-centers on the track).
+          "[&::-moz-range-track]:h-0.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-muted",
+          "[&::-moz-range-thumb]:size-3 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-foreground",
+          // Focus remains visible on the thumb in both engines.
           "[&:focus-visible::-webkit-slider-thumb]:ring-2 [&:focus-visible::-webkit-slider-thumb]:ring-ring/50",
           "[&:focus-visible::-moz-range-thumb]:ring-2 [&:focus-visible::-moz-range-thumb]:ring-ring/50",
         )}

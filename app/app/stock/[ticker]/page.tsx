@@ -209,7 +209,7 @@ export default async function StockPage({
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Price comparison — {range} (normalized 100)</CardTitle>
           <CardDescription className="text-xs leading-relaxed">
-            Green = xStock token (simulated in V0), red = real equity, gray dashed = Nasdaq QQQ.
+            xStock token (simulated in V0) · real equity · Nasdaq QQQ (dashed).
           </CardDescription>
         </CardHeader>
         <CardContent className="min-h-[380px]">
@@ -221,9 +221,6 @@ export default async function StockPage({
               Yahoo returned no candles — retry another range.
             </p>
           )}
-          <p className="mt-4 border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">
-            Zoom with the brush sliders — the y-scale follows the visible window.
-          </p>
         </CardContent>
       </Card>
 

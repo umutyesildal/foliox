@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { Skeleton } from "@/components/states";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * One listing row. All numeric fields are server-computed from live endpoints
+ * One listing row — the whole card is a link to /stock/[ticker] (same pattern
+ * as the /stocks cards: native anchor, keyboard accessible, hover ring on the
+ * border). All numeric fields are server-computed from live endpoints
  * (Jupiter price, Yahoo daily closes) — this component never fabricates or
  * derives new figures, it only sorts and renders.
  */
@@ -48,54 +49,56 @@ function sortRows(rows: EtfRow[], sort: SortKey): EtfRow[] {
 function EtfCard({ row }: { row: EtfRow }) {
   const change = row.change24h;
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="font-mono text-lg font-semibold tabular-nums">
-              {row.ticker}
-            </CardTitle>
-            {row.name ? (
-              <CardDescription className="truncate text-xs">{row.name}</CardDescription>
+    <Link
+      href={`/stock/${encodeURIComponent(row.ticker)}`}
+      className="group block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+    >
+      <Card className="h-full transition-colors group-hover:border-foreground/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="font-mono text-lg font-semibold tabular-nums">
+                {row.ticker}
+              </CardTitle>
+              {row.name ? (
+                <CardDescription className="truncate text-xs">{row.name}</CardDescription>
+              ) : null}
+            </div>
+            {row.provider ? (
+              <span
+                title="Tokenized instrument issuer"
+                className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
+              >
+                {PROVIDER_LABEL[row.provider] ?? row.provider}
+              </span>
             ) : null}
           </div>
-          {row.provider ? (
-            <span
-              title="Tokenized instrument issuer"
-              className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
-            >
-              {PROVIDER_LABEL[row.provider] ?? row.provider}
-            </span>
-          ) : null}
-        </div>
-      </CardHeader>
-      <CardContent className="flex h-full flex-col justify-between gap-3">
-        <div className="grid grid-cols-2 gap-3 border-t border-border/60 pt-3">
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Token price
-            </p>
-            <p className="font-mono text-sm tabular-nums">
-              {row.price !== null ? formatUsd(row.price) : "—"}
-            </p>
+        </CardHeader>
+        <CardContent className="flex h-full flex-col">
+          <div className="grid grid-cols-2 gap-3 border-t border-border/60 pt-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Token price
+              </p>
+              <p className="font-mono text-sm tabular-nums">
+                {row.price !== null ? formatUsd(row.price) : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">24h</p>
+              <p
+                className={cn(
+                  "font-mono text-sm tabular-nums",
+                  change !== null && change >= 0 ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {change !== null ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">24h</p>
-            <p
-              className={cn(
-                "font-mono text-sm tabular-nums",
-                change !== null && change >= 0 ? "text-foreground" : "text-muted-foreground",
-              )}
-            >
-              {change !== null ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}
-            </p>
-          </div>
-        </div>
-        <Button render={<Link href={`/stock/${row.ticker}`} />} variant="outline" size="xs" className="w-fit">
-          View
-        </Button>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 

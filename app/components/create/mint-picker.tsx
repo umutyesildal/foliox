@@ -146,9 +146,6 @@ export function MintPicker({
                     <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground" title={row.mint}>
                       {truncateAddress(row.mint, 10, 8)}
                     </span>
-                    <span className="mt-1 block font-mono text-xs tabular-nums text-muted-foreground">
-                      {row.decimals} decimals · multiplier ×{row.multiplier}
-                    </span>
                   </span>
                   <span
                     aria-hidden="true"

@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 
 import { Area, AreaChart } from "@/components/charts/area-chart";
-import { ChartBrush, ChartBrushLayout } from "@/components/charts/chart-brush";
 import { Grid } from "@/components/charts/grid";
 import { Bar } from "@/components/charts/bar";
 import { BarChart } from "@/components/charts/bar-chart";
@@ -20,7 +19,7 @@ export interface MarketSeriesMeta {
   label: string;
   color: string;
   dashed?: boolean;
-  /** Line-only series (benchmark, ochre) — never rendered as an area fill. */
+  /** Line-only series (the benchmark) — never rendered as an area fill. */
   lineOnly?: boolean;
 }
 
@@ -35,13 +34,10 @@ export interface MarketChartProps {
 }
 
 /**
- * Normalized-to-100 four-series AreaChart with the documented local Brush
- * adapter (implements the Bklit ChartBrush/ChartBrushLayout API — not official
- * registry source) plus a 30-candle volume BarChart.
+ * Normalized-to-100 four-series AreaChart (full range, no brush) plus a
+ * 30-candle volume BarChart.
  */
 export default function MarketChart({ rows, series, volume, volumeLabel }: MarketChartProps) {
-  const benchmarkKey = series[series.length - 1]?.key ?? series[0]?.key;
-  const benchmarkColor = series[series.length - 1]?.color ?? "hsl(var(--chart-3))";
   const peakVolume = useMemo(
     () => volume.reduce((max, d) => Math.max(max, d.volume), 0),
     [volume],
@@ -80,71 +76,39 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
   return (
     <div className="flex flex-col gap-6">
       <div data-slot="market-normalized-chart" className="min-h-[300px]">
-        <ChartBrushLayout
+        <AreaChart
           data={rows}
           xDataKey="date"
-          enabled
-          height={48}
-          brushStrip={(layout) => (
-            <AreaChart
-              data={rows}
-              xDataKey="date"
-              style={{ height: 48 }}
-              margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
-              className="h-full"
-            >
-              <Area
-                dataKey={benchmarkKey}
-                fill={benchmarkColor}
-                stroke={benchmarkColor}
-                fillOpacity={0}
-                strokeWidth={1}
-              />
-              <ChartBrush
-                initialSelection={layout.brushSelection ?? undefined}
-                onSelectionChange={layout.onBrushSelectionChange}
-              />
-            </AreaChart>
-          )}
+          margin={{ top: 12, right: 16, bottom: 28, left: 48 }}
+          className="h-full w-full"
         >
-          {(layout) => (
-            <AreaChart
-              data={rows}
-              xDataKey="date"
-              xDomain={layout.xDomain}
-              xDomainSlotCount={layout.xDomainSlotCount}
-              tweenYDomainOnXDomainChange
-              margin={{ top: 12, right: 16, bottom: 28, left: 48 }}
-              className="h-full w-full"
-            >
-              {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
-                  fading to 0 by ~40% height; secondary/benchmark line-only. */}
-              <Grid
-                horizontal
-                highlightRowValues={[100]}
-                highlightRowStroke="hsl(var(--chart-grid))"
-                highlightRowStrokeDasharray="0"
-                highlightRowStrokeWidth={1}
-              />
-              {series.map((s) => (
-                <Area
-                  key={s.key}
-                  dataKey={s.key}
-                  fill={s.color}
-                  stroke={s.color}
-                  fillOpacity={s.dashed || s.lineOnly ? 0 : 0.06}
-                  gradientSpan={0.4}
-                  strokeWidth={s.dashed ? 1.5 : 2}
-                  dashFromIndex={s.dashed ? 0 : undefined}
-                  dashArray={s.dashed ? "6 4" : undefined}
-                />
-              ))}
-              <XAxis numTicks={5} />
-              <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
-              <ChartTooltip rows={tooltipRows} />
-            </AreaChart>
-          )}
-        </ChartBrushLayout>
+          {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
+              fading to 0 by ~40% height; secondary/benchmark line-only. Soft
+              1.5px strokes for the ethereal look. */}
+          <Grid
+            horizontal
+            highlightRowValues={[100]}
+            highlightRowStroke="hsl(var(--chart-grid))"
+            highlightRowStrokeDasharray="0"
+            highlightRowStrokeWidth={1}
+          />
+          {series.map((s) => (
+            <Area
+              key={s.key}
+              dataKey={s.key}
+              fill={s.color}
+              stroke={s.color}
+              fillOpacity={s.dashed || s.lineOnly ? 0 : 0.06}
+              gradientSpan={0.4}
+              strokeWidth={1.5}
+              dashFromIndex={s.dashed ? 0 : undefined}
+              dashArray={s.dashed ? "6 4" : undefined}
+            />
+          ))}
+          <XAxis numTicks={5} />
+          <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
+          <ChartTooltip rows={tooltipRows} />
+        </AreaChart>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { TraditionalVsTokenized } from "@/components/etfs/traditional-vs-tokenized";
+
 /**
  * Hero product visual — a real product screenshot. To swap it later, replace
  * the file at app/public/brand/market-hero.png (keep the path) or edit this
@@ -29,7 +31,7 @@ const SECTIONS = [
   {
     index: "02",
     name: "Tokenized ETFs",
-    line: "Traditional vs tokenized — the difference, then the list.",
+    line: "The tokenized ETF tickers FolioX lists today.",
     href: "/etfs",
   },
   {
@@ -42,8 +44,9 @@ const SECTIONS = [
 
 /**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02):
- * a badge line, h1, one subline, two CTAs, then the real product visual and a
- * quiet three-row section gateway (Stocks / Tokenized ETFs / Baskets). No
+ * a badge line, h1, one subline, two CTAs, then the real product visual, the
+ * interactive Traditional vs tokenized comparison (moved here from /etfs), and
+ * a quiet three-row section gateway (Stocks / Tokenized ETFs / Baskets). No
  * footer, texture, stats, devices, or data fetch.
  */
 export default function LandingPage() {
@@ -92,6 +95,25 @@ export default function LandingPage() {
         <p className="mt-2 text-center font-mono text-[11px] text-muted-foreground">
           Live market view · Yahoo Finance · as-of labeled
         </p>
+      </section>
+
+      {/* Traditional vs tokenized — interactive comparison (moved from /etfs),
+          its own quiet section between the hero visual and the gateway rows. */}
+      <section
+        aria-label="Traditional vs tokenized ETFs"
+        className="border-t border-border/60 py-12"
+      >
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+            Traditional vs tokenized
+          </p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            The same underlying ETF, wrapped differently.
+          </p>
+          <div className="mt-6">
+            <TraditionalVsTokenized />
+          </div>
+        </div>
       </section>
 
       {/* Section gateway — three quiet link rows, full-bleed in the container. */}

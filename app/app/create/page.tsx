@@ -404,7 +404,7 @@ export default function CreatePage() {
               Back
             </Button>
             {step < 5 && (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end gap-1">
                 {nextBlockedReason && (
                   <p className="text-xs text-muted-foreground" aria-live="polite">
                     {nextBlockedReason}
@@ -413,10 +413,15 @@ export default function CreatePage() {
                 <Button
                   type="button"
                   onClick={() => setStep((s) => Math.min(5, s + 1))}
-                  disabled={!stepValid[step]}
+                  disabled={!stepValid[step] || !connected}
                 >
                   Next
                 </Button>
+                {!connected && (
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    Connect your wallet to continue
+                  </p>
+                )}
               </div>
             )}
           </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,6 +12,10 @@ import { cn } from "@/lib/utils";
  * "tokenized wins here" without prose). Clicking a column header focuses
  * that side (the other dims); clicking again clears. Single accent: the
  * Tokenized header carries a 2px chart-1 underline.
+ *
+ * Lives on the HOME landing (moved from /etfs, 2026-09-02). No card header:
+ * the page owns the section label and the one factual description line, so
+ * they are not duplicated inside the card.
  */
 
 const DIMENSIONS: { dimension: string; traditional: string; tokenized: string }[] = [
@@ -33,12 +37,6 @@ export function TraditionalVsTokenized() {
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium">Traditional vs tokenized</CardTitle>
-        <CardDescription className="text-xs">
-          The same underlying ETF, wrapped differently.
-        </CardDescription>
-      </CardHeader>
       <CardContent className="space-y-2">
         {/* Column headers — clickable to focus one side. */}
         <div className={GRID}>

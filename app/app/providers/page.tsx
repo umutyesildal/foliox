@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { EmptyState, FreshnessBadge } from "@/components/states";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   Table,
   TableBody,
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { SiteFooter } from "@/components/shell";
 import { truncateAddress } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Data providers — FolioX",
@@ -60,6 +60,11 @@ interface HealthPayload {
   ts?: string;
   version?: string;
   db?: { connected?: boolean; note?: string; degraded?: boolean } | null;
+  subsystems?: {
+    indexer?: { enabled?: boolean; running?: boolean };
+    navEngine?: { enabled?: boolean; running?: boolean };
+    feeCrank?: { enabled?: boolean; running?: boolean };
+  } | null;
 }
 
 /** Well-known links for the static registry rows (configuration, not health data). */
@@ -77,6 +82,12 @@ const STATIC_REGISTRY: ProviderRow[] = [
   { id: "nasdaq", name: "Nasdaq Benchmark (QQQ)", type: "index", symbol: "QQQ" },
 ];
 
+const ROLE_LABEL: Record<string, string> = {
+  xstock: "issuer",
+  price: "price feed",
+  index: "benchmark",
+};
+
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -91,43 +102,35 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
-function RoleBadge({ type }: { type: string }) {
-  if (type === "xstock") {
-    return (
-      <Badge
-        variant="outline"
-        className="border-border/60 text-muted-foreground"
-      >
-        issuer
-      </Badge>
-    );
-  }
-  return <Badge variant="outline">{type}</Badge>;
+function StatusDot({ state }: { state: "on" | "off" | "unknown" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "h-1.5 w-1.5 shrink-0 rounded-full",
+        state === "on" && "bg-foreground",
+        state === "off" && "border border-muted-foreground/60 bg-transparent",
+        state === "unknown" && "bg-border",
+      )}
+    />
+  );
 }
 
-/** Health is shown honestly: there is no per-provider health endpoint, so it is "Unknown". */
-function HealthBadge({ healthy, label }: { healthy: boolean | null; label: string }) {
-  if (healthy === null) {
-    return (
-      <span
-        title="No provider health endpoint is wired yet — status is reported honestly, not fabricated."
-        className="inline-flex h-5 items-center rounded-4xl border border-border px-2 font-mono text-xs text-muted-foreground"
-      >
-        unknown
-      </span>
-    );
-  }
+function StatusItem({ state, label }: { state: "on" | "off" | "unknown"; label: string }) {
   return (
-    <Badge
-      variant="outline"
-      className={
-        healthy
-          ? "border-border/60 text-foreground"
-          : "border-border/60 text-muted-foreground"
-      }
-    >
-      {label}
-    </Badge>
+    <span className="inline-flex items-center gap-2 font-mono text-xs">
+      <StatusDot state={state} />
+      <span className={state === "on" ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+    </span>
+  );
+}
+
+/** Quiet bordered mono chip — health is unknown until monitoring exists. */
+function UnknownChip() {
+  return (
+    <span className="inline-flex h-5 items-center rounded-4xl border border-border px-2 font-mono text-xs text-muted-foreground">
+      unknown
+    </span>
   );
 }
 
@@ -143,6 +146,7 @@ export default async function ProvidersPage() {
   const health = healthRes;
   const apiHealthy = healthRes !== null;
   const dbConnected = health?.db?.connected === true;
+  const dbDegraded = health?.db?.degraded === true;
 
   const xstockRows: XStockRow[] = xstocksRes?.data ?? [];
   const fallbackMints: XStockRow[] = (rows.find((r) => r.id === "backed")?.mints ?? []).map((m) => ({
@@ -154,68 +158,68 @@ export default async function ProvidersPage() {
     priceSource: m.priceSource,
   }));
 
+  const dbState: "on" | "off" | "unknown" = !apiHealthy ? "unknown" : dbConnected ? "on" : "off";
+  const dbLabel = !apiHealthy ? "DB unknown" : dbDegraded ? "DB degraded" : dbConnected ? "DB connected" : "DB-less";
+  const indexerState: "on" | "off" | "unknown" =
+    !apiHealthy || health?.subsystems?.indexer == null
+      ? "unknown"
+      : health.subsystems.indexer.running === true
+        ? "on"
+        : "off";
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1.5">
-          <h1 className="text-3xl font-semibold tracking-tight">Providers</h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            Source registry for every quoted figure in FolioX: the xStocks issuer, the token price
-            feed, the equity price feed, and the Nasdaq benchmark.
-          </p>
+    <div>
+      <header className="pb-10">
+        <h1 className="text-3xl font-semibold tracking-tight">Providers</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Every quoted figure names its source — issuer, token price, equity price, benchmark.
+        </p>
+      </header>
+
+      {/* Backend status — observed live from /api/v1/health. */}
+      <section aria-labelledby="backend-status" className="border-t border-border py-10">
+        <h2 id="backend-status" className="text-sm font-medium tracking-tight">
+          Backend status
+        </h2>
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <StatusItem
+            state={apiHealthy ? "on" : "off"}
+            label={apiHealthy ? "API reachable" : "API unreachable"}
+          />
+          <StatusItem state={dbState} label={dbLabel} />
+          <StatusItem
+            state={indexerState}
+            label={!apiHealthy ? "Indexer unknown" : indexerState === "on" ? "Indexer on" : "Indexer off"}
+          />
+          {apiHealthy && health?.ts ? <FreshnessBadge source="live" asOf={health.ts} /> : null}
         </div>
-        <FreshnessBadge
-          source={registryReachable ? "registry via /api/v1/providers" : "static registry (API unreachable)"}
-          asOf={health?.ts}
-        />
-      </div>
+        {apiHealthy && indexerState === "off" ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Indexer offline — basket pages stay empty.
+          </p>
+        ) : null}
+      </section>
 
-      {/* Honest backend status — this is the only status we can actually observe. */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Backend status</CardTitle>
-          <CardDescription className="text-xs leading-relaxed">
-            Observed live from <span className="font-mono">/api/v1/health</span>. Per-provider health
-            monitoring does not exist yet, so provider rows below report unknown rather than a
-            fabricated state.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <span className="flex items-center gap-2">
-            <span className="text-muted-foreground">API</span>
-            <HealthBadge healthy={apiHealthy} label={apiHealthy ? "reachable" : "unreachable"} />
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="text-muted-foreground">Indexer DB</span>
-            {apiHealthy ? (
-              <HealthBadge healthy={dbConnected} label={dbConnected ? "connected" : "DB-less mode"} />
-            ) : (
-              <HealthBadge healthy={null} label="unknown" />
-            )}
-          </span>
-          {health?.db?.note ? <span className="text-xs text-muted-foreground">{health.db.note}</span> : null}
-          {health?.ts ? <FreshnessBadge source="health probe" asOf={health.ts} /> : null}
-        </CardContent>
-      </Card>
-
-      {/* Source registry table */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Source registry</CardTitle>
-          <CardDescription className="text-xs leading-relaxed">
-            Every quote in the UI names one of these sources. Registry status comes from the backend
-            registry listing; it is not a health probe.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
+      {/* Source registry */}
+      <section aria-labelledby="source-registry" className="border-t border-border py-10">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+          <h2 id="source-registry" className="text-sm font-medium tracking-tight">
+            Source registry
+          </h2>
+          <FreshnessBadge
+            source={registryReachable ? "registry · /api/v1/providers" : "static registry"}
+          />
+        </div>
+        <div className="mt-4">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4">Provider</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Provides</TableHead>
-                <TableHead>Registry status</TableHead>
-                <TableHead>Health</TableHead>
+                <TableHead>
+                  <span title="Provider health shows unknown until monitoring exists.">Health</span>
+                </TableHead>
                 <TableHead className="pr-4">Links</TableHead>
               </TableRow>
             </TableHeader>
@@ -224,43 +228,22 @@ export default async function ProvidersPage() {
                 const link = p.url ?? PROVIDER_LINKS[p.id];
                 return (
                   <TableRow key={p.id} className="h-11 hover:bg-muted/40">
-                    <TableCell className="pl-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{p.name}</span>
-                        <span className="font-mono text-[11px] text-muted-foreground">{p.id}</span>
-                      </div>
+                    <TableCell className="pl-4 text-sm font-medium">{p.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {ROLE_LABEL[p.type] ?? p.type}
                     </TableCell>
-                    <TableCell>
-                      <RoleBadge type={p.type} />
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-sm text-muted-foreground">
                       {p.mints?.length
                         ? p.mints.map((m) => m.ticker).join(" · ")
                         : p.symbol
-                          ? `${p.symbol} (benchmark series)`
-                          : "equity/index price series"}
+                          ? `${p.symbol} benchmark series`
+                          : "price series"}
                     </TableCell>
                     <TableCell>
-                      {p.status ? (
-                        <Badge
-                          variant="outline"
-                          className={
-                            p.status === "Active"
-                              ? "border-border/60 text-foreground"
-                              : "border-border/60 text-muted-foreground"
-                          }
-                        >
-                          {p.status}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <HealthBadge healthy={null} label="unknown" />
+                      <UnknownChip />
                     </TableCell>
                     <TableCell className="pr-4">
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-3">
                         {link ? (
                           <a
                             href={link}
@@ -272,17 +255,26 @@ export default async function ProvidersPage() {
                           </a>
                         ) : null}
                         {p.id === "backed" ? (
-                          <Link href="#xstock-instruments" className="text-xs underline underline-offset-4 hover:text-foreground">
+                          <Link
+                            href="#xstock-instruments"
+                            className="text-xs underline underline-offset-4 hover:text-foreground"
+                          >
                             Instruments
                           </Link>
                         ) : null}
                         {p.id === "nasdaq" ? (
-                          <Link href="/market" className="text-xs underline underline-offset-4 hover:text-foreground">
+                          <Link
+                            href="/market"
+                            className="text-xs underline underline-offset-4 hover:text-foreground"
+                          >
                             Market view
                           </Link>
                         ) : null}
                         {p.id === "yahoo" || p.id === "jupiter" ? (
-                          <Link href="/stock/TSLAx" className="text-xs underline underline-offset-4 hover:text-foreground">
+                          <Link
+                            href="/stock/TSLAx"
+                            className="text-xs underline underline-offset-4 hover:text-foreground"
+                          >
                             Example chart
                           </Link>
                         ) : null}
@@ -293,34 +285,32 @@ export default async function ProvidersPage() {
               })}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-
-      {!registryReachable ? (
-        <p className="text-xs text-muted-foreground">
-          /api/v1/providers was unreachable, so the table shows the app&apos;s static registry
-          configuration. Health stays unknown — no status is invented.
-        </p>
-      ) : null}
+        </div>
+      </section>
 
       {/* xStock instruments */}
-      <Card>
-        <CardHeader className="pb-2" id="xstock-instruments">
-          <CardTitle className="text-base font-medium">xStock instruments</CardTitle>
-          <CardDescription className="text-xs leading-relaxed">
-            Token-2022 mints issued by Backed Finance. Each instrument maps to a real equity ticker
-            used by the Yahoo feed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
+      <section aria-labelledby="xstock-instruments" className="border-t border-border py-10">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 id="xstock-instruments" className="text-sm font-medium tracking-tight">
+            xStock instruments
+          </h2>
+          <span
+            title="Issuer disclosure must be approved by counsel before mainnet."
+            className="inline-flex h-5 items-center rounded-4xl border border-border px-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
+          >
+            Legal review required
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Token-2022 mints issued by Backed Finance — structured instruments, not direct equity.
+        </p>
+        <div className="mt-4">
           {xstockRows.length === 0 && fallbackMints.length === 0 ? (
-            <div className="p-4">
-              <EmptyState
-                chip="NOT INDEXED"
-                title="Instrument list unavailable"
-                description="/api/v1/xstocks and the registry mints are unreachable right now, so no mint list is shown."
-              />
-            </div>
+            <EmptyState
+              chip="NOT INDEXED"
+              title="Instrument list unavailable"
+              description="/api/v1/xstocks and the registry mints are unreachable right now."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -328,10 +318,8 @@ export default async function ProvidersPage() {
                   <TableHead className="pl-4">Ticker</TableHead>
                   <TableHead>Issuer</TableHead>
                   <TableHead>Mint</TableHead>
-                  <TableHead>Price source</TableHead>
-                  <TableHead className="pr-4 text-right">
-                    <span className="sr-only">Chart</span>
-                  </TableHead>
+                  <TableHead className="text-right">Decimals</TableHead>
+                  <TableHead className="pr-4">Price source</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -339,35 +327,31 @@ export default async function ProvidersPage() {
                   <TableRow key={x.ticker} className="h-11 hover:bg-muted/40">
                     <TableCell className="pl-4 font-mono text-sm tabular-nums">{x.ticker}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">Backed Finance</TableCell>
+                    <TableCell>
+                      {x.mint ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                            {truncateAddress(x.mint, 6, 6)}
+                          </span>
+                          <CopyButton value={x.mint} label={`Copy ${x.ticker} mint`} />
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
-                      {x.mint ? truncateAddress(x.mint, 6, 6) : "—"}
+                      {x.decimals ?? "—"}
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="pr-4 font-mono text-xs text-muted-foreground">
                       {x.priceSource ?? `jupiter:${x.ticker}`}
-                    </TableCell>
-                    <TableCell className="pr-4 text-right">
-                      <Link
-                        href={`/stock/${x.ticker}`}
-                        className="text-xs underline underline-offset-4 hover:text-foreground"
-                      >
-                        View chart
-                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
-
-      <div className="space-y-1 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
-        <p>
-          xStock tokens are issued by Backed Finance as structured instruments —
-          they track the underlying equity but are not the share itself.
-        </p>
-        <p>LEGAL_REVIEW_REQUIRED: issuer disclosure must be approved by counsel before mainnet.</p>
-      </div>
+        </div>
+      </section>
 
       <SiteFooter />
     </div>

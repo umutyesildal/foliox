@@ -193,13 +193,13 @@ export default function CreatorPage() {
       {status === "ready" && payload && (
         <>
           <dl className="mt-6 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-border bg-card p-4">
+            <div className="rounded-lg border border-border bg-card p-5">
               <dt className="text-xs text-muted-foreground">Baskets created</dt>
               <dd className="mt-1 font-mono text-xl tabular-nums">
                 {basketCount ?? baskets.length}
               </dd>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4">
+            <div className="rounded-lg border border-border bg-card p-5">
               <dt className="text-xs text-muted-foreground">Total AUM (indexed)</dt>
               <dd className="mt-1 font-mono text-xl tabular-nums">
                 {stats ? (() => {
@@ -208,7 +208,7 @@ export default function CreatorPage() {
                 })() : "—"}
               </dd>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4">
+            <div className="rounded-lg border border-border bg-card p-5">
               <dt className="text-xs text-muted-foreground">Fees earned (indexed)</dt>
               <dd className="mt-1 font-mono text-xl tabular-nums">
                 {stats ? (() => {

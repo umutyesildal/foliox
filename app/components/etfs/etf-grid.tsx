@@ -148,7 +148,7 @@ export function EtfGridSkeleton() {
       className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
       {Array.from({ length: 4 }, (_, i) => (
-        <div key={i} aria-hidden="true" className="rounded-lg border border-border bg-card p-4">
+        <div key={i} aria-hidden="true" className="rounded-lg border border-border bg-card p-5">
           <Skeleton className="h-5 w-16" />
           <Skeleton className="mt-2 h-3 w-28" />
           <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3">

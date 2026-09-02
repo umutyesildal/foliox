@@ -1,12 +1,13 @@
 import Link from "next/link";
 
 import { formatUsd } from "@/lib/format";
+import { ChangeValue } from "@/components/stocks/change-value";
 
 /**
- * One tokenized stock in the /stocks grid — Ondo-market-style compact card,
- * rebuilt monochrome: ticker + provider, last token price (Jupiter), 24h
- * change in gray (never green/red — direction is the sign, not a hue), and a
- * mute sparkline of underlying equity daily closes.
+ * One tokenized stock in the /stocks grid — Ondo-market-style compact card:
+ * ticker + provider, last token price (Jupiter), 24h change colored via the
+ * chart data tokens (green up / red down — per user decision; the rest of the
+ * card stays monochrome), and a mute sparkline of underlying equity closes.
  */
 export function StockCard({
   ticker,
@@ -27,15 +28,11 @@ export function StockCard({
   return (
     <Link
       href={`/stock/${encodeURIComponent(ticker)}`}
-      className="group flex flex-col rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-semibold tracking-tight text-foreground">{ticker}</span>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          {changePct !== null
-            ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`
-            : "—"}
-        </span>
+        <ChangeValue changePct={changePct} />
       </div>
       <span className="mt-0.5 text-xs text-muted-foreground">{provider}</span>
       <span className="mt-4 font-mono text-2xl tabular-nums text-foreground">

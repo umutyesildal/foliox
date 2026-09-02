@@ -54,7 +54,7 @@ export function SummaryRail({
     <aside
       aria-label="Basket summary"
       className={cn(
-        "flex h-fit flex-col gap-4 rounded-xl border border-border bg-card p-4 text-sm",
+        "flex h-fit flex-col gap-4 rounded-lg border border-border bg-card p-5 text-sm",
         className,
       )}
     >

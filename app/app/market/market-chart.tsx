@@ -11,6 +11,7 @@ import { BarXAxis } from "@/components/charts/bar-x-axis";
 import { XAxis } from "@/components/charts/x-axis";
 import { YAxis } from "@/components/charts/y-axis";
 import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
+import type { TooltipRow } from "@/components/charts/tooltip/tooltip-content";
 import { Badge } from "@/components/ui/badge";
 import { formatTokenAmount } from "@/lib/format";
 
@@ -40,6 +41,7 @@ export interface MarketChartProps {
  */
 export default function MarketChart({ rows, series, volume, volumeLabel }: MarketChartProps) {
   const benchmarkKey = series[series.length - 1]?.key ?? series[0]?.key;
+  const benchmarkColor = series[series.length - 1]?.color ?? "hsl(var(--chart-3))";
   const peakVolume = useMemo(
     () => volume.reduce((max, d) => Math.max(max, d.volume), 0),
     [volume],
@@ -52,6 +54,28 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
       </div>
     );
   }
+
+  /** Tooltip rows: date from the tooltip title; values 2dp index points. */
+  const tooltipRows = (point: Record<string, unknown>): TooltipRow[] =>
+    series.map((s) => {
+      const value = point[s.key];
+      return {
+        color: s.color,
+        label: s.label,
+        value: typeof value === "number" ? value.toFixed(2) : "—",
+      };
+    });
+
+  const volumeTooltipRows = (point: Record<string, unknown>): TooltipRow[] => [
+    {
+      color: "hsl(var(--chart-3))",
+      label: "Volume",
+      value:
+        typeof point.volume === "number"
+          ? `${formatTokenAmount(point.volume, { maximumFractionDigits: 1 })} shares`
+          : "—",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,8 +95,8 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
             >
               <Area
                 dataKey={benchmarkKey}
-                fill="hsl(var(--chart-3))"
-                stroke="hsl(var(--chart-3))"
+                fill={benchmarkColor}
+                stroke={benchmarkColor}
                 fillOpacity={0}
                 strokeWidth={1}
               />
@@ -115,9 +139,9 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
                   dashArray={s.dashed ? "6 4" : undefined}
                 />
               ))}
-              <XAxis />
-              <YAxis numTicks={5} />
-              <ChartTooltip />
+              <XAxis numTicks={5} />
+              <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
+              <ChartTooltip rows={tooltipRows} />
             </AreaChart>
           )}
         </ChartBrushLayout>
@@ -157,13 +181,17 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
           <BarChart
             data={volume as unknown as Record<string, unknown>[]}
             xDataKey="date"
-            margin={{ top: 8, right: 16, bottom: 24, left: 16 }}
+            margin={{ top: 8, right: 16, bottom: 24, left: 48 }}
             className="h-full w-full"
           >
             <Grid horizontal />
             <Bar dataKey="volume" fill="hsl(var(--chart-3))" />
+            <YAxis
+              numTicks={3}
+              formatValue={(value) => formatTokenAmount(value, { maximumFractionDigits: 1 })}
+            />
             <BarXAxis />
-            <ChartTooltip />
+            <ChartTooltip rows={volumeTooltipRows} />
           </BarChart>
         </div>
       </div>

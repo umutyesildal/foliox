@@ -179,7 +179,7 @@ export function StocksGrid() {
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       >
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} aria-hidden="true" className="rounded-lg border border-border bg-card p-4">
+          <div key={i} aria-hidden="true" className="rounded-lg border border-border bg-card p-5">
             <Skeleton className="h-4 w-16" />
             <Skeleton className="mt-1.5 h-3 w-24" />
             <Skeleton className="mt-4 h-7 w-28" />

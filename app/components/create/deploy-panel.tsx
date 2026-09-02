@@ -356,7 +356,7 @@ export function DeployPanel({
         </dd>
       </dl>
 
-      <div className="rounded-lg border border-border bg-card p-3">
+      <div className="rounded-lg border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium">Metadata (hashed, not uploaded)</h3>
           <button
@@ -456,7 +456,7 @@ export function DeployPanel({
             aria-modal="true"
             aria-labelledby="deploy-review-title"
             tabIndex={-1}
-            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-lg outline-none"
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
           >
             <div className="flex items-start justify-between gap-3">
               <h2 id="deploy-review-title" className="text-base font-medium">

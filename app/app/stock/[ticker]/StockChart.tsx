@@ -6,6 +6,7 @@ import { Grid } from "@/components/charts/grid";
 import { XAxis } from "@/components/charts/x-axis";
 import { YAxis } from "@/components/charts/y-axis";
 import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
+import type { TooltipRow } from "@/components/charts/tooltip/tooltip-content";
 import { Badge } from "@/components/ui/badge";
 
 interface Candle {
@@ -34,10 +35,34 @@ function normalize(candles: Candle[] | undefined): { ts: number; v: number }[] {
 }
 
 /**
- * Three-series normalized-to-100 comparison: xStock (blue, simulated in V0),
- * the real equity (green), and the Nasdaq benchmark (gray, dashed). xDomain
- * zoom uses the local Brush adapter implementing the documented Bklit
- * ChartBrush/ChartBrushLayout API (not official registry source).
+ * Chart data colors per user decision — UI chrome stays monochrome.
+ * xStock (token, simulated in V0) = chart-1 green, real equity = chart-2 red,
+ * Nasdaq benchmark = gray (muted-foreground, dashed). Legend order matches
+ * the Area render order below.
+ */
+const SERIES = [
+  { key: "xStock", label: "xStock (simulated)", color: "hsl(var(--chart-1))" },
+  { key: "real", label: "Real equity", color: "hsl(var(--chart-2))" },
+  { key: "nasdaq", label: "Nasdaq QQQ", color: "hsl(var(--muted-foreground))" },
+] as const;
+
+/** Tooltip rows: date comes from the tooltip title; values 2dp index points. */
+function tooltipRows(point: Record<string, unknown>): TooltipRow[] {
+  return SERIES.map((s) => {
+    const value = point[s.key];
+    return {
+      color: s.color,
+      label: s.label,
+      value: typeof value === "number" ? value.toFixed(2) : "—",
+    };
+  });
+}
+
+/**
+ * Three-series normalized-to-100 comparison: xStock (green), the real equity
+ * (red), and the Nasdaq benchmark (gray, dashed). xDomain zoom uses the local
+ * Brush adapter implementing the documented Bklit ChartBrush/ChartBrushLayout
+ * API (not official registry source).
  */
 export default function StockChart({ data }: StockChartProps) {
   const yahooNorm = normalize(data.yahoo?.candles);
@@ -67,31 +92,25 @@ export default function StockChart({ data }: StockChartProps) {
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge
-          variant="outline"
-          className="inline-flex items-center gap-1.5 bg-card px-2 py-0 font-mono text-[11px] font-medium"
-        >
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: "hsl(var(--chart-1))" }} />
-          xStock (simulated)
-        </Badge>
-        <Badge
-          variant="outline"
-          className="inline-flex items-center gap-1.5 bg-card px-2 py-0 font-mono text-[11px] font-medium"
-        >
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: "hsl(var(--chart-2))" }} />
-          Real equity
-        </Badge>
-        <Badge
-          variant="outline"
-          className="inline-flex items-center gap-1.5 bg-card px-2 py-0 font-mono text-[11px] font-medium"
-        >
-          <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ background: "hsl(var(--chart-3))", border: "1px dashed hsl(var(--chart-3))" }}
-          />
-          Nasdaq QQQ
-          <span className="text-[10px] font-sans text-muted-foreground">dashed</span>
-        </Badge>
+        {SERIES.map((s) => (
+          <Badge
+            key={s.key}
+            variant="outline"
+            className="inline-flex items-center gap-1.5 bg-card px-2 py-0 font-mono text-[11px] font-medium"
+          >
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{
+                background: s.color,
+                border: s.key === "nasdaq" ? `1px dashed ${s.color}` : undefined,
+              }}
+            />
+            {s.label}
+            {s.key === "nasdaq" ? (
+              <span className="text-[10px] font-sans text-muted-foreground">dashed</span>
+            ) : null}
+          </Badge>
+        ))}
         <span className="text-xs text-muted-foreground">Normalized to 100 at the start of the window.</span>
       </div>
 
@@ -142,33 +161,22 @@ export default function StockChart({ data }: StockChartProps) {
                 highlightRowStrokeDasharray="0"
                 highlightRowStrokeWidth={1}
               />
-              <Area
-                dataKey="xStock"
-                fill="hsl(var(--chart-1))"
-                stroke="hsl(var(--chart-1))"
-                fillOpacity={0.06}
-                gradientSpan={0.4}
-                strokeWidth={2}
-              />
-              <Area
-                dataKey="real"
-                fill="hsl(var(--chart-2))"
-                stroke="hsl(var(--chart-2))"
-                fillOpacity={0}
-                strokeWidth={2}
-              />
-              <Area
-                dataKey="nasdaq"
-                fill="hsl(var(--chart-3))"
-                stroke="hsl(var(--chart-3))"
-                fillOpacity={0}
-                strokeWidth={1.5}
-                dashFromIndex={0}
-                dashArray="6 4"
-              />
-              <XAxis />
-              <YAxis numTicks={5} />
-              <ChartTooltip />
+              {SERIES.map((s) => (
+                <Area
+                  key={s.key}
+                  dataKey={s.key}
+                  fill={s.color}
+                  stroke={s.color}
+                  fillOpacity={s.key === "xStock" ? 0.06 : 0}
+                  gradientSpan={s.key === "xStock" ? 0.4 : undefined}
+                  strokeWidth={s.key === "nasdaq" ? 1.5 : 2}
+                  dashFromIndex={s.key === "nasdaq" ? 0 : undefined}
+                  dashArray={s.key === "nasdaq" ? "6 4" : undefined}
+                />
+              ))}
+              <XAxis numTicks={5} />
+              <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
+              <ChartTooltip rows={tooltipRows} />
             </AreaChart>
           )}
         </ChartBrushLayout>

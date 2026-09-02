@@ -98,7 +98,7 @@ export function FeesEditor({
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
         <h3 className="text-sm font-medium">90/10 split — worked example</h3>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 font-mono text-xs tabular-nums">
           <dt className="text-muted-foreground">Gross mint</dt>

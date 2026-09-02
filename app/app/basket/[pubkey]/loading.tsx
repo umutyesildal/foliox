@@ -14,15 +14,15 @@ export default function BasketLoading() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {["NAV", "Share price", "Supply", "AUM"].map((label) => (
-          <div key={label} className="rounded-md border border-border p-4">
+          <div key={label} className="rounded-lg border border-border bg-card p-5">
             <MetricCardSkeleton label={label} />
           </div>
         ))}
       </div>
-      <div className="rounded-md border border-border p-4">
+      <div className="rounded-lg border border-border bg-card p-5">
         <ChartBlockSkeleton label="Loading NAV history" />
       </div>
-      <div className="rounded-md border border-border p-4">
+      <div className="rounded-lg border border-border bg-card p-5">
         <TableRowSkeleton rows={4} columns={5} label="Loading constituents" />
       </div>
     </div>

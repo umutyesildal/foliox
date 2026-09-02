@@ -37,11 +37,13 @@ interface OverviewPayload {
   range?: string;
 }
 
+// Chart data colors per user decision — distinct hues per index; the
+// benchmark (^IXIC) stays gray (muted-foreground) and is rendered dashed.
 const SERIES_COLORS: Record<string, string> = {
   QQQ: "hsl(var(--chart-1))",
   SPY: "hsl(var(--chart-2))",
   DIA: "hsl(var(--chart-4))",
-  IXIC: "hsl(var(--chart-3))",
+  IXIC: "hsl(var(--muted-foreground))",
 };
 
 const SERIES_LABELS: Record<string, string> = {

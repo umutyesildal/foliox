@@ -119,6 +119,20 @@ function resolveTimeSeriesYDomain(
   return [minValue - padding, maxValue + padding];
 }
 
+/**
+ * Tight y-domain around the visible data: [min*0.95, max*1.05]. For series that
+ * hover in a narrow band (e.g. normalized-to-100 comparisons) a zero-based axis
+ * flattens all detail — this fits the axis to the data instead. Callers pass the
+ * brushed/visible slice so the domain follows the zoom window.
+ */
+function resolveFittedYDomain(
+  data: Record<string, unknown>[],
+  dataKeys: string[]
+): [number, number] {
+  const { minValue, maxValue } = collectNumericExtents(data, dataKeys);
+  return [minValue * 0.95, maxValue * 1.05];
+}
+
 function ensureChildKey(child: ReactElement, index: number): ReactElement {
   if (child.key != null) {
     return child;
@@ -165,6 +179,8 @@ export interface TimeSeriesChartInnerProps {
   xDomainSlotCount?: number;
   /** Tween y-domain when the visible x-range changes during the ready phase. */
   tweenYDomainOnXDomainChange?: boolean;
+  /** Fit the y-domain to the visible data ([min*0.95, max*1.05]) instead of zero-basing. Default: false */
+  fitYDomain?: boolean;
   onPhaseChange?: (phase: ChartPhase) => void;
 }
 
@@ -205,6 +221,7 @@ const TimeSeriesChartCore = memo(function TimeSeriesChartCore({
   xDomain,
   xDomainSlotCount,
   tweenYDomainOnXDomainChange = false,
+  fitYDomain = false,
   onPhaseChange,
 }: TimeSeriesChartInnerProps) {
   const staticPreview = useStaticChartPreview();
@@ -220,9 +237,12 @@ const TimeSeriesChartCore = memo(function TimeSeriesChartCore({
         usesDefaultOnly && yScaleDomainMax != null
           ? yScaleDomainMax
           : undefined;
+      if (fitYDomain) {
+        return resolveFittedYDomain(sourceData, dataKeys);
+      }
       return resolveTimeSeriesYDomain(sourceData, dataKeys, domainMax);
     },
-    [lines, yScaleDomainMax]
+    [lines, yScaleDomainMax, fitYDomain]
   );
 
   const skeletonData = useMemo(() => {

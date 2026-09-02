@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
 import { EmptyState, ErrorState, FreshnessBadge, Skeleton, TableRowSkeleton } from "@/components/states";
-import { SiteFooter, WalletButton } from "@/components/shell";
+import { WalletButton } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -295,7 +295,6 @@ export default function PortfolioPage() {
         </p>
       </div>
 
-      <SiteFooter />
     </div>
   );
 }

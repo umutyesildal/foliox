@@ -59,3 +59,58 @@ export function TextField({
     </div>
   );
 }
+
+/**
+ * Labeled single-value range slider on a native <input type="range"> — the
+ * base-ui Slider renders without a visible track/thumb in this app, so the
+ * wizard uses this plain control instead: thin monochrome track, solid thumb,
+ * keyboard operable. `children` fills the value slot on the label row (mono
+ * readout or editable number input).
+ */
+export function RangeField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  children,
+  className,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <label htmlFor={id} className="font-medium text-foreground">
+          {label}
+        </label>
+        {children}
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className={cn(
+          "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted",
+          "[&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-border [&::-webkit-slider-thumb]:bg-foreground",
+          "[&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-foreground",
+          "[&:focus-visible::-webkit-slider-thumb]:ring-2 [&:focus-visible::-webkit-slider-thumb]:ring-ring/50",
+          "[&:focus-visible::-moz-range-thumb]:ring-2 [&:focus-visible::-moz-range-thumb]:ring-ring/50",
+        )}
+      />
+    </div>
+  );
+}

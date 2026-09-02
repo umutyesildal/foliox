@@ -36,7 +36,6 @@ import {
   type VaultHoldingRow,
 } from "@/components/basket/basket-api";
 import { formatAsOf, formatBps, formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
-import { SiteFooter } from "@/components/shell";
 import { formatRawShares6 } from "@/components/basket/basket-math";
 
 /**
@@ -432,7 +431,6 @@ export default function BasketDetailPage({
         </>
       ) : null}
 
-      <SiteFooter />
     </div>
   );
 }

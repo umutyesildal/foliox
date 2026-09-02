@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import CandleVolumeChart from "./CandleVolumeChart";
 import StockChart from "./StockChart";
+import MintCopyButton from "./MintCopyButton";
 import { FreshnessBadge } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SiteFooter } from "@/components/shell";
-import { CopyButton } from "@/components/ui/copy-button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatUsd } from "@/lib/format";
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
@@ -81,7 +79,7 @@ export async function generateMetadata({
   const ticker = decodeURIComponent(rawTicker);
   return {
     title: `${ticker} — xStock vs real equity — FolioX`,
-    description: `Normalized price comparison for ${ticker}: xStock token vs the real equity vs the Nasdaq benchmark, plus OHLC candles and volume.`,
+    description: `Normalized price comparison for ${ticker}: xStock token vs the real equity vs the Nasdaq benchmark, plus volume.`,
   };
 }
 
@@ -125,17 +123,17 @@ export default async function StockPage({
         <FreshnessBadge source="Yahoo Finance" asOf={asOf} />
       </div>
 
-      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-2">
+      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-muted-foreground">Range</span>
         {RANGES.map((r) => (
           <Link
             key={r}
             href={`/stock/${ticker}?range=${r}`}
             aria-current={r === range ? "true" : undefined}
-            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+            className={`text-xs transition-colors ${
               r === range
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {r}
@@ -150,17 +148,13 @@ export default async function StockPage({
         <div className="grid gap-3 md:grid-cols-3">
           <Card className="h-full">
             <CardHeader className="pb-2">
+              <CardAction>
+                {compare.mint ? <MintCopyButton value={compare.mint} /> : null}
+              </CardAction>
               <CardDescription>xStock (Jupiter)</CardDescription>
               <CardTitle className="font-mono text-2xl tabular-nums">
                 {compare.jupiter !== null ? formatUsd(compare.jupiter) : "—"}
               </CardTitle>
-              {/* Mint address gets its own row with a copy affordance (B10). */}
-              {compare.mint ? (
-                <CardDescription className="flex items-center gap-2 font-mono text-xs">
-                  <span className="truncate">{compare.mint}</span>
-                  <CopyButton value={compare.mint} label="Copy mint address" />
-                </CardDescription>
-              ) : null}
             </CardHeader>
           </Card>
           <Card className="h-full">
@@ -215,7 +209,7 @@ export default async function StockPage({
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Price comparison — {range} (normalized 100)</CardTitle>
           <CardDescription className="text-xs leading-relaxed">
-            Blue = xStock token (simulated in V0), green = real equity, gray dashed = Nasdaq QQQ.
+            Green = xStock token (simulated in V0), red = real equity, gray dashed = Nasdaq QQQ.
           </CardDescription>
         </CardHeader>
         <CardContent className="min-h-[380px]">
@@ -233,23 +227,6 @@ export default async function StockPage({
         </CardContent>
       </Card>
 
-      {yahooCandles.length >= 2 ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">
-              Candlestick + volume — {yahooSymbol} (Yahoo OHLCV)
-            </CardTitle>
-            <CardDescription className="text-xs leading-relaxed">
-              Daily candles for the real equity with volume bars. The brush selection drives both
-              panels.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="min-h-[480px]">
-            <CandleVolumeChart candles={yahooCandles} />
-          </CardContent>
-        </Card>
-      ) : null}
-
       <div className="space-y-1 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
         <p>
           The xStock series is simulated in V0 (jitter around the Yahoo close) and is replaced by
@@ -261,7 +238,6 @@ export default async function StockPage({
         </p>
       </div>
 
-      <SiteFooter />
     </div>
   );
 }

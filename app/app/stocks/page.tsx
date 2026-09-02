@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { SiteFooter } from "@/components/shell";
 import { StocksGrid } from "@/components/stocks/stocks-grid";
 
 export const metadata: Metadata = {
@@ -26,7 +25,6 @@ export default function StocksPage() {
         Cards open the per-token comparison.
       </p>
 
-      <SiteFooter />
     </div>
   );
 }

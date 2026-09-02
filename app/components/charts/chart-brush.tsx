@@ -186,7 +186,7 @@ export function ChartBrushLayout({
     <div className={cn("flex flex-col gap-2 h-full", className)}>
       <div className="flex-1 min-h-[180px] overflow-visible">{children(layout)}</div>
 
-      <div className="shrink-0 rounded-lg border bg-muted/20 p-1 overflow-visible">
+      <div className="shrink-0">
         <div style={{ height }} className="overflow-visible">
           {brushStrip(brushLayoutForStrip as any)}
         </div>

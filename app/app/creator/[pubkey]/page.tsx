@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PublicKey } from "@solana/web3.js";
 
-import { SiteFooter } from "@/components/shell";
-import { EmptyState, ErrorState, FreshnessBadge, TableRowSkeleton } from "@/components/states";
+import { EmptyState, ErrorState, TableRowSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -131,17 +130,16 @@ export default function CreatorPage() {
     <div className="mx-auto w-full max-w-4xl">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Creator</h1>
-          <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
-            {validKey ? pubkeyParam : "invalid address"}
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Creator{" "}
+            <span
+              className="font-mono text-2xl tabular-nums text-muted-foreground"
+              title={validKey ? pubkeyParam : undefined}
+            >
+              {validKey ? truncateAddress(pubkeyParam, 4, 4) : "invalid address"}
+            </span>
+          </h1>
         </div>
-        {payload?.source && (
-          <FreshnessBadge
-            source={payload.source}
-            asOf={payload.asOf ?? undefined}
-          />
-        )}
       </div>
 
       {!validKey && (
@@ -287,7 +285,6 @@ export default function CreatorPage() {
         </>
       )}
 
-      <SiteFooter />
     </div>
   );
 }

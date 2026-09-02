@@ -59,6 +59,8 @@ export interface AreaChartProps {
   xDomainSlotCount?: number;
   /** Tween y-domain when brush changes the visible x-range. Default: false */
   tweenYDomainOnXDomainChange?: boolean;
+  /** Fit the y-domain to visible data ([min*0.95, max*1.05]) instead of zero-basing. Default: false */
+  fitYDomain?: boolean;
   /** Inline container styles (e.g. fixed height for brush strip). */
   style?: CSSProperties;
   /** Fires when the internal chart phase changes (e.g. OG capture readiness). */
@@ -127,6 +129,7 @@ interface ChartInnerProps {
   xDomain?: [Date, Date];
   xDomainSlotCount?: number;
   tweenYDomainOnXDomainChange?: boolean;
+  fitYDomain?: boolean;
   children: ReactNode;
   containerRef: React.RefObject<HTMLDivElement | null>;
   onPhaseChange: (phase: ChartPhase) => void;
@@ -149,6 +152,7 @@ function ChartInner({
   xDomain,
   xDomainSlotCount,
   tweenYDomainOnXDomainChange,
+  fitYDomain,
   children,
   containerRef,
   onPhaseChange,
@@ -171,6 +175,7 @@ function ChartInner({
       onPhaseChange={onPhaseChange}
       revealSignature={revealSignature}
       tweenYDomainOnXDomainChange={tweenYDomainOnXDomainChange}
+      fitYDomain={fitYDomain}
       width={width}
       xDataKey={xDataKey}
       xDomain={xDomain}
@@ -200,6 +205,7 @@ export function AreaChart({
   xDomain,
   xDomainSlotCount,
   tweenYDomainOnXDomainChange = false,
+  fitYDomain,
   style,
   onPhaseChange,
   children,
@@ -246,6 +252,7 @@ export function AreaChart({
             onPhaseChange={handlePhaseChange}
             revealSignature={revealSignature}
             tweenYDomainOnXDomainChange={tweenYDomainOnXDomainChange}
+            fitYDomain={fitYDomain}
             width={width}
             xDataKey={xDataKey}
             xDomain={xDomain}

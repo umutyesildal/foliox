@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import MarketChart, { type MarketSeriesMeta } from "./market-chart";
-import { SiteFooter } from "@/components/shell";
 import { FreshnessBadge } from "@/components/states";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -217,17 +216,17 @@ export default async function MarketPage({
         />
       </div>
 
-      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-2">
+      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-muted-foreground">Range</span>
         {RANGES.map((r) => (
           <Link
             key={r}
             href={`/market?range=${r}`}
             aria-current={r === range ? "true" : undefined}
-            className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+            className={`text-xs transition-colors ${
               r === range
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {r}
@@ -272,7 +271,6 @@ export default async function MarketPage({
         </Button>
       </div>
 
-      <SiteFooter />
     </div>
   );
 }

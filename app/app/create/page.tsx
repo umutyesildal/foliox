@@ -15,7 +15,9 @@ import {
   SeedPreview,
   Stepper,
   SummaryRail,
+  WalletGateBanner,
   WeightsEditor,
+  formatRawAsTokenUnits,
   type StepValidity,
 } from "@/components/create";
 import { ENTRY_FEE_CAP_BPS, EXIT_FEE_CAP_BPS, MANAGEMENT_FEE_CAP_BPS } from "@/lib/create-basket";
@@ -27,7 +29,6 @@ import {
   type LegalAcknowledgments,
   type WhitelistRow,
 } from "@/components/create/types";
-import { SiteFooter } from "@/components/shell";
 import { sha256Hex } from "@/lib/create-basket";
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
@@ -271,10 +272,10 @@ export default function CreatePage() {
           ? validity.fees
             ? null
             : "Fees must stay within the caps (300/100/300 bps)."
-          : step === 3
-            ? validity.seed
-              ? null
-              : "Every raw seed amount must be greater than zero."
+            : step === 3
+              ? validity.seed
+                ? null
+                : "Every token needs a seed amount greater than zero."
             : step === 4
               ? validity.legal
                 ? null
@@ -288,7 +289,7 @@ export default function CreatePage() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl pb-16">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Create a strategy basket</h1>
@@ -301,6 +302,8 @@ export default function CreatePage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="min-w-0">
+          {!connected && <WalletGateBanner className="mb-4" />}
+
           <Stepper
             steps={STEPS.map((label, i) => ({ key: `${i}-${label}`, label }))}
             current={step}
@@ -436,7 +439,12 @@ export default function CreatePage() {
               : null,
             seedRawTotal:
               count > 0
-                ? constituents.map((c) => `${c.ticker} ${c.seedRaw}`).join(" + ")
+                ? constituents
+                    .map(
+                      (c) =>
+                        `${c.ticker} ${formatRawAsTokenUnits(c.seedRaw, c.decimals)}`,
+                    )
+                    .join(" + ")
                 : null,
             legalAccepted: validity.legal,
             walletAddress: publicKey?.toBase58() ?? null,
@@ -455,7 +463,6 @@ export default function CreatePage() {
         </p>
       </div>
 
-      <SiteFooter />
     </div>
   );
 }

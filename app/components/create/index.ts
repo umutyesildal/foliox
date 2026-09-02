@@ -7,7 +7,8 @@ export { SeedPreview } from "./seed-preview";
 export { LegalCheckboxes } from "./legal-checkboxes";
 export { DeployPanel } from "./deploy-panel";
 export { LegalReviewTag } from "./legal-review-tag";
-export { TextField } from "./field";
+export { WalletGateBanner } from "./wallet-gate";
+export { TextField, RangeField } from "./field";
 export {
   tickerFromRow,
   equalWeights,

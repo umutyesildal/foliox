@@ -3,35 +3,37 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ErrorState, EmptyState, FreshnessBadge, Skeleton, TableRowSkeleton } from "@/components/states";
+import { ErrorState, EmptyState, FreshnessBadge, Skeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  formatAsOf,
-  formatTokenAmount,
-  formatUsd,
-  truncateAddress,
-} from "@/lib/format";
+import { ChangeValue } from "@/components/stocks/change-value";
+import { formatUsd, truncateAddress } from "@/lib/format";
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 
 /** Numeric field as served by the indexer: Postgres numeric serialized as text. */
 type Numeric = string | number | null | undefined;
 
+/** Defensive shape — the list feed carries no constituents today (see compositionOf). */
+interface ConstituentLike {
+  ticker?: unknown;
+  symbol?: unknown;
+  name?: unknown;
+  mint?: unknown;
+  weight?: unknown;
+  weight_bps?: unknown;
+  weightBps?: unknown;
+  weight_pct?: unknown;
+  weightPct?: unknown;
+}
+
 interface BasketRow {
   pubkey: string;
   creator?: string | null;
   /** Not carried by the list feed today; parsed defensively if the backend adds it. */
   metadata_json?: string | Record<string, unknown> | null;
+  /** Mint pubkeys (indexer feed, positional with weights_bps) or richer objects. */
+  constituents?: (ConstituentLike | string)[] | null;
+  weights_bps?: Numeric[] | null;
   num_constituents?: Numeric;
   share_mint?: string | null;
   nav?: Numeric;
@@ -82,7 +84,6 @@ interface Bench {
 }
 
 type SortKey = "popular" | "return_24h" | "return_30d" | "vs_spy";
-type ViewMode = "table" | "grid";
 
 function num(v: Numeric): number | null {
   if (v === null || v === undefined || v === "") return null;
@@ -94,9 +95,7 @@ function asOfOf(b: BasketRow): string | null {
   return b.asOf ?? b.nav_as_of ?? b.refreshed_at ?? null;
 }
 
-/** Basket display name from metadata_json when present; the list feed carries no name today. */
-function nameOf(b: BasketRow): string | null {
-  const mj = b.metadata_json;
+function metaObj(mj: BasketRow["metadata_json"]): Record<string, unknown> | null {
   if (!mj) return null;
   let obj: unknown = mj;
   if (typeof mj === "string") {
@@ -106,28 +105,79 @@ function nameOf(b: BasketRow): string | null {
       return null;
     }
   }
-  if (obj && typeof obj === "object") {
-    const name = (obj as { name?: unknown }).name;
-    if (typeof name === "string" && name.trim()) return name.trim();
+  return obj && typeof obj === "object" ? (obj as Record<string, unknown>) : null;
+}
+
+/** Basket display name from metadata_json when present; the list feed carries no name today. */
+function nameOf(b: BasketRow): string | null {
+  const name = metaObj(b.metadata_json)?.name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
+
+/** Ticker-ish symbol for a constituent; short mint as last resort. */
+function constituentTicker(c: ConstituentLike): string | null {
+  for (const key of [c.ticker, c.symbol]) {
+    if (typeof key === "string" && key.trim()) return key.trim();
   }
+  if (typeof c.name === "string" && c.name.trim()) return c.name.trim();
+  if (typeof c.mint === "string" && c.mint) return truncateAddress(c.mint, 4, 4);
   return null;
 }
 
-function ChangeCell({ value }: { value: number | null }) {
-  if (value === null) {
-    return <span className="text-muted-foreground">—</span>;
+/** Weight as a percent number; accepts pct, bps, or an ambiguous raw fraction. */
+function constituentWeightPct(c: ConstituentLike): number | null {
+  const pct = num(c.weight_pct as Numeric) ?? num(c.weightPct as Numeric);
+  if (pct !== null) return pct;
+  const bps = num(c.weight_bps as Numeric) ?? num(c.weightBps as Numeric);
+  if (bps !== null) return bps / 100;
+  const w = num(c.weight as Numeric);
+  if (w === null) return null;
+  return w <= 100 ? w : w / 100;
+}
+
+const MAX_COMPOSITION_PARTS = 4;
+
+/**
+ * Composition string for the card top row, e.g. "AAPLx 50 · TSLAx 50".
+ * Mint-pubkey constituents are resolved through the whitelist ticker map;
+ * falls back to metadata constituents, then null (card shows name/pubkey).
+ */
+function compositionOf(b: BasketRow, mintTickers: Map<string, string>): string | null {
+  const parts: string[] = [];
+  const rawList = Array.isArray(b.constituents) ? b.constituents : null;
+  if (rawList && rawList.length > 0) {
+    const weights = Array.isArray(b.weights_bps) ? b.weights_bps : null;
+    rawList.forEach((c, i) => {
+      const mint = typeof c === "string" ? c : typeof c.mint === "string" ? c.mint : null;
+      const ticker =
+        (typeof c === "object" && c !== null ? constituentTicker(c) : null) ??
+        (mint ? mintTickers.get(mint) ?? null : null) ??
+        (mint ? truncateAddress(mint, 4, 4) : null);
+      if (!ticker) return;
+      const bps = weights ? num(weights[i]) : null;
+      parts.push(bps !== null ? `${ticker} ${Math.round(bps / 100)}` : ticker);
+    });
+  } else {
+    let list: ConstituentLike[] | null = null;
+    const metaConstituents = metaObj(b.metadata_json)?.constituents;
+    if (Array.isArray(metaConstituents)) list = metaConstituents as ConstituentLike[];
+    for (const c of list ?? []) {
+      const ticker = constituentTicker(c);
+      if (!ticker) continue;
+      const weight = constituentWeightPct(c);
+      parts.push(weight !== null ? `${ticker} ${Math.round(weight)}` : ticker);
+    }
   }
-  const positive = value >= 0;
-  return (
-    <span
-      className={`font-mono text-xs tabular-nums ${
-        positive ? "text-foreground" : "text-muted-foreground"
-      }`}
-    >
-      {positive ? "+" : ""}
-      {value.toFixed(2)}%
-    </span>
-  );
+  if (parts.length === 0) return null;
+  const shown = parts.slice(0, MAX_COMPOSITION_PARTS).join(" · ");
+  return parts.length > MAX_COMPOSITION_PARTS
+    ? `${shown} · +${parts.length - MAX_COMPOSITION_PARTS}`
+    : shown;
+}
+
+/** Card headline: composition string when available, else metadata name, else truncated pubkey. */
+function headlineOf(b: BasketRow, mintTickers: Map<string, string>): string {
+  return compositionOf(b, mintTickers) ?? nameOf(b) ?? truncateAddress(b.pubkey, 6, 4);
 }
 
 /** Basket return minus SPY return over the same window. Gray +/-, sign always shown. */
@@ -155,120 +205,83 @@ function DeltaCell({ value, window: win }: { value: number | null; window: "24h"
   );
 }
 
-function ConstituentsCell({ value }: { value: number | null }) {
-  if (value === null) {
-    return (
-      <span
-        className="text-muted-foreground"
-        title="Constituent count is served on the basket detail page; the list feed does not carry it."
-      >
-        —
-      </span>
-    );
-  }
-  return <span className="font-mono text-xs tabular-nums">{value}</span>;
-}
-
-function CreatorChip({ creator }: { creator: string }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <Link
-        href={`/creator/${creator}`}
-        title={`Created by ${creator} — open creator page`}
-        className="inline-flex items-center rounded-[4px] border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        {truncateAddress(creator, 4, 4)}
-      </Link>
-      <CopyButton value={creator} label="Copy creator pubkey" />
-    </span>
-  );
-}
-
 interface BasketCardProps {
   b: BasketRow;
-  rank: number;
-  feedSource: string;
   bench: Bench | null;
+  showVs24: boolean;
+  mintTickers: Map<string, string>;
 }
 
-function BasketCard({ b, rank, feedSource, bench }: BasketCardProps) {
-  const name = nameOf(b);
+/**
+ * One basket in the /explore grid — same card treatment as /stocks:
+ * whole card is a link to /basket/[pubkey], mono headline = what's inside,
+ * big mono share price, AUM muted, bottom row 24h change + vs SPY delta.
+ */
+function BasketCard({ b, bench, showVs24, mintTickers }: BasketCardProps) {
   const change = num(b.return_24h);
   const r30 = num(b.return_30d);
   const d24 = change !== null && bench?.d24 != null ? change - bench.d24 : null;
   const d30 = r30 !== null && bench?.d30 != null ? r30 - bench.d30 : null;
-  const constituents = num(b.num_constituents);
-  const creator = b.creator ?? null;
+  const sharePrice = num(b.share_price);
+  const nav = num(b.nav);
+  /** No NAV/price indexed yet — muted price plus an explicit "not indexed" chip. */
+  const unavailable = sharePrice === null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+    <Link
+      href={`/basket/${b.pubkey}`}
+      title={`Open basket ${b.pubkey}`}
+      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+    >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <span className="mr-1.5 font-mono text-[11px] tabular-nums text-muted-foreground">#{rank}</span>
-          <span
-            className="break-all font-mono text-xs font-medium"
-            title={name ? b.pubkey : undefined}
-          >
-            {name ?? truncateAddress(b.pubkey, 6, 4)}
+        <span
+          className="min-w-0 break-words font-mono text-sm font-medium tracking-tight text-foreground"
+          title={b.pubkey}
+        >
+          {headlineOf(b, mintTickers)}
+        </span>
+        {unavailable ? (
+          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+            not indexed
           </span>
-        </div>
-        <ChangeCell value={change} />
+        ) : null}
       </div>
 
-      {creator ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Creator</span>
-          <CreatorChip creator={creator} />
-        </div>
-      ) : (
-        <span className="text-[11px] text-muted-foreground">Creator not indexed</span>
-      )}
+      <span
+        className={`mt-4 font-mono text-2xl tabular-nums ${
+          unavailable ? "text-muted-foreground" : "text-foreground"
+        }`}
+      >
+        {sharePrice !== null ? formatUsd(sharePrice) : "—"}
+      </span>
+      <span className="mt-0.5 text-xs text-muted-foreground">
+        AUM {nav !== null ? formatUsd(nav, { maximumFractionDigits: 0 }) : "—"}
+      </span>
 
-      <dl className="grid grid-cols-3 gap-2 text-xs">
-        <div>
-          <dt className="text-muted-foreground">AUM</dt>
-          <dd className="font-mono tabular-nums">
-            {num(b.nav) !== null ? formatUsd(num(b.nav) as number, { maximumFractionDigits: 0 }) : "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Price</dt>
-          <dd className="font-mono tabular-nums">
-            {num(b.share_price) !== null ? formatUsd(num(b.share_price) as number) : "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Constituents</dt>
-          <dd>
-            <ConstituentsCell value={constituents} />
-          </dd>
-        </div>
-      </dl>
-
-      {bench ? (
-        <dl className="grid grid-cols-2 gap-2 border-t border-border/60 pt-2 text-xs">
-          <div>
-            <dt className="text-muted-foreground">vs SPY 24h</dt>
-            <dd>
+      <div className="mt-auto pt-4">
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">24h</span>
+            <ChangeValue changePct={change} />
+          </span>
+          {showVs24 ? (
+            <span className="flex flex-col items-end gap-0.5">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                vs SPY
+              </span>
               <DeltaCell value={d24} window="24h" />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">vs SPY 30d</dt>
-            <dd>
+            </span>
+          ) : bench ? (
+            <span className="flex flex-col items-end gap-0.5">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                vs SPY 30d
+              </span>
               <DeltaCell value={d30} window="30d" />
-            </dd>
-          </div>
-        </dl>
-      ) : null}
-
-      <div className="mt-auto flex items-center justify-between gap-2">
-        <FreshnessBadge source={b.source ?? feedSource} asOf={asOfOf(b) ?? undefined} />
-        <Button render={<Link href={`/basket/${b.pubkey}`} />} variant="outline" size="xs">
-          Open
-        </Button>
+            </span>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -280,11 +293,10 @@ export default function ExploreClient() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const [bench, setBench] = useState<Bench | null>(null);
+  const [mintTickers, setMintTickers] = useState<Map<string, string>>(new Map());
 
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("popular");
-  const [positiveOnly, setPositiveOnly] = useState(false);
-  const [view, setView] = useState<ViewMode>("table");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -326,6 +338,39 @@ export default function ExploreClient() {
     void load();
     return () => controller.abort();
   }, [reloadKey]);
+
+  // Whitelist mint→ticker map for card composition strings — fetched once, optional.
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadTickers() {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/whitelist`, {
+          signal: controller.signal,
+          cache: "no-store",
+          headers: { accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const payload = (await res.json()) as {
+          data?: { mint?: string; ticker?: string; price_source?: string }[];
+        };
+        const map = new Map<string, string>();
+        for (const row of payload.data ?? []) {
+          if (typeof row.mint !== "string" || !row.mint) continue;
+          const fromField = typeof row.ticker === "string" ? row.ticker.trim() : "";
+          const fromSource = typeof row.price_source === "string" ? row.price_source.split(":").pop() ?? "" : "";
+          const ticker = fromField || fromSource;
+          if (ticker) map.set(row.mint, ticker);
+        }
+        setMintTickers(map);
+      } catch {
+        // composition falls back to metadata name / mint fragments
+      }
+    }
+
+    void loadTickers();
+    return () => controller.abort();
+  }, []);
 
   // Benchmark series (SPY daily closes via the market overview feed) — fetched once.
   // When unavailable, every vs-SPY affordance is hidden; no fabricated zeros.
@@ -384,15 +429,13 @@ export default function ExploreClient() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let rows = baskets.filter((b) => {
-      if (positiveOnly) {
-        const change = num(b.return_24h);
-        if (change === null || change < 0) return false;
-      }
       if (!q) return true;
       const name = nameOf(b)?.toLowerCase() ?? "";
+      const composition = compositionOf(b, mintTickers)?.toLowerCase() ?? "";
       return (
         b.pubkey.toLowerCase().includes(q) ||
         name.includes(q) ||
+        composition.includes(q) ||
         (b.creator ?? "").toLowerCase().includes(q) ||
         (b.share_mint ?? "").toLowerCase().includes(q)
       );
@@ -426,10 +469,9 @@ export default function ExploreClient() {
       }
     });
     return rows;
-  }, [baskets, query, sortKey, positiveOnly, bench]);
+  }, [baskets, query, sortKey, bench]);
 
   const hasBaskets = baskets.length > 0;
-  const tableColSpan = 8 + (showVs24 ? 1 : 0) + (showVs30 ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -444,11 +486,20 @@ export default function ExploreClient() {
       </div>
 
       {status === "loading" ? (
-        <Card>
-          <CardContent className="space-y-4 p-4">
-            <TableRowSkeleton rows={8} columns={7} label="Loading baskets" />
-          </CardContent>
-        </Card>
+        <div
+          role="status"
+          aria-label="Loading baskets"
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
+          {Array.from({ length: 8 }, (_, i) => (
+            <div key={i} aria-hidden="true" className="rounded-lg border border-border bg-card p-5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="mt-4 h-7 w-24" />
+              <Skeleton className="mt-1.5 h-3 w-16" />
+              <Skeleton className="mt-6 h-3 w-full" />
+            </div>
+          ))}
+        </div>
       ) : status === "error" ? (
         <ErrorState
           title="Baskets unavailable"
@@ -469,39 +520,30 @@ export default function ExploreClient() {
               Create the first basket
             </Button>
           }
-          previewLabel="Layout preview — baskets table"
+          previewLabel="Layout preview — baskets grid"
           preview={
-            <div className="overflow-hidden rounded-md border border-border/60">
-              {/* Real column headers of the populated table */}
-              <div className="grid grid-cols-[2rem_minmax(0,2fr)_1fr_1fr_1fr_1fr] gap-3 border-b border-border/60 bg-muted/40 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-                <span>#</span>
-                <span>Basket</span>
-                <span>Creator</span>
-                <span className="text-right">AUM</span>
-                <span className="text-right">24h</span>
-                <span className="text-right">vs SPY</span>
-              </div>
-              <div className="flex flex-col gap-2.5 px-3 py-3">
-                {Array.from({ length: 4 }, (_, row) => (
-                  <div
-                    key={row}
-                    className="grid grid-cols-[2rem_minmax(0,2fr)_1fr_1fr_1fr_1fr] items-center gap-3"
-                  >
-                    <Skeleton className="h-4 w-4" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-3/5" />
-                    <Skeleton className="ml-auto h-4 w-4/5" />
-                    <Skeleton className="ml-auto h-4 w-4/5" />
-                    <Skeleton className="ml-auto h-4 w-4/5" />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div
+                  key={i}
+                  aria-hidden="true"
+                  className="rounded-lg border border-border/60 bg-card p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-10" />
                   </div>
-                ))}
-              </div>
+                  <Skeleton className="mt-4 h-6 w-20" />
+                  <Skeleton className="mt-2 h-3 w-16" />
+                  <Skeleton className="mt-6 h-3 w-full" />
+                </div>
+              ))}
             </div>
           }
         />
       ) : (
         <>
-          {/* Controls — view toggle / search / sort / filter, client-side over the fetched list */}
+          {/* Controls — search / sort, client-side over the fetched list. Freshness for the whole feed lives here, not per card. */}
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="flex flex-1 flex-col gap-1">
               <label htmlFor="explore-search" className="text-xs font-medium text-muted-foreground">
@@ -517,27 +559,6 @@ export default function ExploreClient() {
               />
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <div
-                role="group"
-                aria-label="View mode"
-                className="inline-flex h-9 items-center gap-0.5 rounded-md border border-border p-0.5"
-              >
-                {(["table", "grid"] as ViewMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={view === mode}
-                    onClick={() => setView(mode)}
-                    className={`h-8 rounded-[4px] px-3 font-mono text-[11px] uppercase tracking-wide transition-colors ${
-                      view === mode
-                        ? "bg-foreground text-background"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
               <div className="flex flex-col gap-1">
                 <label htmlFor="explore-sort" className="text-xs font-medium text-muted-foreground">
                   Sort by
@@ -555,156 +576,25 @@ export default function ExploreClient() {
                   ))}
                 </select>
               </div>
-              <Button
-                variant={positiveOnly ? "default" : "outline"}
-                size="sm"
-                aria-pressed={positiveOnly}
-                onClick={() => setPositiveOnly((v) => !v)}
-              >
-                24h positive only
-              </Button>
+              {payloadMeta ? (
+                <FreshnessBadge
+                  source={`feed: ${payloadMeta.source}`}
+                  asOf={payloadMeta.asOf ?? undefined}
+                />
+              ) : null}
             </div>
           </div>
 
-          {view === "table" ? (
-            <Card>
-              <CardContent className="p-0">
-                {/* Comparison-first ranking table (desktop) */}
-                <div className="hidden md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-10 pl-4">#</TableHead>
-                        <TableHead>Basket</TableHead>
-                        <TableHead>Creator</TableHead>
-                        <TableHead className="text-right">AUM</TableHead>
-                        <TableHead className="text-right">Share price</TableHead>
-                        <TableHead className="text-right">24h</TableHead>
-                        {showVs24 ? <TableHead className="text-right">vs SPY 24h</TableHead> : null}
-                        {showVs30 ? <TableHead className="text-right">vs SPY 30d</TableHead> : null}
-                        <TableHead>Source / freshness</TableHead>
-                        <TableHead className="pr-4 text-right">
-                          <span className="sr-only">Actions</span>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visible.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={tableColSpan} className="p-6">
-                            <p className="text-sm text-muted-foreground">
-                              No basket matches the current search or filter.
-                            </p>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        visible.map((b, i) => {
-                          const nav = num(b.nav);
-                          const sharePrice = num(b.share_price);
-                          const change = num(b.return_24h);
-                          const r30 = num(b.return_30d);
-                          const asOf = asOfOf(b);
-                          const d24 = change !== null && bench?.d24 != null ? change - bench.d24 : null;
-                          const d30 = r30 !== null && bench?.d30 != null ? r30 - bench.d30 : null;
-                          return (
-                            <TableRow key={b.pubkey}>
-                              <TableCell className="pl-4 font-mono text-xs tabular-nums text-muted-foreground">
-                                {i + 1}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span
-                                    className="font-mono text-xs font-medium"
-                                    title={nameOf(b) ? b.pubkey : undefined}
-                                  >
-                                    {nameOf(b) ?? truncateAddress(b.pubkey, 6, 4)}
-                                  </span>
-                                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                    constituents <ConstituentsCell value={num(b.num_constituents)} />
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {b.creator ? (
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <Link
-                                      href={`/creator/${b.creator}`}
-                                      className="font-mono text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                                      title={`Created by ${b.creator} — open creator page`}
-                                    >
-                                      {truncateAddress(b.creator, 6, 4)}
-                                    </Link>
-                                    <CopyButton value={b.creator} label="Copy creator pubkey" />
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">—</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs tabular-nums">
-                                {nav !== null ? formatUsd(nav, { maximumFractionDigits: 0 }) : "—"}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs tabular-nums">
-                                {sharePrice !== null ? formatUsd(sharePrice) : "—"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <ChangeCell value={change} />
-                              </TableCell>
-                              {showVs24 ? (
-                                <TableCell className="text-right">
-                                  <DeltaCell value={d24} window="24h" />
-                                </TableCell>
-                              ) : null}
-                              {showVs30 ? (
-                                <TableCell className="text-right">
-                                  <DeltaCell value={d30} window="30d" />
-                                </TableCell>
-                              ) : null}
-                              <TableCell>
-                                <FreshnessBadge source={b.source ?? payloadMeta?.source ?? ""} asOf={asOf ?? undefined} />
-                              </TableCell>
-                              <TableCell className="pr-4 text-right">
-                                <Button render={<Link href={`/basket/${b.pubkey}`} />} variant="outline" size="xs">
-                                  Open
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Mobile representation — same rows as cards */}
-                <div className="space-y-3 p-4 md:hidden">
-                  {visible.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No basket matches the current search or filter.</p>
-                  ) : (
-                    visible.map((b, i) => (
-                      <BasketCard key={b.pubkey} b={b} rank={i + 1} feedSource={payloadMeta?.source ?? ""} bench={bench} />
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Grid only — same responsive layout as /stocks (1 / 2 / 3-4 columns). */}
+          {visible.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No basket matches the current search.
+            </p>
           ) : (
-            /* Grid view — creator-first cards */
-            <div>
-              {visible.length === 0 ? (
-                <Card>
-                  <CardContent className="p-6">
-                    <p className="text-sm text-muted-foreground">
-                      No basket matches the current search or filter.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {visible.map((b, i) => (
-                    <BasketCard key={b.pubkey} b={b} rank={i + 1} feedSource={payloadMeta?.source ?? ""} bench={bench} />
-                  ))}
-                </div>
-              )}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {visible.map((b) => (
+                <BasketCard key={b.pubkey} b={b} bench={bench} showVs24={showVs24} mintTickers={mintTickers} />
+              ))}
             </div>
           )}
 
@@ -712,12 +602,6 @@ export default function ExploreClient() {
             <span>
               {visible.length} of {baskets.length} baskets shown
             </span>
-            {payloadMeta ? (
-              <FreshnessBadge source={`feed: ${payloadMeta.source}`} asOf={payloadMeta.asOf ?? undefined} />
-            ) : null}
-            {payloadMeta?.asOf ? (
-              <span className="font-mono tabular-nums">last update {formatAsOf(payloadMeta.asOf)}</span>
-            ) : null}
             {bench ? (
               <span>vs SPY = basket return − SPY return (Yahoo Finance daily closes) over the matching window.</span>
             ) : null}

@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { SiteFooter } from "@/components/shell";
 import { truncateAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -290,17 +289,9 @@ export default async function ProvidersPage() {
 
       {/* xStock instruments */}
       <section aria-labelledby="xstock-instruments" className="border-t border-border py-10">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 id="xstock-instruments" className="text-sm font-medium tracking-tight">
-            xStock instruments
-          </h2>
-          <span
-            title="Issuer disclosure must be approved by counsel before mainnet."
-            className="inline-flex h-5 items-center rounded-4xl border border-border px-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
-          >
-            Legal review required
-          </span>
-        </div>
+        <h2 id="xstock-instruments" className="text-sm font-medium tracking-tight">
+          xStock instruments
+        </h2>
         <p className="mt-2 text-xs text-muted-foreground">
           Token-2022 mints issued by Backed Finance — structured instruments, not direct equity.
         </p>
@@ -352,8 +343,6 @@ export default async function ProvidersPage() {
           )}
         </div>
       </section>
-
-      <SiteFooter />
     </div>
   );
 }

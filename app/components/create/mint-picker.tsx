@@ -4,7 +4,7 @@ import { Check, Minus } from "lucide-react";
 
 import { EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
-import { formatAsOf, truncateAddress } from "@/lib/format";
+import { truncateAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { TextField } from "./field";
 import { tickerFromRow, type WhitelistRow } from "./types";
@@ -92,21 +92,20 @@ export function MintPicker({
 
   const activeRows = rows.filter((row) => row.status === "Active");
   const pausedRows = rows.filter((row) => row.status !== "Active");
-  const asOf = rows.find((row) => row.asOf)?.asOf;
   const allSelected = selectedMints.length >= maxSelected;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <TextField
-          label="Basket name (stored off-chain in the metadata JSON)"
+          label="Name"
           value={basketName}
           maxLength={64}
           onChange={onNameChange}
           placeholder="e.g. US mega-cap tech"
         />
         <TextField
-          label="Thesis (one sentence — hashed into the metadata JSON)"
+          label="One-line thesis"
           value={description}
           maxLength={200}
           onChange={onDescriptionChange}
@@ -197,7 +196,6 @@ export function MintPicker({
           </span>{" "}
           · need 2-{maxSelected}
         </span>
-        {asOf ? <span className="font-mono tabular-nums">whitelist as of {formatAsOf(asOf)}</span> : null}
       </div>
     </div>
   );

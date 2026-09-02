@@ -114,6 +114,7 @@ async function readJsonBody(req: http.IncomingMessage): Promise<Record<string, u
 
 const BASKETS_LIST_SQL = `
   SELECT r.pubkey, r.creator, r.share_mint,
+         b.constituents, b.weights_bps, b.metadata_json,
          r.nav::text AS nav, r.supply::text AS supply,
          r.share_price::text AS share_price,
          r.return_30d::text AS return_30d, r.mint_count, r.refreshed_at,
@@ -121,6 +122,7 @@ const BASKETS_LIST_SQL = `
          ((r.nav - h24.nav) / NULLIF(h24.nav, 0))::text AS return_24h,
          COALESCE(h.holders, 0) AS holders
   FROM basket_rankings r
+  JOIN baskets b ON b.pubkey = r.pubkey
   LEFT JOIN LATERAL (
     SELECT ts FROM nav_snapshots WHERE basket = r.pubkey ORDER BY ts DESC LIMIT 1
   ) nav ON true

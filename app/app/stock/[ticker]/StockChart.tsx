@@ -8,10 +8,12 @@ import { YAxis } from "@/components/charts/y-axis";
 import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
 import type { TooltipRow } from "@/components/charts/tooltip/tooltip-content";
 import { Badge } from "@/components/ui/badge";
+import VolumeBars from "./VolumeBars";
 
 interface Candle {
   ts: number;
   close: number;
+  volume?: number;
 }
 
 export interface StockChartSeries {
@@ -65,7 +67,8 @@ function tooltipRows(point: Record<string, unknown>): TooltipRow[] {
  * API (not official registry source).
  */
 export default function StockChart({ data }: StockChartProps) {
-  const yahooNorm = normalize(data.yahoo?.candles);
+  const yahooCandles = data.yahoo?.candles ?? [];
+  const yahooNorm = normalize(yahooCandles);
   const xStockNorm = normalize(data.xStock?.candles);
   const nasdaqNorm = normalize(data.nasdaq?.candles);
 
@@ -77,6 +80,7 @@ export default function StockChart({ data }: StockChartProps) {
     xStock: xStockNorm[i]?.v ?? null,
     real: yahooNorm[i]?.v ?? null,
     nasdaq: nasdaqNorm[i]?.v ?? null,
+    volume: yahooCandles[i]?.volume ?? null,
   })).filter((r) => r.xStock !== null || r.real !== null || r.nasdaq !== null);
 
   if (rows.length < 2) {
@@ -87,6 +91,7 @@ export default function StockChart({ data }: StockChartProps) {
     );
   }
 
+  const hasVolume = rows.some((r) => typeof r.volume === "number" && r.volume > 0);
   const rowsForChart = rows as unknown as Record<string, unknown>[];
 
   return (
@@ -114,7 +119,7 @@ export default function StockChart({ data }: StockChartProps) {
         <span className="text-xs text-muted-foreground">Normalized to 100 at the start of the window.</span>
       </div>
 
-      <div className="min-h-[260px] flex-1">
+      <div className="min-h-[320px] flex-1">
         <ChartBrushLayout
           data={rowsForChart}
           xDataKey="date"
@@ -143,41 +148,61 @@ export default function StockChart({ data }: StockChartProps) {
           )}
         >
           {(layout) => (
-            <AreaChart
-              data={rowsForChart}
-              xDataKey="date"
-              xDomain={layout.xDomain}
-              xDomainSlotCount={layout.xDomainSlotCount}
-              tweenYDomainOnXDomainChange
-              margin={{ top: 12, right: 12, bottom: 24, left: 48 }}
-              className="h-full w-full"
-            >
-              {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
-                  fading to 0 by ~40% height; secondary/benchmark line-only. */}
-              <Grid
-                horizontal
-                highlightRowValues={[100]}
-                highlightRowStroke="hsl(var(--chart-grid))"
-                highlightRowStrokeDasharray="0"
-                highlightRowStrokeWidth={1}
-              />
-              {SERIES.map((s) => (
-                <Area
-                  key={s.key}
-                  dataKey={s.key}
-                  fill={s.color}
-                  stroke={s.color}
-                  fillOpacity={s.key === "xStock" ? 0.06 : 0}
-                  gradientSpan={s.key === "xStock" ? 0.4 : undefined}
-                  strokeWidth={s.key === "nasdaq" ? 1.5 : 2}
-                  dashFromIndex={s.key === "nasdaq" ? 0 : undefined}
-                  dashArray={s.key === "nasdaq" ? "6 4" : undefined}
-                />
-              ))}
-              <XAxis numTicks={5} />
-              <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
-              <ChartTooltip rows={tooltipRows} />
-            </AreaChart>
+            <div className="flex h-full flex-col gap-2">
+              <div className="min-h-[240px] flex-1">
+                <AreaChart
+                  data={rowsForChart}
+                  xDataKey="date"
+                  xDomain={layout.xDomain}
+                  xDomainSlotCount={layout.xDomainSlotCount}
+                  tweenYDomainOnXDomainChange
+                  fitYDomain
+                  margin={{ top: 12, right: 12, bottom: 24, left: 48 }}
+                  className="h-full w-full"
+                >
+                  {/* B1: faint solid gridline at the 100 base; primary fill ≤6% alpha
+                      fading to 0 by ~40% height; secondary/benchmark line-only. */}
+                  <Grid
+                    horizontal
+                    highlightRowValues={[100]}
+                    highlightRowStroke="hsl(var(--chart-grid))"
+                    highlightRowStrokeDasharray="0"
+                    highlightRowStrokeWidth={1}
+                  />
+                  {SERIES.map((s) => (
+                    <Area
+                      key={s.key}
+                      dataKey={s.key}
+                      fill={s.color}
+                      stroke={s.color}
+                      fillOpacity={s.key === "xStock" ? 0.06 : 0}
+                      gradientSpan={s.key === "xStock" ? 0.4 : undefined}
+                      strokeWidth={s.key === "nasdaq" ? 1.5 : 2}
+                      dashFromIndex={s.key === "nasdaq" ? 0 : undefined}
+                      dashArray={s.key === "nasdaq" ? "6 4" : undefined}
+                    />
+                  ))}
+                  <XAxis numTicks={5} />
+                  <YAxis numTicks={5} formatValue={(value) => value.toFixed(0)} />
+                  <ChartTooltip rows={tooltipRows} />
+                </AreaChart>
+              </div>
+              {hasVolume ? (
+                <div className="h-20 shrink-0" aria-hidden="true">
+                  <AreaChart
+                    data={rowsForChart}
+                    xDataKey="date"
+                    xDomain={layout.xDomain}
+                    xDomainSlotCount={layout.xDomainSlotCount}
+                    tweenYDomainOnXDomainChange
+                    margin={{ top: 2, right: 12, bottom: 0, left: 48 }}
+                    className="h-full w-full"
+                  >
+                    <VolumeBars volumeKey="volume" />
+                  </AreaChart>
+                </div>
+              ) : null}
+            </div>
           )}
         </ChartBrushLayout>
       </div>

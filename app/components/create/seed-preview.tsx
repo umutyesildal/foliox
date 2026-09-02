@@ -60,9 +60,16 @@ export function SeedPreview({
 
   return (
     <div className="flex flex-col gap-4">
+      <div>
+        <h3 className="text-sm font-medium">How much of each token to seed the basket with</h3>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Amounts are entered in whole tokens (e.g. 2.5 shares of TSLAx).
+        </p>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
         <TextField
-          label="USD example (UX estimate only — not a quote)"
+          label="Budget (USD, estimate — not a quote)"
           value={budgetUsd}
           onChange={onBudgetChange}
           inputMode="decimal"
@@ -75,7 +82,7 @@ export function SeedPreview({
           variant="outline"
           size="sm"
           onClick={onRecomputeProportional}
-          title="Recompute raw seed amounts proportional to weights using the USD example and reference prices"
+          title="Recompute the token amounts proportional to your weights, using the budget and reference prices"
         >
           <RefreshCw className="size-3.5" aria-hidden="true" />
           Recompute proportional
@@ -98,7 +105,7 @@ export function SeedPreview({
           <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           {priceStatus === "loading"
             ? "Loading reference prices…"
-            : "No reference price for at least one constituent. Enter raw amounts directly — the USD column is omitted where no price exists."}
+            : "Some tokens have no reference price yet — their USD column shows a dash, so type the amount directly."}
         </p>
       )}
 
@@ -110,8 +117,7 @@ export function SeedPreview({
               <TableHead className="text-right text-xs">Weight</TableHead>
               <TableHead className="text-right text-xs">USD (est.)</TableHead>
               <TableHead className="text-right text-xs">Ref. price</TableHead>
-              <TableHead className="text-xs">Raw seed (on-chain units)</TableHead>
-              <TableHead className="text-right text-xs">Token units</TableHead>
+              <TableHead className="text-xs">Amount (tokens)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,7 +145,7 @@ export function SeedPreview({
                   </TableCell>
                   <TableCell className="w-44">
                     <TextField
-                      label={`Raw seed for ${constituent.ticker}`}
+                      label={`Amount of ${constituent.ticker} to seed`}
                       hideLabel
                       value={formatRawAsTokenUnits(constituent.seedRaw, constituent.decimals)}
                       onChange={(value) => {
@@ -150,9 +156,6 @@ export function SeedPreview({
                       mono
                       invalid={constituent.seedRaw <= 0n}
                     />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {formatRawAsTokenUnits(constituent.seedRaw, constituent.decimals)}
                   </TableCell>
                 </TableRow>
               );
@@ -165,7 +168,7 @@ export function SeedPreview({
                 <TableCell className="text-right font-mono text-xs tabular-nums">
                   {formatUsd(totalUsd)}
                 </TableCell>
-                <TableCell colSpan={3} />
+                <TableCell colSpan={2} />
               </TableRow>
             )}
           </TableBody>
@@ -175,17 +178,15 @@ export function SeedPreview({
       {zeroSeeds && (
         <p className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
           <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          Every seed amount must be greater than zero — the factory reverts on
-          ZeroSeedAmount, and the atomic seed transfer is what prevents empty
-          baskets.
+          Every token needs a seed amount greater than zero — an empty basket
+          cannot be created.
         </p>
       )}
 
       <p className="text-xs leading-5 text-muted-foreground">
-        The seed transfers happen in the same transaction as basket creation
-        (creator ATA → vault ATA, raw amounts, transfer_checked) — there is no
-        init-then-seed two-step to front-run. Raw amounts are the on-chain
-        truth; token units above are raw ÷ 10^decimals for reading.
+        These amounts are transferred to the basket vault in the same
+        transaction that creates the basket — there is no separate deposit
+        step. You type whole tokens; the exact on-chain math is handled for you.
       </p>
     </div>
   );

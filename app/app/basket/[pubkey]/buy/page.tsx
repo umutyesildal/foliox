@@ -12,7 +12,6 @@ import {
   fetchBasketDetail,
   type BasketDetail,
 } from "@/components/basket/basket-api";
-import { SiteFooter } from "@/components/shell";
 import { truncateAddress } from "@/lib/format";
 
 type Tab = "inkind" | "zap";
@@ -207,7 +206,6 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
         </>
       ) : null}
 
-      <SiteFooter />
     </div>
   );
 }

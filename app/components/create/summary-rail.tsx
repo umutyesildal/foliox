@@ -96,7 +96,7 @@ export function SummaryRail({
         )}
         {summary.seedRawTotal !== null && (
           <>
-            <dt className="text-muted-foreground">Seed raw</dt>
+            <dt className="text-muted-foreground">Seed amounts</dt>
             <dd className="max-w-[14rem] truncate text-right font-mono tabular-nums" title={summary.seedRawTotal}>
               {summary.seedRawTotal}
             </dd>

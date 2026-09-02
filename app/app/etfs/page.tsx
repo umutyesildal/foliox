@@ -3,17 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { EtfGrid, EtfGridSkeleton, type EtfRow } from "@/components/etfs/etf-grid";
+import { TraditionalVsTokenized } from "@/components/etfs/traditional-vs-tokenized";
 import { EmptyState, FreshnessBadge } from "@/components/states";
-import { SiteFooter } from "@/components/shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 export const metadata: Metadata = {
   title: "Tokenized ETFs — FolioX",
@@ -72,7 +63,7 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
- * Section 2 body: fetch the instrument registry, keep only ETF-type tickers,
+ * Section 1 body: fetch the instrument registry, keep only ETF-type tickers,
  * attach the live token price (Jupiter) and the 24h change (Yahoo daily
  * close-to-close — never the simulated xStock series). Renders its own header
  * so the FreshnessBadge only appears once real metadata exists.
@@ -169,53 +160,6 @@ async function EtfListing() {
   );
 }
 
-/** Section 1 — generic category education, one line per cell. */
-function TraditionalVsTokenized() {
-  const rows: { dimension: string; traditional: string; tokenized: string }[] = [
-    { dimension: "Settlement", traditional: "T+1 or T+2, via broker rails", tokenized: "Seconds, settled on-chain" },
-    { dimension: "Access", traditional: "Broker account, market hours", tokenized: "Any wallet, 24/7" },
-    { dimension: "Ownership", traditional: "Custodied by the broker", tokenized: "Self-custodied Token-2022 mint" },
-    { dimension: "Transferability", traditional: "Broker-mediated transfers only", tokenized: "Permissionless wallet-to-wallet" },
-    { dimension: "Transparency", traditional: "NAV published daily", tokenized: "Holdings verifiable on-chain" },
-  ];
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium">Traditional vs tokenized</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-4">Dimension</TableHead>
-              <TableHead>Traditional ETF</TableHead>
-              <TableHead>Tokenized ETF</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.dimension} className="h-11 hover:bg-muted/40">
-                <TableCell className="pl-4 text-sm font-medium">{row.dimension}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{row.traditional}</TableCell>
-                <TableCell className="text-sm text-foreground">{row.tokenized}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <div className="flex flex-col gap-1.5 border-t border-border/60 pt-4">
-          <span className="inline-flex w-fit items-center rounded-4xl border border-border px-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            LEGAL_REVIEW_REQUIRED
-          </span>
-          <p className="text-[11px] leading-5 text-muted-foreground">
-            Educational content — not investment advice; tokenized products differ by issuer.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function EtfsPage() {
   return (
     <div>
@@ -227,32 +171,20 @@ export default function EtfsPage() {
         </p>
       </header>
 
-      {/* Section 1 — education (static, no data dependency). */}
-      <section aria-label="Traditional vs tokenized ETFs" className="border-t border-border py-8">
-        <TraditionalVsTokenized />
-      </section>
-
-      {/* Section 2 — live listing; streams after the fetches resolve. */}
+      {/* Section 1 — live listing, right under the intro; streams after the fetches resolve. */}
       <section aria-label="Tokenized ETFs on FolioX" className="border-t border-border py-8">
         <Suspense fallback={<EtfGridSkeleton />}>
           <EtfListing />
         </Suspense>
       </section>
 
-      {/* Section 3 — bridge to basket composition (baskets are never called ETFs). */}
-      <section aria-label="Compose your own basket" className="border-t border-border py-8">
-        <p className="text-sm text-muted-foreground">
-          Want your own mix?{" "}
-          <Link
-            href="/explore"
-            className="underline underline-offset-4 hover:text-foreground"
-          >
-            FolioX lets anyone compose these building blocks into a custom basket →
-          </Link>
-        </p>
+      {/* Section 2 — education (static, no data dependency), kept below the listing.
+          No trailing bridge: the header Create button covers basket composition. */}
+      <section aria-label="Traditional vs tokenized ETFs" className="border-t border-border py-8">
+        <div className="max-w-3xl">
+          <TraditionalVsTokenized />
+        </div>
       </section>
-
-      <SiteFooter />
     </div>
   );
 }

@@ -1,5 +1,4 @@
 export { SiteHeader } from "@/components/shell/site-header";
-export { SiteFooter } from "@/components/shell/site-footer";
 export { WalletButton } from "@/components/shell/wallet-button";
 export { NetworkIndicator } from "@/components/shell/network-indicator";
 export {

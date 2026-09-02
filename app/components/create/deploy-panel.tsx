@@ -266,7 +266,7 @@ export function DeployPanel({
     return (
       <ErrorState
         title="Wallet not connected"
-        message="Deploying signs a create_basket transaction from your wallet. Connect a wallet with the button in the header, then return to this step."
+        message="Deploying signs a create_basket transaction from your wallet. Connect a wallet with the banner at the top of the wizard, then return to this step."
       />
     );
   }

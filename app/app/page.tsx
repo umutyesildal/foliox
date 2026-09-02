@@ -42,10 +42,9 @@ const SECTIONS = [
 
 /**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02):
- * a badge line, h1, one subline, two CTAs, then the real product visual, a
- * quiet three-row section gateway (Stocks / Tokenized ETFs / Baskets) and a
- * single muted disclosure line. No texture, stats, devices, or data fetch.
- * The landing deliberately renders no SiteFooter; footers are per-page.
+ * a badge line, h1, one subline, two CTAs, then the real product visual and a
+ * quiet three-row section gateway (Stocks / Tokenized ETFs / Baskets). No
+ * footer, texture, stats, devices, or data fetch.
  */
 export default function LandingPage() {
   return (
@@ -131,17 +130,6 @@ export default function LandingPage() {
           </ul>
         </nav>
       </section>
-
-      {/* Not a footer block — one tiny muted disclosure line. */}
-      <p className="mx-auto w-full max-w-3xl px-4 pb-10 text-center text-[11px] text-muted-foreground sm:px-6">
-        Not investment advice · xStocks are structured instruments ·{" "}
-        <Link
-          href="/legal"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          Risks &amp; Disclosures
-        </Link>
-      </p>
     </div>
   );
 }

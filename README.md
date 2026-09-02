@@ -41,21 +41,34 @@ See `docs/foliox-v0-spec.md` §2-6 for account model, instruction args, mint/red
 
 Indexer listens for `BasketCreated/Minted/Redeemed/FeeAccrued` (Borsh decoders), upserts `baskets`/`events`/`creator_stats`, syncs `vault_holdings` (raw + multiplier + scaled), NAV engine snapshots `nav_snapshots` + refreshes `basket_rankings`, fee crank emits **unsigned** `accrue_management_fee` transactions. REST `/api/v1` implements the spec §8-9 routes with honest empty/error states (`NOT_INDEXED`, `DB_UNAVAILABLE`, `QUOTE_UNAVAILABLE`) — no fabricated production-looking data. Zap quotes proxy Jupiter; provenance + sequential/non-atomic warning included.
 
-## Frontend (real — 13 routes)
+## Frontend (real — 12 routes, new IA)
 
-Landing, Explore (comparison-first table), Market + Stock (normalized multi-series AreaChart + OHLC Candlestick + volume + Brush), Providers (honest status), basket Detail (NAV chart, drift table, fees, action rail), Buy (In-Kind with exact 1%-tolerance validation + Zap with provenance), Redeem (pro-rata floor preview, oracle-free copy), Create (6-step wizard with hard validation gates + account-level review modal), Portfolio, Creator, Legal. Wallet: Phantom/Solflare with disconnected/connecting/connected/wrong-network/rejected states. Shared: skeleton/error/empty/`FreshnessBadge` library, `@/lib/format` (raw↔scaled BigInt-exact).
+Owner-approved information architecture (2026-09-03):
+
+- `/` Home — classic shadcn hero + framed product visual + **Traditional vs tokenized** interactive comparison + gateway to the three sections
+- `/stocks` — provider-grouped grid of tokenized stocks (live price, 24h, sparkline) → `/stock/[ticker]` detail (one clean chart, ethereal series colors, fitY-domain)
+- `/etfs` — pure tokenized-ETF listing (grid, sort, clickable cards)
+- `/explore` — **Baskets** flagship: grid-only cards (name-first — "Tech Duo", composition + price + 24h + vs-SPY), whole card clickable
+- `/create` — 6-step wizard (wallet-gated Next, working slim sliders, over-10k allowed with exact-10k deploy gate, plain-language seed step with live value preview)
+- `/basket/[pubkey]` + buy/redeem — transaction surfaces; `/portfolio`, `/creator/[pubkey]`, `/legal`
+
+Design language: **monochrome UI chrome** (classic shadcn dark/light) + **ethereal chart data palette** (sage/rose/blue/sand/lavender, benchmark gray dashed — user decision 2026-09-03). No site footer; LEGAL_REVIEW_REQUIRED chips removed from the UI (review backlog — the wizard's legal-checkbox step stays functional). Charts are verified-official Bklit components (Brush = documented local adapter; see `docs/bklit-registry-findings-2026-09-01.md`).
 
 ## Security
 
 See spec §11. Key invariants (all evidenced in `plan.md` §6 gate table): `redeem_in_kind` never gated (no whitelist/oracle/pauser account in its context; structural test), no `admin_withdraw`, RAW-only transfers, fee caps + 90/10 split, genesis 1M inflation-attack protection. Run `cargo test` + `cso` + `review-and-iterate` before devnet/mainnet.
 
-## Legal Placeholders `LEGAL_REVIEW_REQUIRED`
+## Legal Placeholders
 
-11 files carry visible placeholders (landing, basket, redeem, providers, stock, legal, footer, deploy-panel, fees-editor, legal-checkboxes, legal-review-tag). Never describe FolioX as an ETF/fund; voice rules in `brand.md`. Counsel review required before mainnet.
+UI chips were removed at the owner's request (2026-09-03); the review items live in the backlog and the wizard's legal-checkbox step + `/legal` page remain. Never describe FolioX as an ETF/fund; voice rules in `brand.md`. Counsel review required before mainnet.
+
+## Local dev demo data
+
+The UI phase seeds the local Postgres so pages render with content: 4 whitelisted mock xStocks (TSLAx/AAPLx/NVDAx/SPYx from `docs/providers.md`) and two demo baskets (**Tech Duo** 50/50 AAPLx-TSLAx, **Index Plus** 60/25/15 SPYx-NVDAx-AAPLx) with 30d NAV history (`demo-seed` source marker). Dev-only — drop or re-seed freely.
 
 ## Milestones
 
-Execution state in `plan.md` §7-8. G0 (brand: Mineral Desk + Geist) and G1 (Bklit provenance) resolved; protocol/backend truth waves complete; Wave C pages complete; Wave D static QA complete. In flight: localnet E2E (`scripts/e2e.sh` + SBF toolchain attempt — `anchor build` SBF is blocked by edition2024 platform-tools; see AGENTS.md §20).
+Execution state in `plan.md` §7-8. G0 brand superseded by the owner's **monochrome** decision (2026-09-03); G1 Bklit provenance resolved; protocol/backend truth waves complete; new-IA UI waves complete (owner feedback rounds 1-2 applied). **Paused (WIP commit `e961849`)**: localnet E2E + create_basket stack-overflow refactor — SBF pins and `idl-build` features are already in place; resume on owner request.
 
 ## Scripts
 

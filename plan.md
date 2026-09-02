@@ -238,6 +238,16 @@ After every phase or material decision:
 | 2026-09-01 | G0 resolved by user: run `brand-design` now to create the deliberate brand; telemetry = off; brand.md is written before design tokens | user | Done — Mineral Desk + Geist applied, `brand.md` written |
 | 2026-09-01 | G2 resolved by user: localnet end-to-end milestone first; no actionable mint/redeem UI before protocol truth | user | Decided — governs Wave B/C ordering |
 | 2026-09-01 | Orchestration moved to ZCode coordinator with Agent subagents in waves (A foundation, B protocol/backend, C pages, D QA); disjoint file ownership enforced per wave; rolling concurrency ~2 workers due to account limit | user/coordinator | Active |
+| 2026-09-02 | Brand superseded: UI monochrome (classic shadcn dark/light) + ethereal chart data palette; Mineral Desk retired; footer removed site-wide; LEGAL_REVIEW_REQUIRED chips removed from UI (review backlog — wizard legal step + /legal stay) | owner | Done |
+| 2026-09-02/03 | New IA: Home (hero + product visual + Traditional-vs-Tokenized interactive + gateway) / Stocks (provider grid) / ETFs (pure clickable-card listing) / Baskets (grid-only, name-first, vs-SPY); Market+Providers unlinked from nav; two owner feedback rounds applied; baskets list API carries constituents/weights/metadata for card composition | owner | Done |
+| 2026-09-03 | Localnet bring-up reached 6/8 E2E steps PASS (deploy + createWhitelist on-chain); create_basket hits SBF stack-frame overflow → refactor PAUSED at WIP `e961849` (owner: UI-only phase); SBF pins + idl-build features in place — resume on owner request | owner | Paused |
+
+## 8b. Current status snapshot (2026-09-03)
+
+- UI: new IA live on :3000 (12 routes), owner feedback rounds 1-2 applied, browser-verified. Monochrome chrome + ethereal chart palette (`brand.md` still describes Mineral Desk — treat chart tokens in `app/app/globals.css` as authority until re-run).
+- Protocol: real Token-2022 CPI, 178 Rust tests. Backend: real indexer/NAV/API, 373 TS tests; baskets list API carries constituents/weights/metadata_json (card composition strings).
+- Local dev demo data: 4 whitelisted mock xStocks + 2 demo baskets (Tech Duo, Index Plus) seeded in Postgres (`demo-seed` marker).
+- Paused: localnet E2E — resume via a fresh protocol worker referencing WIP `e961849` (stack-frame refactor of `CreateBasket::try_accounts`).
 
 ## 8. Immediate next actions
 

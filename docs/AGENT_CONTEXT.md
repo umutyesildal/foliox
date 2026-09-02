@@ -3,8 +3,8 @@
 > **For: Opencode, Claude Code, Codex, Cursor, any LLM agent working in this repo**
 > **Read this first before writing code.** This is the single source of truth for FolioX V0.
 > Spec: `docs/foliox-v0-spec.md` (774 lines, 13 sections) | Prompt: `foliox_build_prompt.md`
-> Brand: `brand.md` (Mineral Desk palette, Geist/Geist Mono, telemetry off — G0 resolved 2026-09-01)
-> Status: **V0 implementation waves complete across protocol/backend/frontend — 178 Rust + 373 backend TS tests (+1 legacy) passing; localnet E2E attempt in flight (SBF toolchain blocker tracked in plan.md)**
+> Brand: **Monochrome** (user decision 2026-09-03 — supersedes Mineral Desk; classic shadcn dark/light UI chrome, ethereal chart data palette, Geist/Geist Mono). Telemetry off. UI chips for legal review removed at owner request (backlog).
+> Status: **V0 implementation complete + UI-only phase applied through owner feedback round 2 — 178 Rust + 373 backend TS tests (+1 legacy) passing; localnet E2E + create_basket stack-overflow refactor PAUSED at WIP commit `e961849` (resume on owner request)**
 
 ---
 
@@ -228,34 +228,35 @@ Backend never signs — if indexer dies, `redeem_in_kind` still works via RPC di
 
 ---
 
-## 10. Frontend Page Map (Next.js App Router — **bklit UI zorunlu**)
+## 10. Frontend Page Map (Next.js App Router — new IA, owner-approved 2026-09-03)
 
-> **UI Zorunluluğu:** Tüm frontend `bklit` (`https://bklit.com/docs/installation`) üzerinden kurulacak. Chart’lar mutlaka `@bklit` registry’den (`area-chart`, `line-chart`, `bar-chart`, `candlestick-chart`, `grid`, `chart-tooltip`, `legend`; Brush = belgelenmiş local adapter) kullanılacak, düz `recharts`/`shadcn` chart kullanılmayacak. Kurulum: `npx shadcn@latest init` → `components.json:registries @bklit` → `npx shadcn@latest add @bklit/area-chart` vb. Tema `app/globals.css` `shadcn/tailwind.css` + `tw-animate-css` üzerinden. `plain HTML` görünümü **yasak** — her sayfa bklit `Card`, `Table`, `Badge` + `AreaChart/BarChart/Candlestick` + `Brush` (xDomain) ile yapılmalı. **Polish:** Stock → Area normalize 100 (3 seri + Brush) + Candlestick OHLC + Volume BarChart + Brush slider; Market → Area 4 endeks normalize + Bar 30 mum.
+> **UI decisions (owner, 2026-09-02/03):** monochrome UI chrome (classic shadcn dark/light; primary = white/near-black) + **ethereal chart data palette** (`--chart-1..5` sage/rose/blue/sand/lavender; benchmark gray dashed; red reserved for errors). NO site footer. NO LEGAL_REVIEW_REQUIRED chips in the UI (review backlog; the wizard's legal-checkbox step + `/legal` page remain functional). Baskets are NEVER called "ETFs" in UI copy (hard legal ban) — the generic category explanation lives on Home. Charts = verified-official Bklit consumer props (see `docs/bklit-registry-findings-2026-09-01.md`; Brush = documented local adapter). Candlestick/volume/brush UI REMOVED from the stock page at owner request — stock page = one clean fitY-domain AreaChart with text range buttons.
 
 ```
 app/
-  layout.tsx              # WalletProvider, header Explore/Create/Portfolio, footer (not investment advice)
-  page.tsx                # landing hero + CTA, convenience-only notice
-  explore/page.tsx        # fetch localhost:3001/api/v1/baskets, grid, card NAV/AUM
-  basket/[pubkey]/page.tsx # detail: NAV, sharePrice, constituents, drift vs target_weights_bps bar, fees, creator, chart, Buy/Redeem CTA, amber redeem note
-  basket/[pubkey]/buy/page.tsx  # "use client" tabs [Zap USDC | In-Kind Mint], sequential swaps + mint_in_kind
-  basket/[pubkey]/redeem/page.tsx # "use client" shares input, pro-rata preview floor, oracle-free
-  create/page.tsx         # "use client" 6-step wizard: 1 select 2-20 whitelisted Active, 2 weights slider sum 10k, 3 fees caps 300/100/300 split 90/10, 4 seed preview ($1000 example), 5 legal checkboxes LEGAL_REVIEW_REQUIRED, 6 deploy create_basket
-  creator/[pubkey]/page.tsx # placeholder baskets/AUM/fees
-  portfolio/page.tsx      # placeholder wallet positions
-  legal/page.tsx          # disclosures (not advice, not ETF, xStocks instrument, jurisdiction, risk, upgrade multisig)
-  stock/[ticker]/page.tsx # **bklit AreaChart** 3 seri (xStock mavi, gerçek yeşil, Nasdaq gri dash) + **Candlestick + Volume + Brush** (OHLCV)
-  stock/[ticker]/StockChart.tsx     # AreaChart normalize 100 + Brush (xDomain, xDomainSlotCount, tweenYDomain)
-  stock/[ticker]/CandleVolumeChart.tsx # CandlestickChart + BarChart volume + Brush (range slider)
-  market/page.tsx         # **bklit AreaChart** normalize 100 4 endeks + **BarChart** 30 mum
-  providers/page.tsx      # **shadcn Card/Table/Badge** + bklit badge
-components/BasketCard.tsx
-components/charts/*       # **bklit** (area-chart.tsx, bar-chart.tsx, candlestick-chart, grid, chart-tooltip, shimmering-text; chart-brush.tsx = documented local adapter)
-components/ui/*           # shadcn card/table/badge/button
-lib/solana.ts             # PROGRAMS, scaledAmount
+  layout.tsx              # flex min-h-screen shell, WalletProvider, header (Stocks · ETFs · Baskets + Create/Portfolio), network chip, wallet button — NO footer
+  page.tsx                # Home: shadcn hero → framed product visual (/brand/market-hero.png, swappable) → Traditional-vs-Tokenized interactive → 01/02/03 gateway rows
+  stocks/page.tsx         # provider-grouped tokenized-stock grid (live price, 24h, sparkline, provider filter) → /stock/[ticker]
+  etfs/page.tsx           # pure tokenized-ETF listing grid (sort, clickable cards); education comparison lives on Home
+  explore/page.tsx        # "Baskets" flagship: grid-only cards — name-first (metadata_json), composition + price + 24h + vs-SPY; whole card links to /basket/[pubkey]; search + sort; honest NOT INDEXED state
+  basket/[pubkey]/page.tsx  # detail (honest NOT INDEXED until indexed); buy/page.tsx (In-Kind exact-validation + Zap provenance tabs); redeem/page.tsx (pro-rata floor preview, oracle-free)
+  create/page.tsx         # 6-step wizard: wallet gate banner top + Next disabled until connected; native slim RangeField sliders; weights editable freely but Next/deploy requires exactly 10k (+ Normalize button); fees = 3 slim rows + worked example; seed step in whole-token language with live estimated value; legal-checkbox step functional
+  portfolio/page.tsx      # wallet-gated positions (indexer-fed)
+  creator/[pubkey]/page.tsx # "Creator <truncated>" header, indexer-fed stats or honest empty
+  legal/page.tsx          # disclosure document (linked from wizard checkboxes)
+  stock/[ticker]/page.tsx # stat cards (price / copy-icon mint / token-vs-equity) + ONE clean fitY-domain 3-series AreaChart + text range buttons
+  market/page.tsx         # normalized 4-index chart (unlinked from nav; benchmark source for Baskets vs-SPY)
+  providers/page.tsx      # source registry + backend status strip (unlinked from nav)
+components/stocks/*        # stocks grid + ChangeValue helper (shared 24h coloring via chart tokens)
+components/etfs/*          # etf-grid (clickable cards), traditional-vs-tokenized (interactive, rendered on Home)
+components/create/*        # wizard components incl. wallet-gate banner + RangeField (slim native slider)
+components/charts/*        # verified-official Bklit sources; chart-brush.tsx = documented local adapter (used by Market)
+components/ui/*            # card (canonical p-5 padding system), button, slider, copy-button…
+lib/solana.ts              # PROGRAMS (on-curve IDs), scaledAmount
+lib/transactions.ts + lib/create-basket.ts  # client Anchor builders (4n mint contract; mirrors program source)
 ```
 
-Wizard blocks `Next` until `2≤len≤20`, `sum==10000`, whitelisted Active, caps, legal checked → `Deploy` calls `basket_factory.create_basket` with `nonce` + `metadata_hash` (IPFS).
+Wizard gates: wallet connected (Next disabled otherwise), `2≤len≤20` Active mints, weights editable freely while adjusting but Next/deploy requires `sum==10000` exactly (Normalize button provided), fee caps `300/100/300`, legal checkboxes → `Deploy` calls `basket_factory.create_basket` (review modal lists every account + arg).
 
 ---
 

@@ -1,16 +1,9 @@
 import Link from "next/link";
 
-import { RomanHeroBand } from "@/components/home/roman-hero-band";
+import { PantheonIllustration } from "@/components/home/pantheon-illustration";
 import { FlowSection } from "@/components/home/flow-section";
 import { LedgerSection } from "@/components/home/ledger-section";
 import { ClosingStrip } from "@/components/home/closing-strip";
-
-/*
- * Imagery attribution (roman-empire):
- *   public/brand/roman-2.jpg — Pantheon dome interior photo by T. Le Berre,
- *   CC BY-SA 4.0. Source and license: docs/roman-imagery-sources.md. An
- *   on-image credit also renders bottom-right of the hero band.
- */
 
 /** Small laurel-wreath glyph — two mirrored branches with leaf ticks, drawn
  *  as plain strokes so it inherits color. Decorative only (aria-hidden). */
@@ -42,10 +35,11 @@ function LaurelGlyph({ flip = false }: { flip?: boolean }) {
 /**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02;
  * roman-empire redesign, 2026-09-03): laurel chip, Cinzel headline, one
- * subline, two CTAs — then a full-bleed cinematic Pantheon band melting into
- * the page, the three-step Flow section (real screen crops), the Ledger
- * inscription (traditional vs tokenized rails), and a closing navigation
- * strip fed by the live xStocks registry. No footer.
+ * subline, two CTAs — then a drawn Pantheon elevation on a faint vignette
+ * (owner feedback: the hero photo band is out — vector line art instead),
+ * the three-step Flow section (drawn Roman motifs), the Ledger inscription
+ * (traditional vs tokenized rails), and a closing navigation strip fed by
+ * the live xStocks registry. No footer, no photography.
  */
 export default function LandingPage() {
   return (
@@ -79,9 +73,18 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Cinematic band — the Pantheon dome interior, edge to edge, bottom
-          fade into the page. Punctuation, not content: no headline on it. */}
-      <RomanHeroBand />
+      {/* Drawn Pantheon — the hero band replacement: full-width section, the
+          elevation centered at ~70% width on a whisper of a radial vignette.
+          Punctuation, not content: no headline on it. */}
+      <section aria-label="Line drawing of the Pantheon" className="relative w-full py-20">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_55%_60%_at_50%_50%,hsl(var(--foreground)/0.04),transparent_70%)]"
+        />
+        <div className="relative mx-auto w-[86%] text-foreground/85 sm:w-[70%]">
+          <PantheonIllustration className="h-auto w-full" />
+        </div>
+      </section>
 
       {/* Flow — the three steps every basket follows, as inscription columns. */}
       <FlowSection />

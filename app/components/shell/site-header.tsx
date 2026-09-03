@@ -34,13 +34,12 @@ function NavLink({ href, label }: { href: string; label: string }) {
 }
 
 /**
- * FolioX mark — laurel wreath around a serif "F" monogram (owner feedback
- * 2026-09-03: the column glyph read as clip-art; "not a column"). Two
+ * FolioX mark — a plain laurel wreath (owner feedback 2026-09-03: the
+ * F-in-laurel monogram read badly; the wreath alone is the mark). Two
  * mirrored branches with leaf ticks rise from a bound base and open at the
- * top; the F is drawn as plain strokes with inscriptional serifs (never
- * <text>, so the exact geometry can be reused in app/icon.svg,
- * apple-icon.tsx and opengraph-image.tsx, which can't load the Cinzel
- * webfont). currentColor throughout; decorative only.
+ * top, leaving the center empty. currentColor throughout; decorative only.
+ * The same geometry (minus the finer ticks at small sizes) is used in
+ * app/icon.svg, apple-icon.tsx and opengraph-image.tsx.
  */
 function LogoMark({ size = 21 }: { size?: number }) {
   return (
@@ -55,7 +54,7 @@ function LogoMark({ size = 21 }: { size?: number }) {
       className="mr-2 shrink-0"
     >
       {/* wreath: two mirrored branches + the binding arc at the base */}
-      <g strokeWidth="1.4">
+      <g strokeWidth="1.5">
         <path d="M8.6 20.7C5.7 19.2 3.9 16.1 3.9 12.7c0-2.7.6-5.3 1.7-7.5" />
         <path d="M15.4 20.7c2.9-1.5 4.7-4.6 4.7-8 0-2.7-.6-5.3-1.7-7.5" />
         <path d="M8.6 20.7c1.1.9 2.3 1.4 3.4 1.4s2.3-.5 3.4-1.4" />
@@ -63,19 +62,12 @@ function LogoMark({ size = 21 }: { size?: number }) {
         <path d="M4.6 7.9 3.1 7.5M3.9 11.3 2.3 11.7M4.4 14.9 2.9 15.7M5.8 18 4.4 19.1" />
         <path d="m19.4 7.9 1.5-.4M20.1 11.3l1.6.4M19.6 14.9l1.5.8M18.2 18l1.4 1.1" />
       </g>
-      {/* serif "F" monogram */}
-      <g strokeWidth="1.6">
-        <path d="M10.6 6.7v10.8" />
-        <path d="M9.3 6.7h5.6M14.9 6.7v1.3" />
-        <path d="M10.6 11.7h3.8M14.4 11.7v1.1" />
-        <path d="M9.4 17.5h2.4" />
-      </g>
     </svg>
   );
 }
 
 /**
- * Site header: FolioX wordmark (laurel-wreath "F" mark + display-face text —
+ * Site header: FolioX wordmark (plain laurel wreath mark + display-face text —
  * roman-empire experiment; the suffix stays Geist), primary nav
  * (Stocks/ETFs/Baskets), contextual actions (Create/Portfolio), network
  * indicator, wallet button, and a no-dependency mobile disclosure nav.

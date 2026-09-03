@@ -1,24 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- FolioX favicon (roman-empire, owner feedback 2026-09-03): laurel wreath
-       + serif "F" monogram on a rounded near-black square — the same mark as
-       LogoMark in components/shell/site-header.tsx, scaled 4/3 into this
-       32-viewBox. The leaf ticks are dropped here only: at 16px they turn to
-       mush; the wreath silhouette + F stay legible. Same geometry also in
-       apple-icon.tsx and opengraph-image.tsx. -->
+  <!-- FolioX favicon (roman-empire, owner feedback 2026-09-03): plain laurel
+       wreath on a rounded near-black square — the F monogram is gone. Same
+       wreath geometry as LogoMark in components/shell/site-header.tsx, scaled
+       up to fill the frame and drawn with thick strokes; only two leaf ticks
+       per side survive — at 16px the finer ticks turn to mush and the branch
+       silhouette is what must read. Same mark also in apple-icon.tsx and
+       opengraph-image.tsx. -->
   <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
-  <g fill="none" stroke="#fafafa" stroke-linecap="round">
-    <!-- wreath: two mirrored branches + binding arc (no leaf ticks at this size) -->
+  <g fill="none" stroke="#fafafa" stroke-linecap="round"
+     transform="translate(16 17.2) scale(1.08) translate(-16 -17.2)">
+    <!-- wreath: two mirrored branches + binding arc, open at the top -->
     <g stroke-width="2.2">
       <path d="M11.5 27.6C7.6 25.6 5.2 21.5 5.2 16.9c0-3.6.8-7.1 2.3-10"/>
       <path d="M20.5 27.6c3.9-2 6.3-6.1 6.3-10.7 0-3.6-.8-7.1-2.3-10"/>
       <path d="M11.5 27.6c1.5 1.2 3.1 1.9 4.5 1.9s3-.7 4.5-1.9"/>
     </g>
-    <!-- serif "F" monogram, slightly heavier for 16px legibility -->
-    <g stroke-width="2.5">
-      <path d="M14.1 8.9v14.4"/>
-      <path d="M12.4 8.9h7.5M19.9 8.9v1.8"/>
-      <path d="M14.1 15.6h5.1M19.2 15.6v1.5"/>
-      <path d="M12.5 23.3h3.2"/>
+    <!-- two lighter leaf ticks per side -->
+    <g stroke-width="1.9">
+      <path d="M4.8 13.2 3.4 12.6M5.7 19.7 4.1 20.5M27.2 13.2l1.4-.6M26.3 19.7l1.6.8"/>
     </g>
   </g>
 </svg>

@@ -7,6 +7,7 @@ import { FreshnessBadge } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { RangeLinks } from "@/components/ui/range-links";
 import { formatUsd } from "@/lib/format";
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
@@ -93,7 +94,9 @@ export default async function StockPage({
   const { ticker: rawTicker } = await params;
   const sp = (await searchParams) ?? {};
   const ticker = decodeURIComponent(rawTicker);
-  const range = RANGES.includes(sp.range as (typeof RANGES)[number]) ? (sp.range as string) : "1mo";
+  const range = RANGES.includes(sp.range as (typeof RANGES)[number])
+    ? (sp.range as (typeof RANGES)[number])
+    : "1mo";
 
   const [chart, compare] = await Promise.all([getChart(ticker, range), getCompare(ticker)]);
 
@@ -123,26 +126,15 @@ export default async function StockPage({
         <FreshnessBadge source="Yahoo Finance" asOf={asOf} />
       </div>
 
-      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-muted-foreground">Range</span>
-        {RANGES.map((r) => (
-          <Link
-            key={r}
-            href={`/stock/${ticker}?range=${r}`}
-            aria-current={r === range ? "true" : undefined}
-            className={`text-xs transition-colors ${
-              r === range
-                ? "font-medium text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {r}
-          </Link>
-        ))}
+      <RangeLinks
+        options={RANGES}
+        value={range}
+        hrefFor={(r) => `/stock/${ticker}?range=${r}`}
+      >
         <Button render={<Link href="/market" />} variant="outline" size="xs" className="ml-2">
           Market overview
         </Button>
-      </nav>
+      </RangeLinks>
 
       {compare ? (
         <div className="grid gap-3 md:grid-cols-3">

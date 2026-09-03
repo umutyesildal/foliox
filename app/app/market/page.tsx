@@ -5,6 +5,8 @@ import MarketChart, { type MarketSeriesMeta } from "./market-chart";
 import { FreshnessBadge } from "@/components/states";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { RangeLinks } from "@/components/ui/range-links";
+import { SectionHeader } from "@/components/ui/section-header";
 
 export const metadata: Metadata = {
   title: "Market overview — FolioX",
@@ -152,7 +154,9 @@ export default async function MarketPage({
   searchParams?: Promise<{ range?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
-  const range = RANGES.includes(sp.range as (typeof RANGES)[number]) ? (sp.range as string) : "1mo";
+  const range = RANGES.includes(sp.range as (typeof RANGES)[number])
+    ? (sp.range as (typeof RANGES)[number])
+    : "1mo";
   const payload = await getOverview(range);
 
   const liveSeries = payload?.data ?? [];
@@ -201,37 +205,21 @@ export default async function MarketPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1.5">
-          <h1 className="text-3xl font-semibold tracking-tight">Market overview</h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            The four benchmark indices, normalized to 100 — the base for reading basket drift.
-          </p>
-        </div>
-        <FreshnessBadge
-          source={demo ? "fixture" : "Yahoo Finance"}
-          asOf={asOf}
-          demo={demo}
-        />
-      </header>
+      <SectionHeader
+        as="h1"
+        size="title"
+        label="Market overview"
+        lead="The four benchmark indices, normalized to 100 — the base for reading basket drift."
+        right={
+          <FreshnessBadge
+            source={demo ? "fixture" : "Yahoo Finance"}
+            asOf={asOf}
+            demo={demo}
+          />
+        }
+      />
 
-      <nav aria-label="Chart range" className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-muted-foreground">Range</span>
-        {RANGES.map((r) => (
-          <Link
-            key={r}
-            href={`/market?range=${r}`}
-            aria-current={r === range ? "true" : undefined}
-            className={`text-xs transition-colors ${
-              r === range
-                ? "font-medium text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {r}
-          </Link>
-        ))}
-      </nav>
+      <RangeLinks options={RANGES} value={range} hrefFor={(r) => `/market?range=${r}`} />
 
       {demo ? (
         <p className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">

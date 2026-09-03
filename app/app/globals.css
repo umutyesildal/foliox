@@ -109,6 +109,44 @@
   body { @apply bg-background text-foreground; }
 }
 
+/* Roman display typography (roman-empire, refined 2026-09-03 after owner
+   feedback). Cinzel is an inscriptional, Trajan-like face with openly spaced
+   capitals: heavy uniform tracking that reads "classical" on tiny sans caps
+   turns into gaps on Cinzel, so tracked display labels settle at 0.14em and
+   running display text at a near-neutral 0.02em. These utilities are the
+   single source of truth for Cinzel usage — apply ONLY to headings, the
+   wordmark, and all-caps section labels, never body/mono text. */
+@layer utilities {
+  /* Display face for headlines and the wordmark. Line-height is set
+     per-use (hero uses leading-[1.08], which sits well with Cinzel's tall
+     caps); only family + a slight positive tracking live here. */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+  }
+  /* All-caps Cinzel section label (e.g. "CREATE · MINT · REDEEM"). Replaces
+     first-pass inline tracking-[0.18em]/[0.22em], which gapped badly. Size
+     and color stay per-use, so it serves both the small muted eyebrow and the
+     large foreground inscription line (see <SectionHeader>). */
+  .text-display {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: 0.14em;
+  }
+  /* Standalone section eyebrow — Cinzel tracked caps pinned to xs/muted.
+     Use directly for labels outside a <SectionHeader> (nav cell labels,
+     quiet chips); <SectionHeader>'s "eyebrow" size composes .text-display
+     instead so size/color remain prop-driven. */
+  .section-label {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    letter-spacing: 0.14em;
+    color: hsl(var(--muted-foreground));
+  }
+}
+
 /* Full-height pages (owner complaint 1): the SiteFooter is rendered per-page
    as the last element of each page tree, inside <main>. On pages that include
    it, flex <main> (and the page's root wrapper, when the footer is wrapped in

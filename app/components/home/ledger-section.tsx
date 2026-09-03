@@ -8,6 +8,8 @@
  * the Tokenized header's 2px imperial underline.
  */
 
+import { SectionHeader } from "@/components/ui/section-header";
+
 const ROWS = [
   {
     dimension: "Settlement",
@@ -41,6 +43,38 @@ const ROWS = [
 const GRID =
   "grid grid-cols-[1fr_3rem_1fr] items-center gap-x-2 sm:grid-cols-[1fr_7rem_1fr] sm:gap-x-4";
 
+/** One inscription row (local to this section — the spine layout is ledger-
+ *  specific): the traditional rail muted and right-aligned, the Cinzel
+ *  dimension on the center spine, and the tokenized rail in full foreground
+ *  opened by a 6px imperial tick. */
+function SpineRow({
+  dimension,
+  traditional,
+  tokenized,
+}: {
+  dimension: string;
+  traditional: string;
+  tokenized: string;
+}) {
+  return (
+    <li className={`${GRID} h-14 border-b border-border/50`}>
+      <span className="text-right text-xs leading-5 text-muted-foreground/60">
+        {traditional}
+      </span>
+      <span className="text-center font-[family-name:var(--font-display)] text-xs font-medium tracking-[0.08em] text-muted-foreground">
+        {dimension}
+      </span>
+      <span className="flex items-center gap-2.5 text-left text-xs leading-5 text-foreground">
+        <span
+          aria-hidden="true"
+          className="h-4 w-1.5 shrink-0 bg-[hsl(var(--imperial))]"
+        />
+        {tokenized}
+      </span>
+    </li>
+  );
+}
+
 export function LedgerSection() {
   return (
     <section
@@ -48,17 +82,12 @@ export function LedgerSection() {
       className="border-t border-border py-16 dark:border-border/60"
     >
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <header>
-          <h2
-            id="ledger-heading"
-            className="font-[family-name:var(--font-display)] text-xl font-medium tracking-[0.06em] text-foreground md:text-2xl"
-          >
-            SAME EXPOSURE. DIFFERENT RAILS.
-          </h2>
-          <p className="mt-3 text-base leading-7 text-muted-foreground">
-            What changes is how you hold it.
-          </p>
-        </header>
+        <SectionHeader
+          id="ledger-heading"
+          size="display"
+          label="SAME EXPOSURE. DIFFERENT RAILS."
+          lead="What changes is how you hold it."
+        />
 
         {/* Column headers — the Tokenized side carries the 2px imperial
             underline, inherited from the component this replaces. */}
@@ -74,21 +103,12 @@ export function LedgerSection() {
 
         <ul>
           {ROWS.map((row) => (
-            <li key={row.dimension} className={`${GRID} h-14 border-b border-border/50`}>
-              <span className="text-right text-xs leading-5 text-muted-foreground/60">
-                {row.traditional}
-              </span>
-              <span className="text-center font-[family-name:var(--font-display)] text-xs font-medium tracking-[0.08em] text-muted-foreground">
-                {row.dimension}
-              </span>
-              <span className="flex items-center gap-2.5 text-left text-xs leading-5 text-foreground">
-                <span
-                  aria-hidden="true"
-                  className="h-4 w-1.5 shrink-0 bg-[hsl(var(--imperial))]"
-                />
-                {row.tokenized}
-              </span>
-            </li>
+            <SpineRow
+              key={row.dimension}
+              dimension={row.dimension}
+              traditional={row.traditional}
+              tokenized={row.tokenized}
+            />
           ))}
         </ul>
       </div>

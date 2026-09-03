@@ -34,8 +34,49 @@ function NavLink({ href, label }: { href: string; label: string }) {
 }
 
 /**
- * Site header: FolioX wordmark (a tiny monochrome column glyph + display-face
- * text — roman-empire experiment; the suffix stays Geist), primary nav
+ * FolioX mark — laurel wreath around a serif "F" monogram (owner feedback
+ * 2026-09-03: the column glyph read as clip-art; "not a column"). Two
+ * mirrored branches with leaf ticks rise from a bound base and open at the
+ * top; the F is drawn as plain strokes with inscriptional serifs (never
+ * <text>, so the exact geometry can be reused in app/icon.svg,
+ * apple-icon.tsx and opengraph-image.tsx, which can't load the Cinzel
+ * webfont). currentColor throughout; decorative only.
+ */
+function LogoMark({ size = 21 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      className="mr-2 shrink-0"
+    >
+      {/* wreath: two mirrored branches + the binding arc at the base */}
+      <g strokeWidth="1.4">
+        <path d="M8.6 20.7C5.7 19.2 3.9 16.1 3.9 12.7c0-2.7.6-5.3 1.7-7.5" />
+        <path d="M15.4 20.7c2.9-1.5 4.7-4.6 4.7-8 0-2.7-.6-5.3-1.7-7.5" />
+        <path d="M8.6 20.7c1.1.9 2.3 1.4 3.4 1.4s2.3-.5 3.4-1.4" />
+        {/* leaf ticks, outboard of each branch */}
+        <path d="M4.6 7.9 3.1 7.5M3.9 11.3 2.3 11.7M4.4 14.9 2.9 15.7M5.8 18 4.4 19.1" />
+        <path d="m19.4 7.9 1.5-.4M20.1 11.3l1.6.4M19.6 14.9l1.5.8M18.2 18l1.4 1.1" />
+      </g>
+      {/* serif "F" monogram */}
+      <g strokeWidth="1.6">
+        <path d="M10.6 6.7v10.8" />
+        <path d="M9.3 6.7h5.6M14.9 6.7v1.3" />
+        <path d="M10.6 11.7h3.8M14.4 11.7v1.1" />
+        <path d="M9.4 17.5h2.4" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Site header: FolioX wordmark (laurel-wreath "F" mark + display-face text —
+ * roman-empire experiment; the suffix stays Geist), primary nav
  * (Stocks/ETFs/Baskets), contextual actions (Create/Portfolio), network
  * indicator, wallet button, and a no-dependency mobile disclosure nav.
  */
@@ -68,27 +109,9 @@ export function SiteHeader() {
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center rounded-sm font-[family-name:var(--font-display)] font-semibold tracking-normal text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="flex items-center rounded-sm font-display font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          {/* Tiny monochrome column mark — plain-stroke SVG, no mascot, no color */}
-          <svg
-            aria-hidden="true"
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-            className="mr-2 shrink-0 text-foreground/50"
-          >
-            {/* abacus + capital */}
-            <path d="M2.5 3h11M4 5.6h8" />
-            {/* fluted shaft */}
-            <path d="M5.5 5.6v6.8M8 5.6v6.8M10.5 5.6v6.8" />
-            {/* base */}
-            <path d="M3.5 14h9" />
-          </svg>
+          <LogoMark />
           FolioX
           <span className="hidden font-sans font-normal text-muted-foreground sm:inline">
             {" "}

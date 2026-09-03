@@ -7,9 +7,9 @@ import { ClosingStrip } from "@/components/home/closing-strip";
 
 /*
  * Imagery attribution (roman-empire):
- *   public/brand/roman-1.jpg — "Colosseum" photo by Ank Kumar, CC BY-SA 4.0.
- *   Source and license: docs/roman-imagery-sources.md. An on-image credit
- *   also renders bottom-right of the hero band.
+ *   public/brand/roman-2.jpg — Pantheon dome interior photo by T. Le Berre,
+ *   CC BY-SA 4.0. Source and license: docs/roman-imagery-sources.md. An
+ *   on-image credit also renders bottom-right of the hero band.
  */
 
 /** Small laurel-wreath glyph — two mirrored branches with leaf ticks, drawn
@@ -42,10 +42,10 @@ function LaurelGlyph({ flip = false }: { flip?: boolean }) {
 /**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02;
  * roman-empire redesign, 2026-09-03): laurel chip, Cinzel headline, one
- * subline, two CTAs — then a full-bleed cinematic Colosseum band melting into
- * the page, the three-step Flow section (real screen crops, `fig.` captions),
- * the Ledger inscription (traditional vs tokenized rails), and a closing
- * navigation strip fed by the live xStocks registry. No footer.
+ * subline, two CTAs — then a full-bleed cinematic Pantheon band melting into
+ * the page, the three-step Flow section (real screen crops), the Ledger
+ * inscription (traditional vs tokenized rails), and a closing navigation
+ * strip fed by the live xStocks registry. No footer.
  */
 export default function LandingPage() {
   return (
@@ -79,8 +79,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Cinematic band — the Colosseum at night, edge to edge, bottom fade
-          into the page. Punctuation, not content: no headline on it. */}
+      {/* Cinematic band — the Pantheon dome interior, edge to edge, bottom
+          fade into the page. Punctuation, not content: no headline on it. */}
       <RomanHeroBand />
 
       {/* Flow — the three steps every basket follows, as inscription columns. */}

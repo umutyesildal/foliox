@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { AccrueCrankButton } from "@/components/basket/accrue-crank";
 import { NavHistoryChart } from "@/components/basket/nav-history-chart";
+import { RangeLinks } from "@/components/ui/range-links";
 import {
   ApiError,
   fetchBasketDetail,
@@ -366,23 +367,11 @@ export default function BasketDetailPage({
                 </h2>
                 <FreshnessBadge source={navSource ?? "onchain-indexed"} asOf={asOf ?? undefined} />
               </div>
-              <nav aria-label="Chart range" className="flex items-center gap-1 font-mono text-xs">
-                {NAV_RANGES.map((r) => (
-                  <button
-                    key={r.key}
-                    type="button"
-                    aria-current={r.key === range ? "true" : undefined}
-                    onClick={() => setRange(r.key)}
-                    className={`inline-flex h-7 min-h-0 items-center rounded-md px-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
-                      r.key === range
-                        ? "bg-muted font-medium text-foreground"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {r.key}
-                  </button>
-                ))}
-              </nav>
+              <RangeLinks
+                options={NAV_RANGES.map((r) => r.key)}
+                value={range}
+                onChange={setRange}
+              />
             </div>
             <div className="rounded-xl bg-card shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
               <div className="p-5">

@@ -1,15 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- FolioX favicon: the site-header column mark, rescaled for 16px legibility
-       (white strokes on a rounded near-black square; no laurel — it turned to
-       mush at 16px). Geometry mirrors the 16-viewBox glyph in
-       components/shell/site-header.tsx, scaled ~1.75x and centered. -->
+  <!-- FolioX favicon (roman-empire, owner feedback 2026-09-03): laurel wreath
+       + serif "F" monogram on a rounded near-black square — the same mark as
+       LogoMark in components/shell/site-header.tsx, scaled 4/3 into this
+       32-viewBox. The leaf ticks are dropped here only: at 16px they turn to
+       mush; the wreath silhouette + F stay legible. Same geometry also in
+       apple-icon.tsx and opengraph-image.tsx. -->
   <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
-  <g fill="none" stroke="#fafafa" stroke-width="2.6" stroke-linecap="round">
-    <!-- abacus + capital -->
-    <path d="M6.4 6.4h19.2M9.1 10.9h13.8"/>
-    <!-- fluted shaft -->
-    <path d="M11 10.9v11.9M16 10.9v11.9M21 10.9v11.9"/>
-    <!-- base -->
-    <path d="M8.3 25.6h15.4"/>
+  <g fill="none" stroke="#fafafa" stroke-linecap="round">
+    <!-- wreath: two mirrored branches + binding arc (no leaf ticks at this size) -->
+    <g stroke-width="2.2">
+      <path d="M11.5 27.6C7.6 25.6 5.2 21.5 5.2 16.9c0-3.6.8-7.1 2.3-10"/>
+      <path d="M20.5 27.6c3.9-2 6.3-6.1 6.3-10.7 0-3.6-.8-7.1-2.3-10"/>
+      <path d="M11.5 27.6c1.5 1.2 3.1 1.9 4.5 1.9s3-.7 4.5-1.9"/>
+    </g>
+    <!-- serif "F" monogram, slightly heavier for 16px legibility -->
+    <g stroke-width="2.5">
+      <path d="M14.1 8.9v14.4"/>
+      <path d="M12.4 8.9h7.5M19.9 8.9v1.8"/>
+      <path d="M14.1 15.6h5.1M19.2 15.6v1.5"/>
+      <path d="M12.5 23.3h3.2"/>
+    </g>
   </g>
 </svg>

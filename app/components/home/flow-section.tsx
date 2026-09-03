@@ -1,19 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { SectionHeader } from "@/components/ui/section-header";
+
 /**
  * Flow section — replaces the old bento gateway. One idea: every basket
- * follows the same three steps, shown as three inscription columns — a large
- * Cinzel numeral, a real crop of that step's screen (flow/create|holdings|
- * redeem.png), a lowercase `fig.` caption, and two lines of copy. The crop
+ * follows the same three steps, shown as three inscription columns — a small
+ * quiet Cinzel numeral (a whisper above the frame), a real crop of that step's
+ * screen (flow/create|holdings|redeem.png), and two lines of copy. The crop
  * card lifts 2px with a brightening border on hover (≤200ms, reduced-motion
- * honored); the numeral and caption stay still. No color — typography only.
+ * honored); the numeral stays still. No color — typography only.
  */
 
 const STEPS = [
   {
     numeral: "I",
-    fig: "fig. i — create",
     copy: "Pick the stocks, set the weights. Immutable after deployment.",
     href: "/create",
     src: "/brand/flow/create.png",
@@ -21,7 +22,6 @@ const STEPS = [
   },
   {
     numeral: "II",
-    fig: "fig. ii — mint",
     copy: "Deposit tokens, receive basket tokens at the exact weights.",
     href: "/explore",
     src: "/brand/flow/holdings.png",
@@ -29,7 +29,6 @@ const STEPS = [
   },
   {
     numeral: "III",
-    fig: "fig. iii — redeem",
     copy: "Burn tokens, receive the underlying. Wallet to wallet.",
     href: "/portfolio",
     src: "/brand/flow/redeem.png",
@@ -45,17 +44,11 @@ export function FlowSection() {
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         {/* Section header — tracked Cinzel eyebrow + the one line. */}
-        <header>
-          <h2
-            id="flow-heading"
-            className="font-[family-name:var(--font-display)] text-xs font-medium tracking-[0.22em] text-muted-foreground"
-          >
-            CREATE · MINT · REDEEM
-          </h2>
-          <p className="mt-3 text-base leading-7 text-muted-foreground">
-            Every basket follows the same three steps.
-          </p>
-        </header>
+        <SectionHeader
+          id="flow-heading"
+          label="CREATE · MINT · REDEEM"
+          lead="Every basket follows the same three steps."
+        />
 
         <ol className="mt-10 grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-3">
           {STEPS.map((step) => (
@@ -64,13 +57,14 @@ export function FlowSection() {
                 href={step.href}
                 className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
+                {/* Numeral — a whisper, not a headline. */}
                 <span
                   aria-hidden="true"
-                  className="font-[family-name:var(--font-display)] text-4xl font-medium leading-none text-foreground/90"
+                  className="font-[family-name:var(--font-display)] text-sm font-medium leading-none tracking-[0.18em] text-muted-foreground/70"
                 >
                   {step.numeral}
                 </span>
-                <span className="mt-5 block overflow-hidden rounded-lg border border-border transition-[border-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:border-foreground/30 motion-reduce:transform-none motion-reduce:transition-none">
+                <span className="mt-3 block overflow-hidden rounded-lg border border-border transition-[border-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:border-foreground/30 motion-reduce:transform-none motion-reduce:transition-none">
                   <Image
                     src={step.src}
                     alt={step.alt}
@@ -80,10 +74,7 @@ export function FlowSection() {
                     className="aspect-[4/3] w-full object-cover object-top"
                   />
                 </span>
-                <span className="mt-3 block font-mono text-[11px] lowercase tracking-wide text-muted-foreground">
-                  {step.fig}
-                </span>
-                <span className="mt-2 block max-w-xs text-sm leading-5 text-muted-foreground">
+                <span className="mt-3 block max-w-xs text-sm leading-5 text-muted-foreground">
                   {step.copy}
                 </span>
               </Link>

@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { FreshnessBadge } from "@/components/states";
-
 /**
  * Closing strip — takes over the deleted bento's navigation role with one
  * hairline-divided row of three cells: STOCKS (live tickers from the real
- * GET /api/v1/xstocks registry), TOKENIZED ETFS (SPYx), BASKETS. Each cell
- * links; its ↗ lifts and warms to pompeian red on hover. A FreshnessBadge
- * carries the as-of of the registry fetch — nothing renders when the backend
- * is unreachable (no fabricated tickers, no fake timestamps).
+ * xStocks registry), TOKENIZED ETFS (SPYx), BASKETS. Each cell links; its ↗
+ * lifts and warms to pompeian red on hover. Nothing renders in the ticker
+ * line when the backend is unreachable (no fabricated tickers) — and no
+ * endpoint/as-of text is shown.
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
@@ -27,7 +25,6 @@ const MAX_TICKERS = 6;
 
 export function ClosingStrip() {
   const [tickers, setTickers] = useState<string | null>(null);
-  const [asOf, setAsOf] = useState<Date | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -48,7 +45,6 @@ export function ClosingStrip() {
             ? `${names.slice(0, MAX_TICKERS).join(" ")} …`
             : names.join(" ");
         setTickers(shown);
-        setAsOf(new Date());
       })
       .catch(() => null)
       .finally(() => clearTimeout(timer));
@@ -68,9 +64,7 @@ export function ClosingStrip() {
               href={cell.href}
               className="group flex items-center justify-between gap-4 py-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:flex-col sm:items-start sm:justify-start sm:gap-3 sm:px-6 sm:first:pl-0 sm:last:pr-0"
             >
-              <span className="font-[family-name:var(--font-display)] text-xs font-medium tracking-[0.18em] text-muted-foreground">
-                {cell.label}
-              </span>
+              <span className="section-label">{cell.label}</span>
               <span className="text-sm leading-5 text-foreground">
                 {cell.line(tickers) ?? ""}
               </span>
@@ -83,12 +77,7 @@ export function ClosingStrip() {
             </Link>
           ))}
         </div>
-        {/* as-of of the registry fetch — only when it actually succeeded. */}
-        <div className="flex justify-center pb-8 sm:justify-end">
-          {tickers && asOf ? (
-            <FreshnessBadge source="GET /api/v1/xstocks" asOf={asOf} />
-          ) : null}
-        </div>
+        <div className="pb-8" />
       </div>
     </section>
   );

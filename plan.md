@@ -251,9 +251,15 @@ After every phase or material decision:
 - Local dev demo data: 4 mock xStocks + Tech Duo / Index Plus baskets (`demo-seed`).
 - Owner redirected work to UI improvements while devnet funding is pending.
 
-## 8. Immediate next actions
+## 8c. Current status snapshot (2026-09-03, post Roman phase)
 
-Status as of 2026-09-01 (user decisions recorded in §7):
+- **Protocol: create_basket stack-overflow FIXED** (handler-side init helpers, factory authority signer-meta fix, 500k CU clients) — **localnet E2E 8/8 PASS, twice consecutive**. 178 Rust + 392 backend TS tests green (positions indexer +19).
+- **DEVNET — BLOCKED ON FAUCET FUNDING (owner-paused):** 15+ airdrop attempts exhausted (CLI amounts, spaced retries, raw API, browser form, owner's GitHub OAuth attempt — all 429). Everything staged for instant rerun (state dir, env-parameterized scripts, verified deploy keypairs, command block in §8b). Resume trigger: owner sends ~12 devnet SOL to `y72KA263br7MtZw7BqC2dx5QYCBUciJGzShE8BRSwRE`, or unlocks faucet via GitHub OAuth in the browser pane.
+- **UI: Roman Empire identity shipped on branch `roman-empire` (pushed, merge pending owner review):** Cinzel display + Roman numerals + laurel monogram logo + Piranesi 1790 Pantheon engraving as hero watermark + imperial/pompeian accents. New IA: Home / Stocks / ETFs / Baskets / Create / Buy+Redeem / Portfolio. Design system consolidated (.font-display/.text-display/.section-label, SectionHeader, RangeLinks). Feedback rounds 1-4 + light-mode/mobile audit applied. `brand.md` rewritten to monochrome + Roman layer.
+- **NEXT: pitch deck** (owner request). Input doc `.superstack/idea-context.md` prepared for the `create-pitch-deck` skill.
+- Backlog: ESLint config, legend wiring, providers.md 8-decimals correction applied (mainnet note), devnet E2E completion.
+
+### Historical wave log (2026-09-01, superseded by §8c above)
 
 1. ~~User chooses brand/telemetry~~ — Done: `brand-design` run, **Mineral Desk** palette + **Geist/Geist Mono** applied (`brand.md`, `app/app/globals.css`, layout/tailwind wired), telemetry **off** (G0 closed).
 2. ~~G2 choice~~ — Done: **localnet E2E first**; Wave B protocol/backend truth workers run before any actionable transaction UI.

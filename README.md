@@ -2,7 +2,7 @@
 
 > "Create an index. Own your thesis." — Onchain strategy baskets powered by xStocks.
 > V0 spec: `docs/foliox-v0-spec.md` (normative product constraints). Execution plan: `plan.md`. Brand: `brand.md`.
-> Current state: **V0 implementation waves complete** — protocol, backend, and frontend are real and gated (see `plan.md` §6 release gates, all evidenced PASS). Localnet E2E attempt in flight (SBF toolchain blocker tracked there). Not yet devnet/mainnet — `LEGAL_REVIEW_REQUIRED` placeholders still need counsel.
+> Current state: **V0 implemented — protocol (real Token-2022 CPI, localnet E2E 8/8 PASS), backend (real indexer/NAV/API), frontend (new IA, Roman identity UI on `roman-empire` branch). 178 Rust + 392 backend TS tests.** DEVNET PAUSED ON FAUCET FUNDING (staged rerun in `plan.md` §8b) — not yet devnet/mainnet.
 
 ## Tests (all green)
 

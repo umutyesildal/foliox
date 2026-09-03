@@ -2,7 +2,18 @@
 
 Onchain strategy baskets powered by xStocks. "Create an index. Own your thesis."
 
-_Last updated 2026-09-03 by owner decision. Supersedes the Mineral Desk palette (2026-09-01). Update by re-running `brand-design`. Telemetry: **off**._
+_Last updated 2026-09-03 (Roman identity layer added — see "Roman layer" below). Supersedes Mineral Desk (2026-09-01). Telemetry: **off**._
+
+## Roman layer (branch `roman-empire`, owner experiment)
+
+Layered ON TOP of the monochrome system, minimally:
+
+- **Display font: Cinzel** (Trajan-esque capitals, `next/font/google` as `--font-display`, exposed as `.font-display`/`.text-display` utilities) — hero headline, "FolioX" wordmark, section labels only. Everything else Geist/Geist Mono.
+- **Roman numerals**: home gateway I/II/III (small, quiet), wizard stepper I-VI (mono, small).
+- **Logo: plain laurel wreath** (open top, two mirrored stroke branches) — no monogram letter. Header 20-22px, favicon simplified for 16px legibility. Same wreath on apple-icon + OG.
+- **Imperial accents, two spots only**: `--imperial` (Tyrian purple) on the hero eyebrow chip + Tokenized ledger ticks/underline; `--pompeian` (Pompeian red) on gateway ↗ hover. UI chrome stays monochrome otherwise; red on chrome = errors only.
+- **Hero art**: Francesco Piranesi's 1790 Pantheon etching (public domain, Wikimedia) inverted to faint lines at 0.11 opacity behind the hero copy, four-edge dissolve masks, plate positioned at `top-62%` with a strengthened top fade (see `docs/roman-imagery-sources.md` for all imagery licenses).
+- **Rule**: the Roman layer appears on Home + wizard stepper + wordmark. Utility pages stay pure monochrome. Baskets are never called "ETFs" in product copy.
 
 ## Direction
 

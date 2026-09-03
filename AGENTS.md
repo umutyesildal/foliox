@@ -3,8 +3,8 @@
 > **For: Opencode, Claude Code, Codex, Cursor, any LLM agent working in this repo**
 > **Read this first before writing code.** This is the single source of truth for FolioX V0.
 > Spec: `docs/foliox-v0-spec.md` (774 lines, 13 sections) | Prompt: `foliox_build_prompt.md`
-> Brand: **Monochrome** (user decision 2026-09-03 — supersedes Mineral Desk; classic shadcn dark/light UI chrome, ethereal chart data palette, Geist/Geist Mono). Telemetry off. UI chips for legal review removed at owner request (backlog).
-> Status: **V0 implementation complete + UI-only phase applied through owner feedback round 2 — 178 Rust + 373 backend TS tests (+1 legacy) passing; localnet E2E + create_basket stack-overflow refactor PAUSED at WIP commit `e961849` (resume on owner request)**
+> Brand: **Monochrome + Roman identity layer** (owner decisions 2026-09-02/03: classic shadcn dark/light chrome, ethereal chart data palette, Cinzel display font, laurel monogram logo, Roman numerals, --imperial purple / --pompeian red accents used sparingly; on the `roman-empire` branch — merge pending owner review). Telemetry off. Legal-review chips removed from UI (backlog).
+> Status: **V0 implementation complete — protocol (real Token-2022 CPI, localnet E2E 8/8 PASS), backend (real indexer/NAV/API, 392 TS tests), frontend (new IA + two owner feedback rounds + Roman theme, browser-verified). DEVNET PAUSED ON FAUCET FUNDING** (all airdrop routes exhausted incl. browser + raw API + GitHub OAuth attempt; owner to fund `y72KA263br7MtZw7BqC2dx5QYCBUciJGzShE8BRSwRE` ~12 devnet SOL — staged rerun in plan.md §8b).
 
 ---
 

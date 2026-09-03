@@ -42,7 +42,8 @@ interface ChartPayload {
 
 const filterButtonClasses = (active: boolean) =>
   cn(
-    "inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+    // 40px tall on phones (touch), back to the compact 32px from sm up.
+    "inline-flex h-8 max-md:h-10 items-center rounded-md border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
     active
       ? "border-primary bg-primary text-primary-foreground"
       : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",

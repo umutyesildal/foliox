@@ -101,7 +101,7 @@ export default function LandingPage() {
           its own quiet section between the hero visual and the gateway rows. */}
       <section
         aria-label="Traditional vs tokenized ETFs"
-        className="border-t border-border/60 py-12"
+        className="border-t border-border py-12 dark:border-border/60"
       >
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
@@ -117,14 +117,14 @@ export default function LandingPage() {
       </section>
 
       {/* Section gateway — three quiet link rows, full-bleed in the container. */}
-      <section aria-label="Explore FolioX" className="border-t border-border/60 py-12">
+      <section aria-label="Explore FolioX" className="border-t border-border py-12 dark:border-border/60">
         <nav aria-label="Sections" className="mx-auto max-w-3xl px-4 sm:px-6">
-          <ul className="border-b border-border/60">
+          <ul className="border-b border-border dark:border-border/60">
             {SECTIONS.map((section) => (
               <li key={section.href}>
                 <Link
                   href={section.href}
-                  className="group -mx-4 flex min-h-14 items-center gap-4 border-t border-border/60 px-4 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:-mx-6 sm:px-6"
+                  className="group -mx-4 flex min-h-14 items-center gap-4 border-t border-border px-4 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 dark:border-border/60 sm:-mx-6 sm:px-6"
                 >
                   <span
                     aria-hidden

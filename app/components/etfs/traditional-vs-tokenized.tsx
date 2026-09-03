@@ -28,8 +28,11 @@ const DIMENSIONS: { dimension: string; traditional: string; tokenized: string }[
 
 type Focus = "traditional" | "tokenized" | null;
 
-/** Fixed 3-column template shared by the header and every row so halves align. */
-const GRID = "grid grid-cols-[1fr_6rem_1fr] items-center gap-x-2 sm:gap-x-3";
+/** Fixed 3-column template shared by the header and every row so halves align.
+ *  The center label column narrows to 3rem on phones so each half keeps a
+ *  readable line length at 390px; ≥sm restores the 6rem rhythm. */
+const GRID =
+  "grid grid-cols-[1fr_3rem_1fr] items-center gap-x-2 sm:grid-cols-[1fr_6rem_1fr] sm:gap-x-3";
 
 export function TraditionalVsTokenized() {
   const [focus, setFocus] = useState<Focus>(null);

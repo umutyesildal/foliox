@@ -189,7 +189,9 @@ export function InKindMintForm({
             const balance = balances?.[i];
             return (
               <li key={mint} className="py-1.5">
-                <div className="flex h-11 items-center gap-4">
+                {/* Wraps on phones: ticker + input on the first line, scaled
+                    amount and wallet balance flow to the next — no clipping. */}
+                <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1.5 py-1">
                   <label
                     htmlFor={`inkind-${i}`}
                     className="w-24 shrink-0 truncate font-mono text-xs tabular-nums"
@@ -206,7 +208,7 @@ export function InKindMintForm({
                     onChange={(e) =>
                       setInputs((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
                     }
-                    className="h-8 w-44 rounded-md border border-border bg-background px-3 font-mono text-xs tabular-nums outline-none placeholder:font-sans placeholder:text-muted-foreground focus:border-ring"
+                    className="h-9 w-44 rounded-md border border-border bg-background px-3 font-mono text-xs tabular-nums outline-none placeholder:font-sans placeholder:text-muted-foreground focus:border-ring"
                     aria-invalid={balanceErrors[i] !== null}
                   />
                   <span

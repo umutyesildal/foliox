@@ -554,7 +554,7 @@ export default function ExploreClient() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search baskets"
-              className="h-9 w-full max-w-sm rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+              className="h-9 max-md:h-10 w-full max-w-sm rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
             />
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1">
@@ -565,7 +565,7 @@ export default function ExploreClient() {
                   id="explore-sort"
                   value={sortKey}
                   onChange={(e) => setSortKey(e.target.value as SortKey)}
-                  className="h-9 rounded-md border border-border bg-card px-2 text-sm text-foreground outline-none focus:border-ring"
+                  className="h-9 max-md:h-10 w-full max-w-[12rem] rounded-md border border-border bg-card px-2 text-sm text-foreground outline-none focus:border-ring"
                 >
                   {SORT_OPTIONS.map((o) => (
                     <option key={o.key} value={o.key}>

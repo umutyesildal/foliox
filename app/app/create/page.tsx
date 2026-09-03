@@ -427,6 +427,8 @@ export default function CreatePage() {
           </div>
         </div>
 
+        {/* Shown on mobile too: the grid collapses to one column below lg, so
+            the rail simply stacks under the wizard instead of disappearing. */}
         <SummaryRail
           summary={{
             step,
@@ -459,7 +461,6 @@ export default function CreatePage() {
               : null,
           }}
           validity={validity}
-          className="hidden lg:flex"
         />
       </div>
       <div className="mt-4 lg:hidden">

@@ -18,8 +18,9 @@ function isReady(readyState: WalletReadyState): boolean {
     readyState === WalletReadyState.Loadable;
 }
 
+// py-2.5 keeps wallet menu entries at a ≥40px touch target on phones.
 const menuButtonClasses =
-  "w-full rounded-sm px-2 py-1.5 text-left text-sm text-popover-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+  "w-full rounded-sm px-2 py-2.5 text-left text-sm text-popover-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
 /**
  * Custom wallet control (the wallet-adapter MultiButton is intentionally not

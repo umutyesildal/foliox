@@ -23,8 +23,12 @@
     --accent-foreground: 0.0 0.0% 9.0%;
     --destructive: 0.0 84.2% 60.2%;
     --destructive-foreground: 0.0 0.0% 98.0%;
-    --border: 0.0 0.0% 89.8%;
-    --input: 0.0 0.0% 89.8%;
+    /* Border/input at 87% (not the stock 89.8%): the redesign uses
+       border-border/40 and /60 dividers, which are nearly invisible on white
+       at 89.8%. 87% keeps card borders crisp and lets the alpha dividers
+       read. Dark values are untouched. */
+    --border: 0.0 0.0% 87.0%;
+    --input: 0.0 0.0% 87.0%;
     --ring: 0.0 0.0% 9.0%;
     --status-positive: 0.0 0.0% 35.0%;
     --status-caution: 0.0 0.0% 45.0%;
@@ -33,11 +37,14 @@
        Soft, desaturated, luminous-on-dark data hues (sage-mint / rose / powder
        blue / sand / lavender). Benchmarks use --muted-foreground (gray,
        dashed), never a chart hue. */
-    --chart-1: 150.0 28.0% 44.0%;
-    --chart-2: 350.0 32.0% 52.0%;
-    --chart-3: 215.0 34.0% 50.0%;
-    --chart-4: 40.0 28.0% 44.0%;
-    --chart-5: 265.0 28.0% 54.0%;
+    /* Light variants deepened for on-white contrast: chart-1/chart-2 double as
+       text colors (ChangeValue up/down), so they must clear 4.5:1 —
+       chart-1 was 3.8:1 at L44, chart-2 4.6:1 at L52. Dark values unchanged. */
+    --chart-1: 150.0 30.0% 36.0%;
+    --chart-2: 350.0 34.0% 46.0%;
+    --chart-3: 215.0 34.0% 46.0%;
+    --chart-4: 40.0 30.0% 40.0%;
+    --chart-5: 265.0 28.0% 48.0%;
     --radius: 0.625rem;
     --chart-background: 0.0 0.0% 100.0%;
     --chart-foreground: 0.0 0.0% 3.9%;

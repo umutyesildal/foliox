@@ -10,8 +10,9 @@ import { CONTEXT_ACTIONS, PRIMARY_NAV, isRouteActive } from "@/components/shell/
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// py-2.5 keeps every disclosure link a ≥40px touch target on phones.
 const mobileLinkClasses =
-  "rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+  "rounded-md px-2 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -62,7 +63,7 @@ export function SiteHeader() {
   }, [mobileOpen]);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-border/40">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
         <Link
           href="/"
@@ -112,6 +113,9 @@ export function SiteHeader() {
             type="button"
             className={cn(
               buttonVariants({ variant: "ghost", size: "sm" }),
+              // The menu toggle is the primary nav control below md — give it
+              // a ≥40px touch target there; desktop sizes are unchanged.
+              "max-md:h-10 max-md:px-3.5",
               "md:hidden",
             )}
             aria-expanded={mobileOpen}
@@ -127,7 +131,7 @@ export function SiteHeader() {
         <nav
           id="foliox-mobile-nav"
           aria-label="Primary mobile"
-          className="border-t border-border/40 bg-background md:hidden"
+          className="border-t border-border bg-background dark:border-border/40 md:hidden"
         >
           <div className="mx-auto flex max-w-6xl flex-col gap-0.5 px-4 py-3 sm:px-6">
             {PRIMARY_NAV.map((item) => {
@@ -146,7 +150,7 @@ export function SiteHeader() {
                 </Link>
               );
             })}
-            <div aria-hidden="true" className="my-2 h-px bg-border/40" />
+            <div aria-hidden="true" className="my-2 h-px bg-border dark:bg-border/40" />
             {CONTEXT_ACTIONS.map((item) => (
               <Link key={item.href} href={item.href} className={mobileLinkClasses}>
                 {item.label}

@@ -371,7 +371,10 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                       const decimals = holding?.decimals ?? 6;
                       const out = preview.outs[i] ?? 0n;
                       return (
-                        <li key={mint} className="flex h-11 items-center gap-4 px-3">
+                        <li
+                          key={mint}
+                          className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1"
+                        >
                           <span
                             className="w-24 shrink-0 truncate font-mono text-xs tabular-nums"
                             title={mint}

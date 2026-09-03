@@ -52,7 +52,7 @@ export function Stepper({
               <button
                 type="button"
                 onClick={() => onSelect(index)}
-                className="rounded-sm px-1.5 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="rounded-sm px-1.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <StepChip index={index} label={step.label} state="done" />
               </button>

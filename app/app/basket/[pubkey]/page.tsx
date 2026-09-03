@@ -352,10 +352,10 @@ export default function BasketDetailPage({
                       type="button"
                       aria-current={r.key === range ? "true" : undefined}
                       onClick={() => setRange(r.key)}
-                      className={`transition-colors ${
+                      className={`inline-flex min-h-9 items-center rounded-md px-2.5 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
                         r.key === range
-                          ? "font-medium text-foreground"
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "font-medium text-foreground underline decoration-foreground/40 underline-offset-4"
+                          : "text-muted-foreground"
                       }`}
                     >
                       {r.key}

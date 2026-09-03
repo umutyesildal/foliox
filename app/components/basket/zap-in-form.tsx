@@ -302,8 +302,10 @@ export function ZapInForm({
 
         {quote ? (
           <>
-            <div className="overflow-hidden rounded-md border border-border">
-              <table className="w-full text-xs">
+            {/* Six data columns — scroll horizontally on phones instead of
+                clipping (the parent border keeps its rounding while scrolled). */}
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full min-w-[36rem] text-xs">
                 <caption className="sr-only">Jupiter quote legs</caption>
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">

@@ -13,16 +13,16 @@
 
 ## 2. Ticker → Mint Eşleştirmesi (V0.1 ilk 4)
 
-`backend/.env.example` PROGRAM_WHITELIST ile senkron. Gerçek mainnet mint’leri Backed docs’tan alınmalı; burada **mock/devnet** ile başla.
+**Düzeltme (2026-09-03, `docs/devnet-tokens-research-2026-09-03.md`):** aşağıdaki `Xs…` mintler **gerçek mainnet xStocks mintleridir** (mock değil — baştaki "mock" etiketi yanlıştı) ve gerçek decimals **8'dir, 6 değil** (on-chain doğrulandı: ScaledUiAmountConfig + transferHook mevcut). Devnet'te resmi xStock yoktur → devnet testleri kendi mintlediğimiz mock Token-2022'lerle yapılır (decimals bizim seçimimiz). Mainnet hazırlığında whitelist'i 8 decimals ile kur.
 
-| Ticker | Gerçek Sembol | xStock Mint (mock) | Decimals | Provider |
-|--------|---------------|--------------------|----------|----------|
-| TSLAx | TSLA | `XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB` | 6 | backed | Solscan doğrulandı |
-| AAPLx | AAPL | `XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp` | 6 | backed | Solscan doğrulandı |
-| NVDAx | NVDA | `Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh` | 6 | backed | Solscan doğrulandı |
-| SPYx | SPY | `XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W` | 6 | backed | Solscan doğrulandı |
+| Ticker | Gerçek Sembol | xStock Mint (MAINNET gerçeği) | Decimals | Provider | Not |
+|--------|---------------|-------------------------------|----------|----------|-----|
+| TSLAx | TSLA | `XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB` | **8** | backed | Solscan doğrulandı |
+| AAPLx | AAPL | `XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp` | **8** | backed | Solscan doğrulandı |
+| NVDAx | NVDA | `Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh` | **8** | backed | Solscan doğrulandı |
+| SPYx | SPY | `XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W` | **8** | backed | Solscan doğrulandı |
 
-Gerçek Backed mint’leri eklenince `scripts/createWhitelist.ts` ile `add_mint` çağrılır. Mock’lar `spl-token-2022` ile localnet’te oluşturulur.
+Local dev DB'sindeki whitelist seed'i (6 decimals mock davranışı) devnet demoları için ayrı tutulur; mainnet geçişinde gerçek mintler + 8 decimals ile yeniden kurulur.
 
 ## 3. Fiyat Kaynakları Detay
 

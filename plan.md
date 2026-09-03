@@ -241,6 +241,7 @@ After every phase or material decision:
 | 2026-09-02 | Brand superseded: UI monochrome (classic shadcn dark/light) + ethereal chart data palette; Mineral Desk retired; footer removed site-wide; LEGAL_REVIEW_REQUIRED chips removed from UI (review backlog — wizard legal step + /legal stay) | owner | Done |
 | 2026-09-02/03 | New IA: Home (hero + product visual + Traditional-vs-Tokenized interactive + gateway) / Stocks (provider grid) / ETFs (pure clickable-card listing) / Baskets (grid-only, name-first, vs-SPY); Market+Providers unlinked from nav; two owner feedback rounds applied; baskets list API carries constituents/weights/metadata for card composition | owner | Done |
 | 2026-09-03 | Localnet bring-up reached 6/8 E2E steps PASS (deploy + createWhitelist on-chain); create_basket hits SBF stack-frame overflow → refactor PAUSED at WIP `e961849` (owner: UI-only phase); SBF pins + idl-build features in place — resume on owner request | owner | Paused |
+| 2026-09-03 | Devnet phase begins (owner request). T0 research verdict: NO official devnet tokens for xStocks/Ondo (verified on-chain; `docs/devnet-tokens-research-2026-09-03.md`) → devnet test uses self-minted Token-2022 mocks with ScaledUiAmountConfig. NOTE for mainnet: providers.md `Xs…` mints are REAL mainnet xStocks with **8 decimals, not 6** | coordinator | Done |
 
 ## 8b. Current status snapshot (2026-09-03)
 

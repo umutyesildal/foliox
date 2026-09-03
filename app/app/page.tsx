@@ -1,10 +1,16 @@
-import Image from "next/image";
 import Link from "next/link";
 
-import { TraditionalVsTokenized } from "@/components/etfs/traditional-vs-tokenized";
+import { RomanHeroBand } from "@/components/home/roman-hero-band";
+import { FlowSection } from "@/components/home/flow-section";
+import { LedgerSection } from "@/components/home/ledger-section";
+import { ClosingStrip } from "@/components/home/closing-strip";
 
-/** Which monochrome visual anchor a gateway card carries (see SectionAnchor). */
-type SectionAnchorKind = "stocks" | "etfs" | "baskets";
+/*
+ * Imagery attribution (roman-empire):
+ *   public/brand/roman-1.jpg — "Colosseum" photo by Ank Kumar, CC BY-SA 4.0.
+ *   Source and license: docs/roman-imagery-sources.md. An on-image credit
+ *   also renders bottom-right of the hero band.
+ */
 
 /** Small laurel-wreath glyph — two mirrored branches with leaf ticks, drawn
  *  as plain strokes so it inherits color. Decorative only (aria-hidden). */
@@ -34,93 +40,17 @@ function LaurelGlyph({ flip = false }: { flip?: boolean }) {
 }
 
 /**
- * Section gateway — the three main areas of the product, as a bento grid of
- * cards. Each card: roman-numeral index (I/II/III, display face), a small
- * pure-CSS anchor (ticker rows or a weight bar — typography only, no icons,
- * no color), name, one short line, and a ↗ that lifts on hover with a
- * single pompeian-red accent. Details live on the pages themselves.
- */
-const SECTIONS: {
-  index: string;
-  name: string;
-  line: string;
-  href: string;
-  anchor: SectionAnchorKind;
-}[] = [
-  {
-    index: "I",
-    name: "Stocks",
-    line: "Tokenized stocks across providers.",
-    href: "/stocks",
-    anchor: "stocks",
-  },
-  {
-    index: "II",
-    name: "Tokenized ETFs",
-    line: "The tokenized ETF tickers FolioX lists today.",
-    href: "/etfs",
-    anchor: "etfs",
-  },
-  {
-    index: "III",
-    name: "Baskets",
-    line: "Community-made baskets, benchmarked on-chain.",
-    href: "/explore",
-    anchor: "baskets",
-  },
-];
-
-/** Decorative per-card anchor — ticker hairline rows for Stocks/ETFs, a mini
- *  weight-bar stack for Baskets. Monochrome, aria-hidden, no meaning. */
-function SectionAnchor({ kind }: { kind: SectionAnchorKind }) {
-  if (kind === "baskets") {
-    return (
-      <div aria-hidden="true" className="space-y-1.5">
-        <div className="h-1 w-full rounded-full bg-foreground/70" />
-        <div className="h-1 w-3/5 rounded-full bg-foreground/40" />
-        <div className="h-1 w-1/3 rounded-full bg-foreground/25" />
-      </div>
-    );
-  }
-  const rows =
-    kind === "stocks"
-      ? ([
-          ["NVDA", "30%"],
-          ["AAPL", "24%"],
-          ["TSLA", "16%"],
-        ] as const)
-      : ([
-          ["TECH", "60%"],
-          ["CORE", "40%"],
-        ] as const);
-  return (
-    <div aria-hidden="true" className="space-y-1.5">
-      {rows.map(([ticker, weight]) => (
-        <div
-          key={ticker}
-          className="flex items-center gap-2 font-mono text-[10px] leading-none"
-        >
-          <span className="w-10 text-foreground/70">{ticker}</span>
-          <span className="h-px flex-1 bg-border" />
-          <span className="text-muted-foreground">{weight}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02,
- * elevated 2026-09-03): a badge line, big h1, one subline, two CTAs, then the
- * signature framed product screenshot (Stocks page, bottom fade into the page
- * background), the three-card bento gateway (Stocks / Tokenized ETFs /
- * Baskets), and a quiet Traditional vs tokenized primer as the closer.
- * No footer, texture, stats, devices, or data fetch.
+ * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02;
+ * roman-empire redesign, 2026-09-03): laurel chip, Cinzel headline, one
+ * subline, two CTAs — then a full-bleed cinematic Colosseum band melting into
+ * the page, the three-step Flow section (real screen crops, `fig.` captions),
+ * the Ledger inscription (traditional vs tokenized rails), and a closing
+ * navigation strip fed by the live xStocks registry. No footer.
  */
 export default function LandingPage() {
   return (
     <div className="mx-auto w-full">
-      <section className="mx-auto flex max-w-3xl flex-col items-center px-4 pb-24 pt-24 text-center sm:px-6 md:pt-32">
+      <section className="mx-auto flex max-w-3xl flex-col items-center px-4 pb-20 pt-24 text-center sm:px-6 md:pt-32">
         <p className="inline-flex items-center gap-2.5 rounded-full border border-[hsl(var(--imperial)/0.45)] bg-muted/40 px-3.5 py-1 font-mono text-xs tracking-wide text-[hsl(var(--imperial))]">
           <LaurelGlyph />
           Onchain strategy baskets · xStocks
@@ -149,91 +79,19 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Product screenshot — the classic shadcn hero visual: the Stocks page
-          in an elevated frame, its bottom ~25% dissolving into the page
-          background (a mask, not decoration). No caption. */}
-      <section
-        aria-label="FolioX Stocks preview"
-        className="mx-auto w-full max-w-5xl px-4 pb-20 sm:px-6"
-      >
-        <div className="relative">
-          <Image
-            src="/brand/stocks-hero.png"
-            alt="FolioX Stocks page with live tokenized stock prices"
-            width={1280}
-            height={720}
-            priority
-            className="h-auto w-full rounded-xl border border-border shadow-xl ring-1 ring-border dark:shadow-black/25"
-          />
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-0 bottom-0 h-1/4 rounded-b-xl bg-gradient-to-b from-transparent to-background"
-          />
-        </div>
-      </section>
+      {/* Cinematic band — the Colosseum at night, edge to edge, bottom fade
+          into the page. Punctuation, not content: no headline on it. */}
+      <RomanHeroBand />
 
-      {/* Section gateway — three bento cards, full-width of the container. */}
-      <section
-        aria-label="Explore FolioX"
-        className="border-t border-border py-16 dark:border-border/60"
-      >
-        <nav aria-label="Sections" className="mx-auto max-w-5xl px-4 sm:px-6">
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {SECTIONS.map((section) => (
-              <li key={section.href}>
-                <Link
-                  href={section.href}
-                  className="group flex min-h-36 flex-col justify-between gap-6 rounded-xl border border-border bg-card p-5 transition-colors hover:border-foreground/25 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      aria-hidden="true"
-                      className="font-[family-name:var(--font-display)] text-xs font-medium tracking-[0.08em] text-muted-foreground"
-                    >
-                      {section.index}
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className="font-mono text-sm text-muted-foreground transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[hsl(var(--pompeian))]"
-                    >
-                      ↗
-                    </span>
-                  </div>
-                  <SectionAnchor kind={section.anchor} />
-                  <div>
-                    <p className="text-lg font-medium leading-tight text-foreground">
-                      {section.name}
-                    </p>
-                    <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                      {section.line}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </section>
+      {/* Flow — the three steps every basket follows, as inscription columns. */}
+      <FlowSection />
 
-      {/* Traditional vs tokenized — closing educational section. Quieter than
-          the hero on purpose: a bonus primer, not a second pitch. */}
-      <section
-        aria-label="Traditional vs tokenized ETFs"
-        className="border-t border-border py-12 dark:border-border/60"
-      >
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <p className="font-[family-name:var(--font-display)] text-sm uppercase tracking-[0.12em] text-muted-foreground">
-            Traditional vs tokenized
-          </p>
-          <p className="mt-3 max-w-2xl text-balance text-base leading-7 text-muted-foreground">
-            Both give you the same underlying ETF exposure. What changes is how
-            you hold it.
-          </p>
-          <div className="mt-8">
-            <TraditionalVsTokenized />
-          </div>
-        </div>
-      </section>
+      {/* Ledger — same exposure, different rails. No card, no cell borders. */}
+      <LedgerSection />
+
+      {/* Closing strip — navigation role of the deleted bento, one hairline
+          row fed by the live xStocks registry. */}
+      <ClosingStrip />
     </div>
   );
 }

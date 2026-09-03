@@ -27,6 +27,26 @@ pub const CREATOR_FEE_SPLIT_BPS: u16 = 9000;
 /// Anchor.toml's `whitelist` entry.
 pub const WHITELIST_PROGRAM_ID: Pubkey = pubkey!("FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS");
 
+/// The basket factory program (programs/basket_factory). Env-free constant on
+/// purpose, cross-checked against `declare_id!` in
+/// programs/basket_factory/src/lib.rs and Anchor.toml's `basket_factory` entry
+/// (single source of truth there). The basket program needs it because the
+/// Basket data account is a PDA derived under the FACTORY program id whose
+/// data is owned by the BASKET program (only an account's owner program may
+/// write its data at runtime, so the factory cannot initialize it itself).
+pub const FACTORY_PROGRAM_ID: Pubkey = pubkey!("3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF");
+
+/// The factory program's single global config PDA seed (`b"factory"` —
+/// mirrors `basket_factory::FACTORY_SEED`).
+pub const FACTORY_SEED: &[u8] = b"factory";
+
+/// The canonical factory PDA (`find_program_address([b"factory"], factory)`)
+/// — the only signer `init_basket` accepts (the factory signs with its CPI
+/// signer seeds, so `init_basket` is callable only from `create_basket`).
+pub fn factory_pda() -> Pubkey {
+    Pubkey::find_program_address(&[FACTORY_SEED], &FACTORY_PROGRAM_ID).0
+}
+
 /// 8-byte Anchor account discriminator of the whitelist program's
 /// `WhitelistedMint` account: `sha256("account:WhitelistedMint")[..8]`.
 /// Recomputed against the live sha256 implementation in the test
@@ -104,6 +124,114 @@ pub mod math {
 #[program]
 pub mod basket {
     use super::*;
+
+    /// Factory-only: initializes the immutable `Basket` data account for a
+    /// newly deployed basket. Invoked via CPI from
+    /// `basket_factory::create_basket`, which has already run the full spec
+    /// §3.2 validation set and has JUST created the account via system
+    /// `create_account` with owner = the BASKET program (the factory signs the
+    /// creation because the PDA derives under the FACTORY program; only the
+    /// owner program may then write the data — hence this CPI). This
+    /// instruction re-checks what it needs to trust its inputs:
+    ///   1. `authority` is the canonical factory PDA AND a signer — only the
+    ///      factory program can make that PDA sign (CPI signer seeds), so
+    ///      nobody can write Basket accounts bypassing the factory;
+    ///   2. the `basket` account is the genuine PDA
+    ///      `[b"basket", factory, creator, nonce]` derived under the FACTORY
+    ///      program id, at its canonical bump;
+    ///   3. the account is owned by the BASKET program and still zeroed
+    ///      (uninitialized);
+    ///   4. constituent/weight vector lengths and bounds.
+    #[allow(clippy::too_many_arguments)]
+    pub fn init_basket<'info>(
+        ctx: Context<'_, '_, '_, 'info, InitBasket<'info>>,
+        creator: Pubkey,
+        nonce: u64,
+        basket_bump: u8,
+        treasury: Pubkey,
+        share_mint: Pubkey,
+        metadata_hash: [u8; 32],
+        constituents: Vec<Pubkey>,
+        weights_bps: Vec<u16>,
+        entry_fee_bps: u16,
+        exit_fee_bps: u16,
+        management_fee_bps: u16,
+        vault_bump: u8,
+    ) -> Result<()> {
+        use anchor_lang::{AnchorSerialize, Discriminator};
+        // 1. Only the canonical factory PDA (signing via the factory's CPI
+        //    signer seeds) may initialize Basket accounts.
+        let factory_key = ctx.accounts.authority.key();
+        require_keys_eq!(factory_key, factory_pda(), BasketError::InvalidFactoryAuthority);
+        require!(
+            ctx.accounts.authority.is_signer,
+            BasketError::InvalidFactoryAuthority
+        );
+        // 2. Genuine basket PDA under the FACTORY program id, canonical bump.
+        let (expected_basket, expected_bump) = Pubkey::find_program_address(
+            &[BASKET_SEED, factory_key.as_ref(), creator.as_ref(), &nonce.to_le_bytes()],
+            &FACTORY_PROGRAM_ID,
+        );
+        let basket_ai = ctx.accounts.basket.to_account_info();
+        require_keys_eq!(*basket_ai.key, expected_basket, BasketError::InvalidBasketPda);
+        require!(basket_bump == expected_bump, BasketError::InvalidBasketPda);
+        // 3. Our account, freshly created by the factory's create_account
+        //    (owner = basket program, rent-exempt, data all zero).
+        let expected_len = 8 + std::mem::size_of::<Basket>();
+        require!(basket_ai.owner == &ID, BasketError::InvalidBasketPda);
+        require!(basket_ai.data_len() == expected_len, BasketError::InvalidBasketPda);
+        {
+            let data = basket_ai.try_borrow_data()?;
+            require!(
+                data.iter().all(|&b| b == 0),
+                BasketError::BasketAlreadyInitialized
+            );
+        }
+        // 4. Cheap shape re-validation (the factory enforces the full §3.2 set).
+        require!(
+            !constituents.is_empty() && constituents.len() == weights_bps.len(),
+            BasketError::LengthMismatch
+        );
+        require!(constituents.len() >= 2 && constituents.len() <= 20, BasketError::LengthMismatch);
+
+        let n = constituents.len();
+        let clock = Clock::get()?;
+        let mut b = Basket {
+            factory: factory_key,
+            creator,
+            treasury,
+            share_mint,
+            nonce,
+            created_at: clock.unix_timestamp,
+            last_fee_accrual_ts: clock.unix_timestamp,
+            metadata_hash,
+            num_constituents: n as u8,
+            constituents: [Pubkey::default(); 20],
+            target_weights_bps: [0; 20],
+            entry_fee_bps,
+            exit_fee_bps,
+            management_fee_bps,
+            // Canonical bump of this PDA under the FACTORY program id (matches
+            // the factory's seeds constraint bump) and the basket program's
+            // vault authority PDA bump under THIS program id.
+            bump: basket_bump,
+            vault_bump,
+        };
+        for i in 0..20 {
+            if i < n {
+                b.constituents[i] = constituents[i];
+                b.target_weights_bps[i] = weights_bps[i];
+            }
+        }
+        // Byte-identical to Anchor `init`: discriminator + borsh payload.
+        let mut buf = Vec::with_capacity(expected_len);
+        buf.extend_from_slice(&Basket::DISCRIMINATOR);
+        b.serialize(&mut buf)?;
+        basket_ai.try_borrow_mut_data()?[..buf.len()].copy_from_slice(&buf);
+
+        msg!("init_basket creator={} nonce={} constituents={}", creator, nonce, n);
+        Ok(())
+    }
 
     /// Mint in-kind — real implementation.
     ///
@@ -865,6 +993,18 @@ fn accrue_fee_internal<'info>(
 }
 
 #[derive(Accounts)]
+pub struct InitBasket<'info> {
+    /// CHECK: created by the factory's system create_account (owner = the
+    /// BASKET program, data zeroed); owner, zero-data, exact length and PDA
+    /// derivation are all verified in the handler before anything is written.
+    #[account(mut)]
+    pub basket: UncheckedAccount<'info>,
+    /// CHECK: must be the canonical factory PDA (`factory_pda()`) and a signer
+    /// — enforced in the handler; only the factory program can sign with it.
+    pub authority: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
 pub struct MintInKind<'info> {
     #[account(mut)]
     pub basket: Account<'info, Basket>,
@@ -1059,6 +1199,12 @@ pub enum BasketError {
     MintPaused,
     #[msg("remaining_accounts whitelist entry is not the WhitelistedMint PDA for its constituent mint (wrong owner, discriminator, or mint field)")]
     InvalidWhitelistAccount,
+    #[msg("init_basket authority is not the canonical factory PDA signer")]
+    InvalidFactoryAuthority,
+    #[msg("basket account is not the PDA [b\"basket\", factory, creator, nonce] under the factory program id (or wrong bump/owner/length)")]
+    InvalidBasketPda,
+    #[msg("basket account data is not zeroed (already initialized)")]
+    BasketAlreadyInitialized,
 }
 
 #[cfg(test)]

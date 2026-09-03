@@ -198,34 +198,72 @@ pub mod basket_factory {
             );
         }
 
-        // ---- initialize the Basket PDA (immutable after this instruction) ----
-        let clock = Clock::get()?;
-        let basket = &mut ctx.accounts.basket;
-        basket.factory = factory_key;
-        basket.creator = creator_key;
-        basket.treasury = ctx.accounts.factory.treasury;
-        basket.share_mint = share_mint_key;
-        basket.nonce = nonce;
-        basket.created_at = clock.unix_timestamp;
-        basket.last_fee_accrual_ts = clock.unix_timestamp;
-        basket.metadata_hash = metadata_hash;
-        basket.num_constituents = n as u8;
-        for i in 0..20 {
-            if i < n {
-                basket.constituents[i] = constituents[i];
-                basket.target_weights_bps[i] = weights_bps[i];
-            } else {
-                basket.constituents[i] = Pubkey::default();
-                basket.target_weights_bps[i] = 0;
-            }
+        // ---- create + initialize the Basket data account (owned by the basket program) ----
+        // The basket PDA derives under THIS program, but its data must be
+        // owned by the BASKET program: mint/redeem/accrue type it as
+        // `Account<Basket>` (owner check) and the runtime only lets the owner
+        // program write account data. Anchor `init` cannot express that (it
+        // both creates and types the account as the current program's), and
+        // the basket program cannot create the PDA itself (a program can only
+        // invoke_signed its OWN PDAs; this PDA is the factory's). So:
+        //   (1) the factory runs system create_account with owner = basket
+        //       program id (the factory PDA-signs for its own PDA);
+        //   (2) the factory CPIs basket::init_basket, which verifies and
+        //       writes the data into the account it now owns.
+        // The factory PDA signs the CPI, making init_basket factory-only; the
+        // whole tx is atomic, so any failure reverts everything.
+        let basket_space = (8 + std::mem::size_of::<BasketAccount>()) as u64;
+        let basket_lamports = Rent::get()?.minimum_balance(basket_space as usize);
+        {
+            let nonce_le = nonce.to_le_bytes();
+            let basket_bump_arr = [ctx.bumps.basket];
+            let basket_signer_seeds: [&[u8]; 5] = [
+                BASKET_SEED,
+                factory_key.as_ref(),
+                creator_key.as_ref(),
+                &nonce_le,
+                &basket_bump_arr,
+            ];
+            anchor_lang::system_program::create_account(
+                CpiContext::new_with_signer(
+                    ctx.accounts.system_program.to_account_info(),
+                    anchor_lang::system_program::CreateAccount {
+                        from: ctx.accounts.creator.to_account_info(),
+                        to: ctx.accounts.basket.to_account_info(),
+                    },
+                    &[&basket_signer_seeds],
+                ),
+                basket_lamports,
+                basket_space,
+                &basket::ID,
+            )?;
         }
-        basket.entry_fee_bps = entry_fee_bps;
-        basket.exit_fee_bps = exit_fee_bps;
-        basket.management_fee_bps = management_fee_bps;
-        basket.bump = ctx.bumps.basket;
-        // Canonical bump of the basket program's vault authority PDA — the value
-        // the basket program itself would derive (self-heal is no longer needed).
-        basket.vault_bump = vault_bump;
+        {
+            let factory_bump_arr = [ctx.accounts.factory.bump];
+            let factory_signer_seeds: [&[u8]; 2] = [FACTORY_SEED, &factory_bump_arr];
+            basket::cpi::init_basket(
+                CpiContext::new_with_signer(
+                    ctx.accounts.basket_program.to_account_info(),
+                    basket::cpi::accounts::InitBasket {
+                        basket: ctx.accounts.basket.to_account_info(),
+                        authority: ctx.accounts.factory.to_account_info(),
+                    },
+                    &[&factory_signer_seeds],
+                ),
+                creator_key,
+                nonce,
+                ctx.bumps.basket,
+                ctx.accounts.factory.treasury,
+                share_mint_key,
+                metadata_hash,
+                constituents.clone(),
+                weights_bps.clone(),
+                entry_fee_bps,
+                exit_fee_bps,
+                management_fee_bps,
+                vault_bump,
+            )?;
+        }
 
         // ---- per-constituent action: create vault ATA + RAW seed transfer ----
         for i in 0..n {
@@ -344,8 +382,9 @@ pub mod basket_factory {
 
         ctx.accounts.factory.basket_count = new_basket_count;
 
+        let clock = Clock::get()?;
         emit!(BasketCreated {
-            basket: basket.key(),
+            basket: basket_key,
             creator: creator_key,
             num_constituents: n as u8,
             share_mint: share_mint_key,
@@ -540,14 +579,21 @@ pub struct InitFactory<'info> {
 pub struct CreateBasket<'info> {
     #[account(mut, seeds = [FACTORY_SEED], bump = factory.bump)]
     pub factory: Account<'info, FactoryConfig>,
+    /// Immutable basket data account — a PDA of THIS program (seeds
+    /// `[b"basket", factory, creator, nonce]`, still pinned by the constraint
+    /// below) whose DATA is owned by the BASKET program: the runtime only lets
+    /// an account's owner program write its data, and the basket program's
+    /// mint/redeem/accrue contexts type it as `Account<Basket>` (owner check),
+    /// so it is created + initialized via the `basket::init_basket` CPI in the
+    /// handler (a program cannot `init` an account owned by another program —
+    /// the former in-context `init` failed Anchor's AccountOwnedByWrongProgram
+    /// check because `Basket::owner()` is the basket program id).
     #[account(
-        init,
-        payer = creator,
-        space = 8 + std::mem::size_of::<BasketAccount>(),
+        mut,
         seeds = [BASKET_SEED, factory.key().as_ref(), creator.key().as_ref(), &nonce.to_le_bytes()],
         bump
     )]
-    pub basket: Account<'info, BasketAccount>,
+    pub basket: UncheckedAccount<'info>,
     /// Basket share mint — Token-2022, 6 decimals, PDA seeds
     /// `["share_mint", basket.key()]`. Created in-handler by `init_share_mint`
     /// with the factory PDA as TEMPORARY mint authority; `create_basket` mints
@@ -577,6 +623,12 @@ pub struct CreateBasket<'info> {
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
+    /// The basket program — target of the `init_basket` CPI that creates the
+    /// basket data account (owned by the basket program). Constrained to the
+    /// declared basket program id that `vault_authority_pda` and the genesis
+    /// mint authority handoff already trust.
+    #[account(constraint = basket_program.key() == basket::ID @ FactoryError::InvalidBasketProgram)]
+    pub basket_program: UncheckedAccount<'info>,
 }
 
 #[account]
@@ -649,6 +701,8 @@ pub enum FactoryError {
     InvalidShareAta,
     #[msg("Only the Token-2022 program is accepted")]
     InvalidTokenProgram,
+    #[msg("basket_program account is not the declared basket program")]
+    InvalidBasketProgram,
 }
 
 #[cfg(test)]

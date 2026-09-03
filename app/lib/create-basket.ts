@@ -333,6 +333,9 @@ export function buildCreateBasketInstruction(
     { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
     { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     { pubkey: PublicKey.default, isSigner: false, isWritable: false },
+    // CPI target for basket::init_basket (the basket data account is owned by
+    // the basket program).
+    { pubkey: PROGRAMS.basket, isSigner: false, isWritable: false },
   ];
   args.constituents.forEach((mint, i) => {
     keys.push({ pubkey: pda.whitelistedMints[i], isSigner: false, isWritable: false });
@@ -354,7 +357,7 @@ export function buildCreateBasketInstruction(
  * bytes; constituent-heavy baskets exceed it without ALT compression.
  */
 export function estimateCreateBasketTxSize(numConstituents: number): number {
-  const accountKeys = 9 + 4 * numConstituents;
+  const accountKeys = 10 + 4 * numConstituents;
   const instructionData =
     8 +
     8 +

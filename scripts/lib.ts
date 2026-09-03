@@ -381,8 +381,9 @@ export interface CreateBasketArgs {
 /**
  * factory create_basket — named accounts in CreateBasket order (factory,
  * basket, share_mint, vault_authority, creator_share_ata, creator,
- * token_program, associated_token_program, system) then remaining_accounts
- * per constituent: [whitelisted_mint_pda, mint, creator_ata, vault_ata].
+ * token_program, associated_token_program, system, basket_program) then
+ * remaining_accounts per constituent:
+ * [whitelisted_mint_pda, mint, creator_ata, vault_ata].
  */
 export function ixCreateBasket(a: CreateBasketArgs): TransactionInstruction {
   const keys: Meta[] = [
@@ -395,6 +396,9 @@ export function ixCreateBasket(a: CreateBasketArgs): TransactionInstruction {
     m(TOKEN_2022_PROGRAM_ID, false),
     m(ASSOCIATED_TOKEN_PROGRAM_ID, false),
     m(SYSTEM_PROGRAM_ID, false),
+    // CPI target for basket::init_basket (the basket data account is owned by
+    // the basket program).
+    m(BASKET_PROGRAM_ID, false),
   ];
   a.constituents.forEach((mint) => {
     keys.push(

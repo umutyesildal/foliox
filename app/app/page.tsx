@@ -47,17 +47,23 @@ export default function LandingPage() {
       <section className="relative w-full overflow-hidden">
         {/* Watermark — Francesco Piranesi, "Veduta del Pantheon d'Agrippa"
             (1790, public domain). The plate is dark ink on light paper, so
-            `invert` flips it to light lines on dark; at 16% opacity over the
+            `invert` flips it to light lines on dark; at 11% opacity over the
             near-black canvas only the etched strokes survive as a faint
-            texture. Gradient masks dissolve every edge into the page. */}
+            texture. The plate is pushed low (top 62%) so the pediment emerges
+            below the CTA cluster, and a heavy top fade keeps the headline zone
+            pure background — the engraving is revealed progressively downward.
+            A soft radial scrim behind the text block guarantees contrast. */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <img
             src="/brand/pantheon-engraving.jpg"
             alt=""
-            className="absolute left-1/2 top-1/2 w-[94%] max-w-[1100px] -translate-x-1/2 -translate-y-1/2 select-none opacity-[0.16] [filter:invert(1)_grayscale(1)_contrast(1.06)]"
+            className="absolute left-1/2 top-[62%] w-[94%] max-w-[1100px] -translate-x-1/2 -translate-y-1/2 select-none opacity-[0.11] [filter:invert(1)_grayscale(1)_contrast(1.06)]"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,hsl(var(--background))_0%,transparent_28%,transparent_70%,hsl(var(--background))_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,hsl(var(--background))_0%,hsl(var(--background))_36%,transparent_64%,transparent_74%,hsl(var(--background))_100%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--background))_0%,transparent_18%,transparent_82%,hsl(var(--background))_100%)]" />
+          {/* Text-zone scrim — blurred-edge radial behind eyebrow + headline
+              + CTAs only; invisible at the edges, /55 at the core. */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_62%_48%_at_50%_34%,hsl(var(--background)/0.55)_0%,hsl(var(--background)/0.3)_55%,transparent_78%)]" />
         </div>
         <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center px-4 pb-20 pt-24 text-center sm:px-6 md:pt-32">
           <p className="inline-flex items-center gap-2.5 rounded-full border border-[hsl(var(--imperial)/0.45)] bg-muted/40 px-3.5 py-1 font-mono text-xs tracking-wide text-[hsl(var(--imperial))]">

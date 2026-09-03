@@ -4,12 +4,13 @@ import { SectionHeader } from "@/components/ui/section-header";
 
 /**
  * Flow section — replaces the old bento gateway. One idea: every basket
- * follows the same three steps, shown as three inscription columns — a small
- * quiet Cinzel numeral (a whisper above the frame), a hand-drawn Roman motif
- * (owner feedback 2026-09-03: screenshot crops are out), and two lines of
- * copy. The motif card lifts 2px with a brightening border and the motif
- * itself inks up on hover (≤200ms, reduced-motion honored); the numeral stays
- * still. No color — line art only, all strokes currentColor.
+ * follows the same three steps, shown as three bare inscription columns —
+ * no card chrome (owner feedback 2026-09-03: kill the boxes), just a
+ * hand-drawn Roman motif, a small quiet Cinzel numeral, and two lines of
+ * copy. Columns are separated by hairline verticals on desktop only. The
+ * motif brightens muted→foreground on hover (≤200ms, reduced-motion
+ * honored); the numeral stays still. No color — line art only, all
+ * strokes currentColor.
  */
 
 /** I. CREATE — a classical column: abacus, echinus capital, fluted shaft,
@@ -132,23 +133,24 @@ export function FlowSection() {
           lead="Every basket follows the same three steps."
         />
 
-        <ol className="mt-10 grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-3">
+        <ol className="mt-12 grid grid-cols-1 gap-y-12 sm:grid-cols-3">
           {STEPS.map((step) => (
-            <li key={step.numeral}>
+            <li
+              key={step.numeral}
+              className="border-border/50 sm:border-l sm:pl-10 sm:first:border-l-0 sm:first:pl-0 dark:border-border/40"
+            >
               <Link
                 href={step.href}
                 className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
+                {/* Motif — bare, no frame; inks up on hover. */}
+                <step.Motif />
                 {/* Numeral — a whisper, not a headline. */}
                 <span
                   aria-hidden="true"
-                  className="font-[family-name:var(--font-display)] text-sm font-medium leading-none tracking-[0.18em] text-muted-foreground/70"
+                  className="mt-4 block font-[family-name:var(--font-display)] text-sm font-medium leading-none tracking-[0.18em] text-muted-foreground/70"
                 >
                   {step.numeral}
-                </span>
-                {/* Motif card — same chrome the crops wore. */}
-                <span className="mt-3 flex aspect-[4/3] items-center justify-center rounded-lg border border-border p-8 transition-[border-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:border-foreground/30 motion-reduce:transform-none motion-reduce:transition-none">
-                  <step.Motif />
                 </span>
                 <span className="mt-3 block max-w-xs text-sm leading-5 text-muted-foreground">
                   {step.copy}

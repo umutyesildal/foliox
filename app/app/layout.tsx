@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import "./globals.css";
 import { Cinzel, Geist, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,29 @@ const geistMono = Geist_Mono({subsets:['latin'],variable:'--font-mono'});
 // tokenized" section label (see app/app/page.tsx). Everything else stays Geist.
 const cinzel = Cinzel({subsets:['latin'],variable:'--font-display'});
 
-export const metadata = { title: "FolioX — Strategy Baskets on Solana", description: "Create an index. Own your thesis. Onchain strategy baskets powered by xStocks." };
+export const metadata: Metadata = {
+  // TODO(roman-empire): swap for the production domain before launch.
+  metadataBase: new URL("http://localhost:3000"),
+  title: {
+    default: "FolioX — Strategy Baskets on Solana",
+    template: "%s · FolioX",
+  },
+  description:
+    "FolioX lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
+  openGraph: {
+    title: "FolioX — Strategy Baskets on Solana",
+    description:
+      "FolioX lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
+    type: "website",
+    siteName: "FolioX",
+  },
+  twitter: {
+    card: "summary",
+    title: "FolioX — Strategy Baskets on Solana",
+    description:
+      "FolioX lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
+  },
+};
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={cn("dark font-sans", geist.variable, geistMono.variable, cinzel.variable)}>

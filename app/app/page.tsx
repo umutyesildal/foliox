@@ -1,7 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { TraditionalVsTokenized } from "@/components/etfs/traditional-vs-tokenized";
-import { InscriptionPanel } from "@/components/inscription-panel";
 
 /** Which monochrome visual anchor a gateway card carries (see SectionAnchor). */
 type SectionAnchorKind = "stocks" | "etfs" | "baskets";
@@ -111,11 +111,11 @@ function SectionAnchor({ kind }: { kind: SectionAnchorKind }) {
 
 /**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02,
- * elevated 2026-09-03): a badge line, big h1, one subline, two CTAs, then a
- * carved-stone Roman inscription panel (static brand art — replaced the old
- * market screenshot), the interactive Traditional vs tokenized comparison
- * (moved here from /etfs), and a three-card bento gateway (Stocks /
- * Tokenized ETFs / Baskets). No footer, texture, stats, devices, or data fetch.
+ * elevated 2026-09-03): a badge line, big h1, one subline, two CTAs, then the
+ * signature framed product screenshot (Stocks page, bottom fade into the page
+ * background), the three-card bento gateway (Stocks / Tokenized ETFs /
+ * Baskets), and a quiet Traditional vs tokenized primer as the closer.
+ * No footer, texture, stats, devices, or data fetch.
  */
 export default function LandingPage() {
   return (
@@ -149,35 +149,26 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Roman inscription panel — a quiet carved-stone plaque. Static brand
-          art (no data, no caption, no FreshnessBadge); it replaced the old
-          framed market screenshot. */}
+      {/* Product screenshot — the classic shadcn hero visual: the Stocks page
+          in an elevated frame, its bottom ~25% dissolving into the page
+          background (a mask, not decoration). No caption. */}
       <section
-        aria-label="FolioX inscription"
-        className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6"
+        aria-label="FolioX Stocks preview"
+        className="mx-auto w-full max-w-5xl px-4 pb-20 sm:px-6"
       >
-        <div className="relative -mt-8">
-          <InscriptionPanel />
-        </div>
-      </section>
-
-      {/* Traditional vs tokenized — interactive comparison (moved from /etfs),
-          its own quiet section between the hero visual and the gateway. */}
-      <section
-        aria-label="Traditional vs tokenized ETFs"
-        className="border-t border-border py-16 dark:border-border/60"
-      >
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <p className="font-[family-name:var(--font-display)] text-sm uppercase tracking-[0.12em] text-muted-foreground">
-            Traditional vs tokenized
-          </p>
-          <p className="mt-3 max-w-2xl text-balance text-base leading-7 text-muted-foreground">
-            Both give you the same underlying ETF exposure. What changes is how
-            you hold it.
-          </p>
-          <div className="mt-8">
-            <TraditionalVsTokenized />
-          </div>
+        <div className="relative">
+          <Image
+            src="/brand/stocks-hero.png"
+            alt="FolioX Stocks page with live tokenized stock prices"
+            width={1280}
+            height={720}
+            priority
+            className="h-auto w-full rounded-xl border border-border shadow-xl ring-1 ring-border dark:shadow-black/25"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-0 h-1/4 rounded-b-xl bg-gradient-to-b from-transparent to-background"
+          />
         </div>
       </section>
 
@@ -222,6 +213,26 @@ export default function LandingPage() {
             ))}
           </ul>
         </nav>
+      </section>
+
+      {/* Traditional vs tokenized — closing educational section. Quieter than
+          the hero on purpose: a bonus primer, not a second pitch. */}
+      <section
+        aria-label="Traditional vs tokenized ETFs"
+        className="border-t border-border py-12 dark:border-border/60"
+      >
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <p className="font-[family-name:var(--font-display)] text-sm uppercase tracking-[0.12em] text-muted-foreground">
+            Traditional vs tokenized
+          </p>
+          <p className="mt-3 max-w-2xl text-balance text-base leading-7 text-muted-foreground">
+            Both give you the same underlying ETF exposure. What changes is how
+            you hold it.
+          </p>
+          <div className="mt-8">
+            <TraditionalVsTokenized />
+          </div>
+        </div>
       </section>
     </div>
   );

@@ -129,7 +129,6 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
             {s.dashed ? <span className="text-[10px] font-sans text-muted-foreground">dashed</span> : null}
           </Badge>
         ))}
-        <span className="text-xs text-muted-foreground">Normalized to 100 at the start of the window.</span>
       </div>
 
       <div className="space-y-1">

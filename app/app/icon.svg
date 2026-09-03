@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- FolioX favicon: the site-header column mark, rescaled for 16px legibility
+       (white strokes on a rounded near-black square; no laurel — it turned to
+       mush at 16px). Geometry mirrors the 16-viewBox glyph in
+       components/shell/site-header.tsx, scaled ~1.75x and centered. -->
+  <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
+  <g fill="none" stroke="#fafafa" stroke-width="2.6" stroke-linecap="round">
+    <!-- abacus + capital -->
+    <path d="M6.4 6.4h19.2M9.1 10.9h13.8"/>
+    <!-- fluted shaft -->
+    <path d="M11 10.9v11.9M16 10.9v11.9M21 10.9v11.9"/>
+    <!-- base -->
+    <path d="M8.3 25.6h15.4"/>
+  </g>
+</svg>

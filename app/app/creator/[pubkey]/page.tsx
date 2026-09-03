@@ -5,16 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PublicKey } from "@solana/web3.js";
 
-import { EmptyState, ErrorState, TableRowSkeleton } from "@/components/states";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { EmptyState, ErrorState, FreshnessBadge, Skeleton } from "@/components/states";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatAsOf, formatUsd, truncateAddress } from "@/lib/format";
 import { LegalReviewTag } from "@/components/create";
 
@@ -128,19 +120,20 @@ export default function CreatorPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Creator{" "}
-            <span
-              className="font-mono text-2xl tabular-nums text-muted-foreground"
-              title={validKey ? pubkeyParam : undefined}
-            >
-              {validKey ? truncateAddress(pubkeyParam, 4, 4) : "invalid address"}
-            </span>
-          </h1>
-        </div>
-      </div>
+      <header className="pb-10">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Creator{" "}
+          <span
+            className="font-mono text-2xl tabular-nums text-muted-foreground"
+            title={validKey ? pubkeyParam : undefined}
+          >
+            {validKey ? truncateAddress(pubkeyParam, 4, 4) : "invalid address"}
+          </span>
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Baskets deployed by this wallet — stats stay empty until the indexer tracks activity.
+        </p>
+      </header>
 
       {!validKey && (
         <ErrorState
@@ -151,9 +144,24 @@ export default function CreatorPage() {
       )}
 
       {status === "loading" && (
-        <div className="mt-8" role="status" aria-label="Loading creator profile">
+        <div className="mt-2" role="status" aria-label="Loading creator profile">
           <span className="sr-only">Loading creator profile</span>
-          <TableRowSkeleton rows={4} columns={3} label="Loading creator profile" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={i} aria-hidden="true" className="rounded-lg border border-border bg-card p-5">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="mt-2 h-8 w-24" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2" aria-hidden="true">
+            {Array.from({ length: 2 }, (_, i) => (
+              <div key={i} className="rounded-lg border border-border bg-card p-5">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="mt-3 h-8 w-24" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -190,96 +198,113 @@ export default function CreatorPage() {
 
       {status === "ready" && payload && (
         <>
-          <dl className="mt-6 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-card p-5">
-              <dt className="text-xs text-muted-foreground">Baskets created</dt>
-              <dd className="mt-1 font-mono text-xl tabular-nums">
-                {basketCount ?? baskets.length}
-              </dd>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-5">
-              <dt className="text-xs text-muted-foreground">Total AUM (indexed)</dt>
-              <dd className="mt-1 font-mono text-xl tabular-nums">
-                {stats ? (() => {
-                  const aum = numeric(stats.total_aum);
-                  return aum === null ? "—" : formatUsd(aum);
-                })() : "—"}
-              </dd>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-5">
-              <dt className="text-xs text-muted-foreground">Fees earned (indexed)</dt>
-              <dd className="mt-1 font-mono text-xl tabular-nums">
-                {stats ? (() => {
-                  const fees = numeric(stats.total_fees_earned);
-                  return fees === null ? "—" : formatUsd(fees);
-                })() : "—"}
-              </dd>
-            </div>
-          </dl>
+          {/* metric strip — same tile language as the basket-detail page */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card className="h-full">
+              <CardHeader className="pb-2">
+                <CardDescription>Baskets created</CardDescription>
+                <CardTitle className="font-mono text-2xl tabular-nums">
+                  {basketCount ?? baskets.length}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="h-full">
+              <CardHeader className="pb-2">
+                <CardDescription>Total AUM (indexed)</CardDescription>
+                <CardTitle className="font-mono text-2xl tabular-nums">
+                  {stats ? (() => {
+                    const aum = numeric(stats.total_aum);
+                    return aum === null ? "—" : formatUsd(aum);
+                  })() : "—"}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="h-full">
+              <CardHeader className="pb-2">
+                <CardDescription>Fees earned (indexed)</CardDescription>
+                <CardTitle className="font-mono text-2xl tabular-nums">
+                  {stats ? (() => {
+                    const fees = numeric(stats.total_fees_earned);
+                    return fees === null ? "—" : formatUsd(fees);
+                  })() : "—"}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
 
-          <h2 className="mt-8 text-xl font-semibold tracking-tight">Baskets</h2>
-          {baskets.length === 0 ? (
-            <EmptyState
-              className="mt-3"
-              chip="NOT INDEXED"
-              title="No indexed baskets"
-              description="The stats row exists but no baskets are linked to this creator yet."
-            />
-          ) : (
-            <div className="mt-3 overflow-x-auto rounded-xl border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs">Basket</TableHead>
-                    <TableHead className="text-xs">Share mint</TableHead>
-                    <TableHead className="text-right text-xs">NAV</TableHead>
-                    <TableHead className="text-xs">Created</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {baskets.map((row) => {
-                    const nav = numeric(row.nav);
-                    return (
-                      <TableRow key={row.pubkey}>
-                        <TableCell>
-                          <Link
-                            href={`/basket/${row.pubkey}`}
-                            className="font-mono text-xs underline-offset-2 hover:underline"
-                          >
-                            {truncateAddress(row.pubkey, 6, 6)}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">
-                          {row.share_mint
-                            ? truncateAddress(row.share_mint, 6, 6)
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">
-                          {nav === null ? "—" : formatUsd(nav)}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {row.created_at ? (
-                            <span className="font-mono tabular-nums">
-                              {formatAsOf(row.created_at)}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+          <section aria-labelledby="creator-baskets" className="border-t border-border py-8">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+              <h2 id="creator-baskets" className="text-sm font-medium tracking-tight">
+                Baskets
+              </h2>
+              <FreshnessBadge
+                source={payload.source ?? "creators · /api/v1/creators/:pubkey"}
+                asOf={payload.asOf ?? undefined}
+              />
             </div>
-          )}
+            {baskets.length === 0 ? (
+              <EmptyState
+                className="mt-4"
+                chip="NOT INDEXED"
+                title="No indexed baskets"
+                description="The stats row exists but no baskets are linked to this creator yet."
+              />
+            ) : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {baskets.map((row) => {
+                  const nav = numeric(row.nav);
+                  const unavailable = nav === null;
+                  return (
+                    <Link
+                      key={row.pubkey}
+                      href={`/basket/${row.pubkey}`}
+                      title={`Open basket ${row.pubkey}`}
+                      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span
+                          className="block break-words font-mono text-sm font-medium tracking-tight text-foreground"
+                          title={row.pubkey}
+                        >
+                          {truncateAddress(row.pubkey, 6, 4)}
+                        </span>
+                        {unavailable ? (
+                          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                            not indexed
+                          </span>
+                        ) : null}
+                      </div>
+                      <span
+                        className={`mt-4 font-mono text-2xl tabular-nums ${
+                          unavailable ? "text-muted-foreground" : "text-foreground"
+                        }`}
+                      >
+                        {nav === null ? "—" : formatUsd(nav)}
+                      </span>
+                      <span className="mt-0.5 text-xs text-muted-foreground">
+                        {row.share_mint
+                          ? `Share mint ${truncateAddress(row.share_mint, 4, 4)}`
+                          : "Share mint —"}
+                      </span>
+                      <div className="mt-auto border-t border-border/60 pt-3">
+                        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Created
+                        </span>
+                        <span className="block font-mono text-xs tabular-nums">
+                          {row.created_at ? formatAsOf(row.created_at) : "—"}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </section>
 
-          <p className="mt-6 flex flex-wrap items-center gap-2 text-xs leading-5 text-muted-foreground">
-            <span>
-              Creator stats describe baskets this wallet deployed. They are not
-              an endorsement of any basket, and creators are not licensed
-              advisers unless separately verified.
-            </span>
+          <p className="border-t border-border py-6 text-xs leading-5 text-muted-foreground">
+            Creator stats describe baskets this wallet deployed. They are not an
+            endorsement of any basket, and creators are not licensed advisers
+            unless separately verified.{" "}
             <LegalReviewTag />
           </p>
         </>

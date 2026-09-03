@@ -201,12 +201,11 @@ export default async function MarketPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
           <h1 className="text-3xl font-semibold tracking-tight">Market overview</h1>
-          <p className="max-w-2xl text-sm leading-6 text-foreground/80">
-            Nasdaq benchmarks normalized to 100 — the base for comparing xStocks-backed strategy
-            baskets against the underlying equity indices.
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            The four benchmark indices, normalized to 100 — the base for reading basket drift.
           </p>
         </div>
         <FreshnessBadge
@@ -214,7 +213,7 @@ export default async function MarketPage({
           asOf={asOf}
           demo={demo}
         />
-      </div>
+      </header>
 
       <nav aria-label="Chart range" className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-muted-foreground">Range</span>
@@ -223,10 +222,10 @@ export default async function MarketPage({
             key={r}
             href={`/market?range=${r}`}
             aria-current={r === range ? "true" : undefined}
-            className={`inline-flex min-h-9 items-center rounded-md px-2.5 text-xs transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+            className={`text-xs transition-colors ${
               r === range
-                ? "font-medium text-foreground underline decoration-foreground/40 underline-offset-4"
-                : "text-muted-foreground"
+                ? "font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {r}
@@ -236,8 +235,7 @@ export default async function MarketPage({
 
       {demo ? (
         <p className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          The market API is unreachable, so this view renders a static fixture. It is labeled demo
-          and must not be read as live index data.
+          Market API unreachable — rendering a static fixture. Not live index data.
         </p>
       ) : null}
 
@@ -249,26 +247,22 @@ export default async function MarketPage({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Normalized comparison — 100 base</CardTitle>
+          <CardTitle className="text-base font-medium">Index comparison — {range} (normalized 100)</CardTitle>
         </CardHeader>
         <CardContent>
           <MarketChart rows={rows} series={series} volume={volume} volumeLabel={volumeLabel} />
-          <p className="mt-4 border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">
-            Four index series over {range}; the benchmark is dashed, shown at full range.
-          </p>
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">
         <span>
-          Source: Yahoo Finance (30-minute cache on the backend). xStock token prices come from
-          Jupiter; the difference to the real equity is the depeg.
+          Source: Yahoo Finance (30-minute cache). xStock token prices: Jupiter — the gap to the
+          real equity is the depeg.
         </span>
         <Button render={<Link href="/providers" />} variant="outline" size="xs">
           Data providers
         </Button>
       </div>
-
     </div>
   );
 }

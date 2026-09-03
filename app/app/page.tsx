@@ -1,21 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { TraditionalVsTokenized } from "@/components/etfs/traditional-vs-tokenized";
-
-/**
- * Hero product visual — a real product screenshot. To swap it later, replace
- * the file at app/public/brand/market-hero.png (keep the path) or edit this
- * single constant: src / alt / width / height. Recommended export: 1600×900
- * (16:9) PNG, monochrome UI screenshot. Update the alt text to describe the
- * new image honestly.
- */
-const HERO_IMAGE = {
-  src: "/brand/market-hero.png",
-  alt: "FolioX Market page — live Nasdaq benchmarks normalized to 100",
-  width: 1600,
-  height: 900,
-} as const;
+import { InscriptionPanel } from "@/components/inscription-panel";
 
 /** Which monochrome visual anchor a gateway card carries (see SectionAnchor). */
 type SectionAnchorKind = "stocks" | "etfs" | "baskets";
@@ -125,11 +111,11 @@ function SectionAnchor({ kind }: { kind: SectionAnchorKind }) {
 
 /**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02,
- * elevated 2026-09-03): a badge line, big h1, one subline, two CTAs, then the
- * real product visual on an elevated card that overlaps a barely-there radial
- * vignette, the interactive Traditional vs tokenized comparison (moved here
- * from /etfs), and a three-card bento gateway (Stocks / Tokenized ETFs /
- * Baskets). No footer, texture, stats, devices, or data fetch.
+ * elevated 2026-09-03): a badge line, big h1, one subline, two CTAs, then a
+ * carved-stone Roman inscription panel (static brand art — replaced the old
+ * market screenshot), the interactive Traditional vs tokenized comparison
+ * (moved here from /etfs), and a three-card bento gateway (Stocks /
+ * Tokenized ETFs / Baskets). No footer, texture, stats, devices, or data fetch.
  */
 export default function LandingPage() {
   return (
@@ -163,29 +149,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Real product visual — elevated screenshot card sitting on a subtle
-          monochrome radial vignette (pure CSS, foreground at 4%). */}
+      {/* Roman inscription panel — a quiet carved-stone plaque. Static brand
+          art (no data, no caption, no FreshnessBadge); it replaced the old
+          framed market screenshot. */}
       <section
-        aria-label="Product preview"
-        className="relative mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6"
+        aria-label="FolioX inscription"
+        className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6"
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-[-2rem] h-[26rem] w-[min(92%,44rem)] -translate-x-1/2 bg-[radial-gradient(closest-side,hsl(var(--foreground)/0.04),transparent)]"
-        />
-        <div className="relative -mt-8 rounded-xl bg-card p-2 shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
-          <Image
-            src={HERO_IMAGE.src}
-            alt={HERO_IMAGE.alt}
-            width={HERO_IMAGE.width}
-            height={HERO_IMAGE.height}
-            priority
-            className="h-auto w-full rounded-lg"
-          />
+        <div className="relative -mt-8">
+          <InscriptionPanel />
         </div>
-        <p className="mt-3 text-center font-mono text-[11px] text-muted-foreground">
-          Live market view · Yahoo Finance · as-of labeled
-        </p>
       </section>
 
       {/* Traditional vs tokenized — interactive comparison (moved from /etfs),
@@ -199,7 +172,8 @@ export default function LandingPage() {
             Traditional vs tokenized
           </p>
           <p className="mt-3 max-w-2xl text-balance text-base leading-7 text-muted-foreground">
-            The same underlying ETF, wrapped differently.
+            Both give you the same underlying ETF exposure. What changes is how
+            you hold it.
           </p>
           <div className="mt-8">
             <TraditionalVsTokenized />

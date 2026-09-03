@@ -21,10 +21,10 @@ import { cn } from "@/lib/utils";
 
 const DIMENSIONS: { dimension: string; traditional: string; tokenized: string }[] = [
   { dimension: "Settlement", traditional: "T+1 or T+2, via broker rails", tokenized: "Seconds, settled on-chain" },
-  { dimension: "Access", traditional: "Broker account, market hours", tokenized: "Any wallet, 24/7" },
-  { dimension: "Ownership", traditional: "Custodied by the broker", tokenized: "Self-custodied Token-2022 mint" },
-  { dimension: "Transferability", traditional: "Broker-mediated transfers only", tokenized: "Permissionless wallet-to-wallet" },
-  { dimension: "Transparency", traditional: "NAV published daily", tokenized: "Holdings verifiable on-chain" },
+  { dimension: "Access", traditional: "Broker account, market hours only", tokenized: "Any wallet, 24/7" },
+  { dimension: "Ownership", traditional: "Held for you at the broker", tokenized: "You hold the token — the token is the share" },
+  { dimension: "Transferability", traditional: "Only the broker can move it", tokenized: "Wallet-to-wallet, no intermediary" },
+  { dimension: "Transparency", traditional: "NAV published once a day", tokenized: "Holdings verifiable on-chain, anytime" },
 ];
 
 type Focus = "traditional" | "tokenized" | null;

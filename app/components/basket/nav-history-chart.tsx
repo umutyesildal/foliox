@@ -7,13 +7,17 @@ import { Grid } from "@/components/charts/grid";
 import { XAxis } from "@/components/charts/x-axis";
 import { YAxis } from "@/components/charts/y-axis";
 import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
-import { EmptyState } from "@/components/states";
 import { numericToNumber, type NavHistoryRow } from "@/components/basket/basket-api";
+
+/** Ethereal fill ceiling for the chart-1 area (charts only, per style contract). */
+const NAV_FILL_OPACITY = 0.06;
 
 /**
  * Dominant historical NAV AreaChart (official Bklit AreaChart composition —
  * see components/charts/*). Raw snapshot series from
  * /baskets/:pubkey/nav/history; no interpolation, no fabricated points.
+ * Fewer than two points renders as a quiet centered note so the hero card
+ * keeps a stable height instead of collapsing.
  */
 export function NavHistoryChart({
   rows,
@@ -39,11 +43,16 @@ export function NavHistoryChart({
 
   if (data.length < 2) {
     return (
-      <EmptyState
-        chip="NO CHART"
-        title="Not enough NAV snapshots yet"
-        description="The indexer stores a NAV snapshot per interval. Fewer than two points are indexed for this basket, so no line is drawn — nothing is interpolated."
-      />
+      <div
+        className="flex h-[320px] w-full items-center justify-center px-6"
+        data-slot="basket-nav-chart"
+      >
+        <p className="text-center font-mono text-xs text-muted-foreground">
+          {data.length === 0
+            ? "No NAV snapshots indexed yet"
+            : "One NAV snapshot indexed — a line appears at two"}
+        </p>
+      </div>
     );
   }
 
@@ -61,10 +70,12 @@ export function NavHistoryChart({
           dataKey="nav"
           fill="hsl(var(--chart-1))"
           stroke="hsl(var(--chart-1))"
-          fillOpacity={0.14}
+          fillOpacity={NAV_FILL_OPACITY}
           strokeWidth={2}
         />
-        <XAxis />
+        {/* Fresh baskets have very few snapshots — cap ticks so the x-axis
+            labels never crowd (data-aligned ticks dedupe duplicates). */}
+        <XAxis numTicks={Math.min(5, Math.max(2, data.length))} />
         <YAxis numTicks={5} />
         <ChartTooltip />
       </AreaChart>

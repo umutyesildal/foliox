@@ -2,12 +2,13 @@ import { ChartBlockSkeleton, Skeleton, TableRowSkeleton } from "@/components/sta
 
 /**
  * Route-level loading for /basket/[pubkey] — mirrors the detail page shape:
- * name-first header, 4-metric strip, dominant NAV chart, holdings table.
- * Child routes (buy/redeem) render their own in-page loading states.
+ * name-first header, 4-metric strip, then hairline-divided sections (NAV
+ * history hero card, compact holdings table). Child routes (buy/redeem)
+ * render their own in-page loading states.
  */
 export default function BasketLoading() {
   return (
-    <div className="space-y-6" aria-busy="true">
+    <div className="space-y-8" aria-busy="true">
       <div className="space-y-2">
         <Skeleton className="h-8 w-72" />
         <Skeleton className="h-4 w-full max-w-xl" />
@@ -20,11 +21,25 @@ export default function BasketLoading() {
           </div>
         ))}
       </div>
-      <div className="rounded-lg border border-border bg-card p-5">
-        <ChartBlockSkeleton label="Loading NAV history" />
-      </div>
-      <div className="rounded-lg border border-border bg-card p-5">
-        <TableRowSkeleton rows={4} columns={5} label="Loading holdings" />
+      <div className="divide-y divide-border">
+        <section className="pb-10 pt-2">
+          <div className="flex items-center justify-between pb-4">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+          <div className="rounded-xl bg-card p-5 shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+            <ChartBlockSkeleton label="Loading NAV history" />
+          </div>
+        </section>
+        <section className="py-10">
+          <div className="flex items-center justify-between pb-4">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+          <div className="rounded-lg border border-border bg-card p-5">
+            <TableRowSkeleton rows={4} columns={5} label="Loading holdings" />
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -1,95 +1,81 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useId, useRef, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletReadyState, type WalletName } from "@solana/wallet-adapter-base";
-import { AlertTriangle } from "lucide-react";
+import { ChevronDown, Wallet } from "lucide-react";
 
-import { useWalletFeedback } from "@/app/providers";
 import { Button } from "@/components/ui/button";
-import { describeWalletError } from "@/lib/wallet";
-
-function isReady(readyState: WalletReadyState): boolean {
-  return (
-    readyState === WalletReadyState.Installed ||
-    readyState === WalletReadyState.Loadable
-  );
-}
+import {
+  WalletPickerMenu,
+  isWalletReady,
+  useMenuDismiss,
+  useWalletConnect,
+} from "@/components/shell/wallet-picker";
 
 /**
  * Wallet gate for the top of the Create wizard. The steps stay browsable, but
- * while no wallet is connected this compact banner sits above the stepper
- * (warning tone, muted border) with an explicit connect action — deploying
- * signs a create_basket transaction from the creator's wallet. The connect
- * flow mirrors the header WalletButton: select first, connect once the wallet
- * lands (avoids the stale-wallet race).
+ * while no wallet is connected this quiet banner sits above the stepper
+ * (muted surface, single primary action) — deploying signs a create_basket
+ * transaction from the creator's wallet. The single "Connect wallet" button
+ * opens the exact picker menu the header control uses (same flow, same
+ * glyphs), so there is one connect affordance per surface.
  */
 export function WalletGateBanner({ className }: { className?: string }) {
-  const { wallets, wallet, connect, select, connecting } = useWallet();
-  const { reportError, clearError } = useWalletFeedback();
-  const pendingConnectRef = useRef(false);
+  const { wallets, connecting } = useWallet();
+  const { requestConnect } = useWalletConnect();
 
-  useEffect(() => {
-    if (!pendingConnectRef.current || !wallet) return;
-    if (!isReady(wallet.readyState)) return;
-    pendingConnectRef.current = false;
-    connect().catch((err: unknown) => {
-      const e = err as { name?: string; message?: string };
-      reportError(e?.name ?? "WalletError", describeWalletError(e));
-    });
-  }, [wallet, connect, reportError]);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
 
-  const requestConnect = (name: WalletName, ready: boolean) => {
-    if (!ready) return;
-    clearError();
-    if (wallet?.adapter.name === name) {
-      connect().catch((err: unknown) => {
-        const e = err as { name?: string; message?: string };
-        reportError(e?.name ?? "WalletError", describeWalletError(e));
-      });
-    } else {
-      pendingConnectRef.current = true;
-      select(name);
-    }
-  };
+  useMenuDismiss({
+    open,
+    onClose: () => setOpen(false),
+    containerRef,
+  });
 
-  const readyWallets = wallets.filter((entry) => isReady(entry.readyState));
+  const hasReadyWallet = wallets.some((entry) => isWalletReady(entry.readyState));
 
   return (
     <div
       role="note"
       aria-label="Wallet not connected"
       className={
-        "flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 " +
+        "flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/50 p-3 " +
         (className ?? "")
       }
     >
-      <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden="true" />
+      <Wallet className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">Wallet not connected</p>
+        <p className="text-sm font-medium">Connect a wallet to deploy</p>
         <p className="text-xs leading-5 text-muted-foreground">
           Deploying signs a create_basket transaction from your wallet. Browse
           the steps freely — connect before you reach Deploy.
         </p>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {readyWallets.length === 0 ? (
-          <Button type="button" variant="outline" size="sm" disabled>
-            No wallet detected
-          </Button>
-        ) : (
-          readyWallets.map((entry) => (
-            <Button
-              key={entry.adapter.name}
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={connecting}
-              onClick={() => requestConnect(entry.adapter.name, true)}
-            >
-              {connecting ? "Connecting…" : `Connect ${entry.adapter.name}`}
-            </Button>
-          ))
+      <div ref={containerRef} className="relative shrink-0">
+        <Button
+          type="button"
+          size="sm"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={menuId}
+          disabled={connecting || !hasReadyWallet}
+          title={hasReadyWallet ? undefined : "No wallet detected"}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {connecting ? "Connecting…" : hasReadyWallet ? "Connect wallet" : "No wallet detected"}
+          <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
+        </Button>
+        {open && (
+          <WalletPickerMenu
+            id={menuId}
+            wallets={wallets}
+            onPick={(name, ready) => {
+              setOpen(false);
+              requestConnect(name, ready);
+            }}
+          />
         )}
       </div>
     </div>

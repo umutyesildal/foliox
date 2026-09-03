@@ -1,22 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletReadyState, type WalletName } from "@solana/wallet-adapter-base";
 
-import { useWalletFeedback } from "@/app/providers";
 import { Button } from "@/components/ui/button";
 import { useClusterHealth } from "@/components/shell/use-cluster-health";
+import {
+  WalletPickerMenu,
+  useMenuDismiss,
+  useWalletConnect,
+  walletGlyph,
+} from "@/components/shell/wallet-picker";
 import { truncateAddress } from "@/lib/format";
-import { RPC_ENDPOINT, clusterFromEndpoint, describeWalletError } from "@/lib/wallet";
+import { RPC_ENDPOINT, clusterFromEndpoint } from "@/lib/wallet";
 import { cn } from "@/lib/utils";
-
-const READY_STATES = [WalletReadyState.Installed, WalletReadyState.Loadable];
-
-function isReady(readyState: WalletReadyState): boolean {
-  return readyState === WalletReadyState.Installed ||
-    readyState === WalletReadyState.Loadable;
-}
 
 // py-2.5 keeps wallet menu entries at a ≥40px touch target on phones.
 const menuButtonClasses =
@@ -27,12 +24,12 @@ const menuButtonClasses =
  * used). States: disconnected (wallet picker), connecting, connected
  * (truncated mono address + copy/disconnect menu), wrong network / RPC
  * unreachable, and rejected-signature or other wallet errors as an inline
- * alert that auto-clears.
+ * alert that auto-clears. The disconnected picker (with wallet glyphs) is
+ * shared with the Create wizard banner via wallet-picker.tsx.
  */
 export function WalletButton({ className }: { className?: string }) {
-  const { wallets, wallet, publicKey, connecting, connected, connect, disconnect, select } =
-    useWallet();
-  const { error, clearError, reportError } = useWalletFeedback();
+  const { wallets, wallet, publicKey, connecting, connected, disconnect } = useWallet();
+  const { error, clearError, requestConnect } = useWalletConnect();
   const health = useClusterHealth(connected);
   const cluster = clusterFromEndpoint(RPC_ENDPOINT);
 
@@ -40,48 +37,16 @@ export function WalletButton({ className }: { className?: string }) {
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const pendingConnectRef = useRef(false);
   const menuId = useId();
 
-  // Connecting must stay an explicit user action. `select()` updates context
-  // asynchronously, so the actual `connect()` fires once the selected wallet
-  // lands and is ready (avoids the stale-wallet race).
-  useEffect(() => {
-    if (!pendingConnectRef.current || !wallet) return;
-    if (!isReady(wallet.readyState)) return;
-    pendingConnectRef.current = false;
-    connect().catch((err: unknown) => {
-      const e = err as { name?: string; message?: string };
-      reportError(e?.name ?? "WalletError", describeWalletError(e));
-    });
-  }, [wallet, connect, reportError]);
-
-  // Close the menu on outside pointer down or Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (
-        containerRef.current &&
-        event.target instanceof Node &&
-        !containerRef.current.contains(event.target)
-      ) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        // Return focus to the trigger so keyboard users stay in place.
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  // Close the menu on outside pointer down or Escape; Escape returns focus to
+  // the trigger so keyboard users stay in place.
+  useMenuDismiss({
+    open,
+    onClose: () => setOpen(false),
+    containerRef,
+    onEscape: () => triggerRef.current?.focus(),
+  });
 
   // Auto-clear the inline wallet error alert.
   useEffect(() => {
@@ -90,33 +55,16 @@ export function WalletButton({ className }: { className?: string }) {
     return () => window.clearTimeout(timer);
   }, [error, clearError]);
 
-  const requestConnect = useCallback(
-    (name: WalletName, ready: boolean) => {
-      if (!ready) return;
-      clearError();
-      if (wallet?.adapter.name === name) {
-        connect().catch((err: unknown) => {
-          const e = err as { name?: string; message?: string };
-          reportError(e?.name ?? "WalletError", describeWalletError(e));
-        });
-      } else {
-        pendingConnectRef.current = true;
-        select(name);
-      }
-    },
-    [wallet, connect, select, clearError, reportError],
-  );
-
-  const handleDisconnect = useCallback(() => {
+  const handleDisconnect = () => {
     setOpen(false);
     clearError();
     disconnect().catch(() => {
       // Disconnect failures leave the previous state intact; the header
       // reflects reality on the next wallet event.
     });
-  }, [disconnect, clearError]);
+  };
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = () => {
     if (!publicKey) return;
     navigator.clipboard
       ?.writeText(publicKey.toBase58())
@@ -127,9 +75,10 @@ export function WalletButton({ className }: { className?: string }) {
       .catch(() => {
         setCopied(false);
       });
-  }, [publicKey]);
+  };
 
   const isConnected = connected && publicKey !== null;
+  const ConnectedGlyph = isConnected ? walletGlyph(wallet?.adapter.name ?? "") : undefined;
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -196,8 +145,11 @@ export function WalletButton({ className }: { className?: string }) {
           aria-label="Wallet"
           className="absolute right-0 top-full z-20 mt-2 w-60 rounded-md border border-border bg-popover p-1 text-popover-foreground"
         >
-          <p className="px-2 py-1.5 font-mono text-xs tabular-nums text-muted-foreground">
-            {wallet?.adapter.name ?? "Wallet"} · {cluster}
+          <p className="flex items-center gap-2 px-2 py-1.5 font-mono text-xs tabular-nums text-muted-foreground">
+            {ConnectedGlyph ? <ConnectedGlyph className="size-3.5 shrink-0" /> : null}
+            <span className="truncate">
+              {wallet?.adapter.name ?? "Wallet"} · {cluster}
+            </span>
           </p>
           <button role="menuitem" type="button" onClick={handleCopy} className={menuButtonClasses}>
             {copied ? "Address copied" : "Copy address"}
@@ -214,40 +166,14 @@ export function WalletButton({ className }: { className?: string }) {
       )}
 
       {open && !isConnected && (
-        <div
+        <WalletPickerMenu
           id={menuId}
-          role="menu"
-          aria-label="Connect a wallet"
-          className="absolute right-0 top-full z-20 mt-2 w-60 rounded-md border border-border bg-popover p-1 text-popover-foreground"
-        >
-          {wallets.length === 0 && (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">
-              No wallets registered.
-            </p>
-          )}
-          {wallets.map((entry) => {
-            const ready = isReady(entry.readyState);
-            return (
-              <button
-                key={entry.adapter.name}
-                role="menuitem"
-                type="button"
-                disabled={!ready}
-                title={ready ? `Connect ${entry.adapter.name}` : `${entry.adapter.name} not detected`}
-                onClick={() => {
-                  setOpen(false);
-                  requestConnect(entry.adapter.name, ready);
-                }}
-                className={cn(menuButtonClasses, "flex items-center justify-between gap-2")}
-              >
-                <span>{entry.adapter.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {ready ? "Detected" : "Not detected"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          wallets={wallets}
+          onPick={(name, ready) => {
+            setOpen(false);
+            requestConnect(name, ready);
+          }}
+        />
       )}
     </div>
   );

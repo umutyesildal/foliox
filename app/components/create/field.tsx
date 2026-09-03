@@ -61,11 +61,13 @@ export function TextField({
 }
 
 /**
- * Labeled single-value range slider on a native <input type="range"> — the
- * base-ui Slider renders without a visible track/thumb in this app, so the
- * wizard uses this plain control instead: slim 2px monochrome track, 12px
- * solid thumb, ~32px compact row, keyboard operable. `children` fills the
- * value slot on the label row (mono readout or editable number input).
+ * Labeled single-value range slider. Native range pseudo-elements (track /
+ * thumb) render inconsistently across engines and zoom levels here, so the
+ * visuals are plain divs — a 4px muted track with a filled portion and an
+ * absolutely-positioned 14px thumb — while the real <input type="range"> is
+ * overlaid at opacity-0 to keep native keyboard support and drag semantics.
+ * `children` fills the value slot on the label row (mono readout or editable
+ * number input).
  */
 export function RangeField({
   label,
@@ -87,35 +89,46 @@ export function RangeField({
   className?: string;
 }) {
   const id = useId();
+  const span = max - min;
+  const pct = span > 0 ? Math.min(100, Math.max(0, ((value - min) / span) * 100)) : 0;
   return (
-    <div className={cn("flex flex-col gap-1", className)}>
+    <div className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex h-4 items-center justify-between gap-2 text-xs">
         <label htmlFor={id} className="font-medium text-foreground">
           {label}
         </label>
         {children}
       </div>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className={cn(
-          "h-3 w-full cursor-pointer appearance-none bg-transparent",
-          // WebKit: 2px track, 12px thumb centered on it via -5px offset.
-          "[&::-webkit-slider-runnable-track]:h-0.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-muted",
-          "[&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:-mt-[5px]",
-          // Firefox: same geometry (thumb auto-centers on the track).
-          "[&::-moz-range-track]:h-0.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-muted",
-          "[&::-moz-range-thumb]:size-3 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-foreground",
-          // Focus remains visible on the thumb in both engines.
-          "[&:focus-visible::-webkit-slider-thumb]:ring-2 [&:focus-visible::-webkit-slider-thumb]:ring-ring/50",
-          "[&:focus-visible::-moz-range-thumb]:ring-2 [&:focus-visible::-moz-range-thumb]:ring-ring/50",
-        )}
-      />
+      <div className="relative h-5 w-full">
+        {/* Track */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted"
+        />
+        {/* Filled portion up to the thumb */}
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-foreground/25"
+          style={{ width: `${pct}%` }}
+        />
+        {/* Thumb (after the input in DOM so `peer` focus ring applies) */}
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          aria-valuetext={String(value)}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="peer absolute inset-0 h-full w-full cursor-pointer touch-none appearance-none border-0 bg-transparent p-0 opacity-0 focus-visible:outline-none"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background bg-foreground shadow-sm transition-shadow peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

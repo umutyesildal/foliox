@@ -66,9 +66,11 @@ function metaObj(mj: unknown): Record<string, unknown> | null {
 
 /**
  * Basket detail — name-first header (same hierarchy as the /explore cards),
- * metric strip, one dominant NAV AreaChart with text range buttons, compact
- * holdings table, one fees/parameters section, action rail. All figures are
- * API-driven; missing data renders as an em dash, never a fabricated value.
+ * metric strip, then hairline-divided sections: NAV history (hero chart on an
+ * elevated card, mono section header + range buttons), a compact mono
+ * holdings table with a scaled-total footer, and one quiet inline fees card.
+ * All figures are API-driven; missing data renders as an em dash or a quiet
+ * centered note, never a fabricated value.
  */
 export default function BasketDetailPage({
   params,
@@ -186,6 +188,21 @@ export default function BasketDetailPage({
     return new Map((detail?.holdings ?? []).map((h) => [h.mint, h]));
   }, [detail]);
 
+  // Footer total for the holdings table — sum of scaled amounts that exist;
+  // null when the indexer returned no scaled figures (total row is skipped).
+  const scaledTotal = useMemo(() => {
+    let sum = 0;
+    let any = false;
+    for (const holding of detail?.holdings ?? []) {
+      const scaled = numericToNumber(holding.scaled_amount ?? null);
+      if (scaled !== null) {
+        sum += scaled;
+        any = true;
+      }
+    }
+    return any ? sum : null;
+  }, [detail]);
+
   // Name-first identity, same resolution order as the /explore cards.
   const composition = useMemo(() => {
     if (!detail) return null;
@@ -211,7 +228,7 @@ export default function BasketDetailPage({
   const vsSpy = change24h !== null && spy24h !== null ? change24h - spy24h : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
         <Link href="/explore" className="underline underline-offset-4 hover:text-foreground">
           Explore
@@ -282,8 +299,7 @@ export default function BasketDetailPage({
                 />
               </div>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Redeem is permissionless and oracle-free — it works over any RPC even if this
-                indexer is offline.
+                Redeem is permissionless and oracle-free — works over any RPC.
               </p>
             </div>
           </div>
@@ -340,140 +356,173 @@ export default function BasketDetailPage({
             )}
           </div>
 
-          {/* dominant NAV chart */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">NAV history</CardTitle>
-              <CardDescription className="flex flex-wrap items-center gap-3 text-xs">
-                <nav aria-label="Chart range" className="flex items-center gap-3">
-                  {NAV_RANGES.map((r) => (
-                    <button
-                      key={r.key}
-                      type="button"
-                      aria-current={r.key === range ? "true" : undefined}
-                      onClick={() => setRange(r.key)}
-                      className={`inline-flex min-h-9 items-center rounded-md px-2.5 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
-                        r.key === range
-                          ? "font-medium text-foreground underline decoration-foreground/40 underline-offset-4"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {r.key}
-                    </button>
-                  ))}
-                </nav>
+          {/* dominant NAV chart — hero visual on an elevated card */}
+          <div className="divide-y divide-border">
+          <section aria-label="NAV history" className="pb-10 pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+                  NAV history
+                </h2>
                 <FreshnessBadge source={navSource ?? "onchain-indexed"} asOf={asOf ?? undefined} />
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {navRows === null ? (
-                <ChartBlockSkeleton label="Loading NAV history" />
-              ) : navFailed ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  NAV history is unavailable right now — the indexer could not be reached. Switching
-                  ranges or reloading retries.
-                </p>
-              ) : (
-                <NavHistoryChart rows={navRows} fitYDomain />
-              )}
-            </CardContent>
-          </Card>
+              </div>
+              <nav aria-label="Chart range" className="flex items-center gap-1 font-mono text-xs">
+                {NAV_RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    aria-current={r.key === range ? "true" : undefined}
+                    onClick={() => setRange(r.key)}
+                    className={`inline-flex h-7 min-h-0 items-center rounded-md px-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                      r.key === range
+                        ? "bg-muted font-medium text-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {r.key}
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="rounded-xl bg-card shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+              <div className="p-5">
+                {navRows === null ? (
+                  <ChartBlockSkeleton label="Loading NAV history" />
+                ) : navFailed ? (
+                  <div className="flex h-[320px] items-center justify-center px-6">
+                    <p className="text-center font-mono text-xs text-muted-foreground">
+                      NAV history unavailable — switching ranges or reloading retries
+                    </p>
+                  </div>
+                ) : (
+                  <NavHistoryChart rows={navRows} fitYDomain />
+                )}
+              </div>
+            </div>
+          </section>
 
-          {/* holdings */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Holdings</CardTitle>
-              <CardDescription className="text-xs">
-                Target vs actual weights from indexed vault holdings — V0 has no auto-rebalance.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="h-11 hover:bg-transparent">
-                    <TableHead className="pl-4">Asset</TableHead>
-                    <TableHead className="text-right">Weight</TableHead>
-                    <TableHead className="text-right">Actual</TableHead>
-                    <TableHead className="text-right">Raw</TableHead>
-                    <TableHead className="pr-4 text-right">Scaled</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.constituents.map((mint, i) => {
-                    const holding = holdingsByMint.get(mint);
-                    const target = weights[i];
-                    const actual =
-                      driftActual && driftActual[i] !== undefined ? driftActual[i] : null;
-                    const scaledNumber = numericToNumber(holding?.scaled_amount ?? null);
-                    const multiplier = numericToNumber(holding?.multiplier ?? null);
-                    const ticker = mintTickers.get(mint) ?? truncateAddress(mint, 4, 4);
-                    return (
-                      <TableRow key={mint} className="h-11">
-                        <TableCell className="pl-4 py-0 font-mono text-xs tabular-nums" title={mint}>
-                          {ticker}
+          {/* holdings — compact mono table */}
+          <section aria-label="Holdings" className="py-10">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 pb-4">
+              <h2 className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+                Holdings
+              </h2>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                target vs actual · no auto-rebalance in V0
+              </p>
+            </div>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="h-11 hover:bg-transparent">
+                      <TableHead className="pl-5 font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                        Asset
+                      </TableHead>
+                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                        Target
+                      </TableHead>
+                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                        Actual
+                      </TableHead>
+                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                        Raw
+                      </TableHead>
+                      <TableHead className="pr-5 text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                        Scaled
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.constituents.map((mint, i) => {
+                      const holding = holdingsByMint.get(mint);
+                      const target = weights[i];
+                      const actual =
+                        driftActual && driftActual[i] !== undefined ? driftActual[i] : null;
+                      const scaledNumber = numericToNumber(holding?.scaled_amount ?? null);
+                      const multiplier = numericToNumber(holding?.multiplier ?? null);
+                      const ticker = mintTickers.get(mint) ?? truncateAddress(mint, 4, 4);
+                      return (
+                        <TableRow key={mint} className="h-11">
+                          <TableCell className="pl-5 py-0 font-mono text-xs tabular-nums" title={mint}>
+                            {ticker}
+                          </TableCell>
+                          <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
+                            {target !== undefined ? `${(target / 100).toFixed(2)}%` : "—"}
+                          </TableCell>
+                          <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
+                            {actual !== null ? `${(actual / 100).toFixed(2)}%` : "—"}
+                          </TableCell>
+                          <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
+                            {/* raw = onchain truth — printed as text, never through Number */}
+                            {holding?.raw_amount ?? "—"}
+                          </TableCell>
+                          <TableCell className="py-0 pr-5 text-right font-mono text-xs tabular-nums">
+                            {scaledNumber !== null ? (
+                              <span
+                                title={
+                                  multiplier !== null
+                                    ? `raw × multiplier ${multiplier} / 10^${holding?.decimals ?? "?"}`
+                                    : undefined
+                                }
+                              >
+                                {formatTokenAmount(scaledNumber)}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {scaledTotal !== null ? (
+                      <TableRow className="h-11 border-t border-border hover:bg-transparent">
+                        <TableCell className="py-0 pl-5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Total scaled
                         </TableCell>
-                        <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
-                          {target !== undefined ? `${(target / 100).toFixed(2)}%` : "—"}
-                        </TableCell>
-                        <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
-                          {actual !== null ? `${(actual / 100).toFixed(2)}%` : "—"}
-                        </TableCell>
-                        <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
-                          {/* raw = onchain truth — printed as text, never through Number */}
-                          {holding?.raw_amount ?? "—"}
-                        </TableCell>
-                        <TableCell className="py-0 pr-4 text-right font-mono text-xs tabular-nums">
-                          {scaledNumber !== null ? (
-                            <span
-                              title={
-                                multiplier !== null
-                                  ? `raw × multiplier ${multiplier} / 10^${holding?.decimals ?? "?"}`
-                                  : undefined
-                              }
-                            >
-                              {formatTokenAmount(scaledNumber)}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
+                        <TableCell colSpan={3} />
+                        <TableCell className="py-0 pr-5 text-right font-mono text-xs tabular-nums">
+                          {formatTokenAmount(scaledTotal)}
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                    ) : null}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </section>
 
-          {/* fees + parameters */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Fees &amp; parameters</CardTitle>
-              <CardDescription className="text-xs">
-                Entry / exit / management, paid in shares — never in underlying.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="h-11 hover:bg-transparent">
-                    <TableHead className="pl-4">Parameter</TableHead>
-                    <TableHead className="text-right">Rate</TableHead>
-                    <TableHead className="pr-4 text-right">Cap</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <FeeRow label="Entry (mint)" rate={detail.entry_fee_bps} cap={300} />
-                  <FeeRow label="Exit (redeem)" rate={detail.exit_fee_bps} cap={100} />
-                  <FeeRow label="Management (per year)" rate={detail.management_fee_bps} cap={300} />
-                </TableBody>
-              </Table>
-              <p className="border-t border-border p-4 text-xs leading-relaxed text-muted-foreground">
-                Every fee splits 90/10 creator/treasury; management accrues via the permissionless
-                crank or inside the next mint/redeem. Weights and fees are immutable on-chain.
-              </p>
-            </CardContent>
-          </Card>
+          {/* fees + parameters — one visually quiet card */}
+          <section aria-label="Fees and parameters" className="pt-10">
+            <h2 className="pb-4 font-mono text-xs uppercase tracking-wide text-muted-foreground">
+              Fees &amp; parameters
+            </h2>
+            <Card>
+              <CardContent className="flex flex-col gap-2.5 p-5 first:pt-5">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-sm tabular-nums">
+                  <span className="text-muted-foreground">Entry</span>
+                  <span title="Protocol cap 3.00%">
+                    {(detail.entry_fee_bps / 100).toFixed(2)}%
+                  </span>
+                  <span aria-hidden="true" className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">Exit</span>
+                  <span title="Protocol cap 1.00%">
+                    {(detail.exit_fee_bps / 100).toFixed(2)}%
+                  </span>
+                  <span aria-hidden="true" className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">Management</span>
+                  <span title="Protocol cap 3.00%/yr">
+                    {(detail.management_fee_bps / 100).toFixed(2)}%/yr
+                  </span>
+                </div>
+                <p className="font-mono text-[11px] leading-5 text-muted-foreground">
+                  Paid in shares · 90/10 creator/treasury split · weights and fees are immutable
+                  on-chain
+                </p>
+              </CardContent>
+            </Card>
+          </section>
+          </div>
         </>
       ) : null}
 
@@ -481,23 +530,9 @@ export default function BasketDetailPage({
   );
 }
 
-function FeeRow({ label, rate, cap }: { label: string; rate: number; cap: number }) {
-  return (
-    <TableRow className="h-11">
-      <TableCell className="py-0 pl-4 text-xs">{label}</TableCell>
-      <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
-        {(rate / 100).toFixed(2)}%
-      </TableCell>
-      <TableCell className="py-0 pr-4 text-right font-mono text-xs tabular-nums text-muted-foreground">
-        {(cap / 100).toFixed(2)}%
-      </TableCell>
-    </TableRow>
-  );
-}
-
 function DetailSkeleton() {
   return (
-    <div className="space-y-6" aria-busy="true">
+    <div className="space-y-8" aria-busy="true">
       <div className="space-y-2">
         <Skeleton className="h-8 w-72" />
         <Skeleton className="h-4 w-full max-w-xl" />
@@ -510,11 +545,25 @@ function DetailSkeleton() {
           </div>
         ))}
       </div>
-      <div className="rounded-lg border border-border bg-card p-5">
-        <ChartBlockSkeleton label="Loading NAV history" />
-      </div>
-      <div className="rounded-lg border border-border bg-card p-5">
-        <TableRowSkeleton rows={4} columns={5} label="Loading holdings" />
+      <div className="divide-y divide-border">
+        <section className="pb-10 pt-2">
+          <div className="flex items-center justify-between pb-4">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+          <div className="rounded-xl bg-card p-5 shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+            <ChartBlockSkeleton label="Loading NAV history" />
+          </div>
+        </section>
+        <section className="py-10">
+          <div className="flex items-center justify-between pb-4">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+          <div className="rounded-lg border border-border bg-card p-5">
+            <TableRowSkeleton rows={4} columns={5} label="Loading holdings" />
+          </div>
+        </section>
       </div>
     </div>
   );

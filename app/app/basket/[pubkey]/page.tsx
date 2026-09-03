@@ -8,11 +8,9 @@ import {
   ErrorState,
   FreshnessBadge,
   ChartBlockSkeleton,
-  MetricCardSkeleton,
   Skeleton,
   TableRowSkeleton,
 } from "@/components/states";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -28,21 +26,49 @@ import { NavHistoryChart } from "@/components/basket/nav-history-chart";
 import {
   ApiError,
   fetchBasketDetail,
-  fetchBasketHoldings,
+  fetchBasketPerformance,
+  fetchMintTickers,
   fetchNavHistory,
+  fetchSpy24h,
   numericToNumber,
   type BasketDetail,
+  type NavInterval,
   type NavHistoryRow,
-  type VaultHoldingRow,
 } from "@/components/basket/basket-api";
-import { formatAsOf, formatBps, formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
+import { ChangeValue } from "@/components/stocks/change-value";
+import { formatAsOf, formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
 import { formatRawShares6 } from "@/components/basket/basket-math";
 
+/** Chart range windows mapped onto /nav/history from+interval params. */
+const NAV_RANGES = [
+  { key: "1D", fromHours: 24, interval: "5m" as NavInterval },
+  { key: "7D", fromHours: 24 * 7, interval: "1h" as NavInterval },
+  { key: "30D", fromHours: 24 * 30, interval: "1d" as NavInterval },
+  { key: "All", fromHours: null, interval: null },
+] as const;
+type NavRangeKey = (typeof NAV_RANGES)[number]["key"];
+
+const MAX_COMPOSITION_PARTS = 4;
+
+/** metadata_json may arrive as object or JSON text — parse defensively. */
+function metaObj(mj: unknown): Record<string, unknown> | null {
+  if (!mj) return null;
+  let obj: unknown = mj;
+  if (typeof mj === "string") {
+    try {
+      obj = JSON.parse(mj);
+    } catch {
+      return null;
+    }
+  }
+  return obj && typeof obj === "object" ? (obj as Record<string, unknown>) : null;
+}
+
 /**
- * Basket detail — identity + immutable parameters, metric strip, dominant NAV
- * AreaChart, target/actual/drift weights table, fee schedule, risk/redeem
- * explainer, action rail. All figures carry source + as-of provenance; the
- * indexer is convenience only (redeem works without it).
+ * Basket detail — name-first header (same hierarchy as the /explore cards),
+ * metric strip, one dominant NAV AreaChart with text range buttons, compact
+ * holdings table, one fees/parameters section, action rail. All figures are
+ * API-driven; missing data renders as an em dash, never a fabricated value.
  */
 export default function BasketDetailPage({
   params,
@@ -53,13 +79,18 @@ export default function BasketDetailPage({
   const pubkey = decodeURIComponent(rawPubkey);
 
   const [detail, setDetail] = useState<BasketDetail | null>(null);
-  const [holdings, setHoldings] = useState<VaultHoldingRow[] | null>(null);
   const [navRows, setNavRows] = useState<NavHistoryRow[] | null>(null);
   const [navSource, setNavSource] = useState<string | null>(null);
+  const [navFailed, setNavFailed] = useState(false);
+  const [change24h, setChange24h] = useState<number | null>(null);
+  const [spy24h, setSpy24h] = useState<number | null>(null);
+  const [mintTickers, setMintTickers] = useState<Map<string, string>>(new Map());
+  const [range, setRange] = useState<NavRangeKey>("All");
   const [status, setStatus] = useState<"loading" | "ready" | "not-found" | "error">("loading");
   const [errorInfo, setErrorInfo] = useState<{ message: string; code?: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Detail is load-bearing — it alone decides page status.
   useEffect(() => {
     const controller = new AbortController();
     setStatus("loading");
@@ -67,7 +98,6 @@ export default function BasketDetailPage({
 
     async function load() {
       try {
-        // Detail is load-bearing; holdings + NAV history are parallel reads.
         const loaded = await fetchBasketDetail(pubkey, controller.signal);
         setDetail(loaded);
         setStatus("ready");
@@ -82,20 +112,6 @@ export default function BasketDetailPage({
           code: err instanceof ApiError ? err.code : undefined,
         });
         setStatus("error");
-        return;
-      }
-      try {
-        const [holdingsRes, navRes] = await Promise.allSettled([
-          fetchBasketHoldings(pubkey, controller.signal),
-          fetchNavHistory(pubkey, controller.signal),
-        ]);
-        if (holdingsRes.status === "fulfilled") setHoldings(holdingsRes.value);
-        if (navRes.status === "fulfilled") {
-          setNavRows(navRes.value.rows);
-          setNavSource(navRes.value.source);
-        }
-      } catch {
-        // AbortError racing shutdown — leave secondary panels as-is.
       }
     }
 
@@ -103,16 +119,63 @@ export default function BasketDetailPage({
     return () => controller.abort();
   }, [pubkey, reloadKey]);
 
+  // NAV series for the selected range (raw snapshots, date_bin bucketing only).
+  useEffect(() => {
+    const controller = new AbortController();
+    setNavRows(null);
+    setNavFailed(false);
+
+    async function load() {
+      const selected = NAV_RANGES.find((r) => r.key === range) ?? NAV_RANGES[NAV_RANGES.length - 1];
+      try {
+        const res = await fetchNavHistory(pubkey, controller.signal, {
+          from: selected.fromHours !== null ? new Date(Date.now() - selected.fromHours * 3600_000) : undefined,
+          interval: selected.interval ?? undefined,
+        });
+        setNavRows(res.rows);
+        setNavSource(res.source);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setNavRows([]);
+        setNavFailed(true);
+      }
+    }
+
+    void load();
+    return () => controller.abort();
+  }, [pubkey, range, reloadKey]);
+
+  // Optional context — 24h return, SPY benchmark, whitelist tickers. Any
+  // failure degrades its metric to an em dash; never blocks the page.
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function load() {
+      const [perfRes, spyRes, tickersRes] = await Promise.allSettled([
+        fetchBasketPerformance(pubkey, controller.signal),
+        fetchSpy24h(controller.signal),
+        fetchMintTickers(controller.signal),
+      ]);
+      if (perfRes.status === "fulfilled") setChange24h(perfRes.value.change24hPct);
+      if (spyRes.status === "fulfilled") setSpy24h(spyRes.value);
+      if (tickersRes.status === "fulfilled") setMintTickers(tickersRes.value);
+    }
+
+    void load().catch(() => {
+      // Aborts racing unmount — optional panels keep their defaults.
+    });
+    return () => controller.abort();
+  }, [pubkey, reloadKey]);
+
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   // ---- derived metrics (honest: null renders as an em dash) ----
-  const nav = numericToNumber(detail?.nav?.value ?? null);
   const sharePrice = numericToNumber(detail?.nav?.sharePrice ?? null);
+  const nav = numericToNumber(detail?.nav?.value ?? null);
   const supply = detail?.nav?.supply ?? null;
   const asOf = detail?.nav?.asOf ?? detail?.asOf ?? null;
   const weights = detail?.weights_bps ?? [];
   const driftActual = detail?.drift?.actualWeightsBps ?? null;
-  const driftBps = detail?.drift?.driftBps ?? null;
   const lastAccrualSeconds = numericToNumber(detail?.last_fee_accrual_ts ?? null);
   const secondsSinceAccrual =
     lastAccrualSeconds !== null && lastAccrualSeconds > 0
@@ -120,9 +183,32 @@ export default function BasketDetailPage({
       : null;
 
   const holdingsByMint = useMemo(() => {
-    const source = holdings ?? detail?.holdings ?? [];
-    return new Map(source.map((h) => [h.mint, h]));
-  }, [holdings, detail]);
+    return new Map((detail?.holdings ?? []).map((h) => [h.mint, h]));
+  }, [detail]);
+
+  // Name-first identity, same resolution order as the /explore cards.
+  const composition = useMemo(() => {
+    if (!detail) return null;
+    const parts: string[] = [];
+    detail.constituents.forEach((mint, i) => {
+      const ticker = mintTickers.get(mint) ?? truncateAddress(mint, 4, 4);
+      const bps = weights[i];
+      parts.push(bps !== undefined ? `${ticker} ${Math.round(bps / 100)}` : ticker);
+    });
+    if (parts.length === 0) return null;
+    const shown = parts.slice(0, MAX_COMPOSITION_PARTS).join(" · ");
+    return parts.length > MAX_COMPOSITION_PARTS
+      ? `${shown} · +${parts.length - MAX_COMPOSITION_PARTS}`
+      : shown;
+  }, [detail, mintTickers, weights]);
+
+  const name = useMemo(() => {
+    const n = metaObj(detail?.metadata_json)?.name;
+    return typeof n === "string" && n.trim() ? n.trim() : null;
+  }, [detail]);
+
+  const headline = name ?? composition ?? truncateAddress(pubkey, 6, 6);
+  const vsSpy = change24h !== null && spy24h !== null ? change24h - spy24h : null;
 
   return (
     <div className="space-y-6">
@@ -163,141 +249,151 @@ export default function BasketDetailPage({
 
       {status === "ready" && detail ? (
         <>
-          {/* identity + immutable parameters */}
+          {/* identity + action rail */}
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-3xl font-semibold tracking-tight">Strategy basket</h1>
-                <Badge variant="outline" className="font-mono text-[11px]">
-                  {detail.num_constituents} constituents
-                </Badge>
-                <Badge variant="secondary" className="font-mono text-[11px]">
-                  immutable
-                </Badge>
-              </div>
-              <p className="font-mono text-xs tabular-nums break-all text-muted-foreground">
-                {detail.pubkey}
-              </p>
-              <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
-                <div className="flex gap-2">
-                  <dt className="text-muted-foreground">Creator</dt>
-                  <dd className="font-mono tabular-nums">{truncateAddress(detail.creator, 4, 4)}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="text-muted-foreground">Share mint</dt>
-                  <dd className="font-mono tabular-nums">
-                    {truncateAddress(detail.share_mint, 4, 4)}
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="text-muted-foreground">Treasury</dt>
-                  <dd className="font-mono tabular-nums">{truncateAddress(detail.treasury, 4, 4)}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="text-muted-foreground">Created</dt>
-                  <dd className="font-mono tabular-nums">{formatAsOf(detail.created_at)}</dd>
-                </div>
-              </dl>
-              {detail.metadata_hash ? (
-                <p className="font-mono text-[11px] break-all text-muted-foreground">
-                  metadata_hash {detail.metadata_hash}
-                </p>
+            <div className="min-w-0 space-y-1.5">
+              <h1 className="text-3xl font-semibold tracking-tight" title={detail.pubkey}>
+                {headline}
+              </h1>
+              {name && composition ? (
+                <p className="font-mono text-xs tabular-nums text-muted-foreground">{composition}</p>
               ) : null}
+              <p className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                {truncateAddress(detail.pubkey, 6, 6)} · creator{" "}
+                {truncateAddress(detail.creator, 4, 4)} · created {formatAsOf(detail.created_at)}
+              </p>
             </div>
 
-            {/* action rail */}
-            <Card className="w-full shrink-0 lg:w-72">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Actions</CardTitle>
-                <CardDescription className="text-xs">
-                  In-kind mint/redeem is the core path — no oracle, no backend signature.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                <Button render={<Link href={`/basket/${pubkey}/buy`} />}>Buy shares</Button>
-                <Button render={<Link href={`/basket/${pubkey}/redeem`} />} variant="outline">
-                  Redeem shares
-                </Button>
-                <div className="mt-1 border-t border-border pt-2">
-                  <AccrueCrankButton
-                    basket={detail.pubkey}
-                    factory={detail.factory}
-                    creator={detail.creator}
-                    treasury={detail.treasury}
-                    shareMint={detail.share_mint}
-                    constituents={detail.constituents}
-                    secondsSinceAccrual={secondsSinceAccrual}
-                    variant="ghost"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="flex w-full shrink-0 flex-col gap-2 lg:w-56">
+              <Button render={<Link href={`/basket/${pubkey}/buy`} />}>Buy shares</Button>
+              <Button render={<Link href={`/basket/${pubkey}/redeem`} />} variant="outline">
+                Redeem shares
+              </Button>
+              <div className="border-t border-border pt-2">
+                <AccrueCrankButton
+                  basket={detail.pubkey}
+                  factory={detail.factory}
+                  creator={detail.creator}
+                  treasury={detail.treasury}
+                  shareMint={detail.share_mint}
+                  constituents={detail.constituents}
+                  secondsSinceAccrual={secondsSinceAccrual}
+                  variant="ghost"
+                />
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Redeem is permissionless and oracle-free — it works over any RPC even if this
+                indexer is offline.
+              </p>
+            </div>
           </div>
 
           {/* metric strip */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="NAV" value={nav !== null ? formatUsd(nav, { maximumFractionDigits: 0 }) : "—"} sub="Σ(scaled × price)" mono />
-            <Metric
-              label="Share price"
-              value={sharePrice !== null ? formatUsd(sharePrice) : "—"}
-              sub="nav / supply"
-              mono
-            />
-            <Metric
-              label="Share supply"
-              value={
-                supply !== null && /^\d+$/.test(supply.trim())
-                  ? formatTokenAmount(Number(formatRawShares6(BigInt(supply.trim()))), {
-                      maximumFractionDigits: 0,
-                    })
-                  : "—"
-              }
-              sub={supply !== null ? `raw ${supply}` : "6 decimals · genesis 1,000,000"}
-              mono
-            />
-            <Metric
-              label="AUM"
-              value={nav !== null ? formatUsd(nav, { maximumFractionDigits: 0 }) : "—"}
-              sub="latest indexed NAV"
-              mono
-            />
+            <Card className="h-full">
+              <CardHeader className="pb-2">
+                <CardDescription>Share price</CardDescription>
+                <CardTitle className="font-mono text-2xl tabular-nums">
+                  {sharePrice !== null ? formatUsd(sharePrice) : "—"}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="h-full">
+              <CardHeader className="pb-2">
+                <CardDescription>AUM</CardDescription>
+                <CardTitle className="font-mono text-2xl tabular-nums">
+                  {nav !== null ? formatUsd(nav, { maximumFractionDigits: 0 }) : "—"}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="h-full">
+              <CardHeader className="pb-2">
+                <CardDescription>24h</CardDescription>
+                <CardTitle className="font-mono text-2xl tabular-nums">
+                  <ChangeValue changePct={change24h} className="text-2xl" />
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            {vsSpy !== null ? (
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardDescription>vs SPY 24h</CardDescription>
+                  <CardTitle className="font-mono text-2xl tabular-nums">
+                    {vsSpy >= 0 ? "+" : ""}
+                    {vsSpy.toFixed(2)}%
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            ) : (
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardDescription>Share supply</CardDescription>
+                  <CardTitle className="font-mono text-2xl tabular-nums">
+                    {supply !== null && /^\d+$/.test(supply.trim())
+                      ? formatTokenAmount(Number(formatRawShares6(BigInt(supply.trim()))), {
+                          maximumFractionDigits: 0,
+                        })
+                      : "—"}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            )}
           </div>
 
           {/* dominant NAV chart */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium">NAV history</CardTitle>
-              <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
+              <CardDescription className="flex flex-wrap items-center gap-3 text-xs">
+                <nav aria-label="Chart range" className="flex items-center gap-3">
+                  {NAV_RANGES.map((r) => (
+                    <button
+                      key={r.key}
+                      type="button"
+                      aria-current={r.key === range ? "true" : undefined}
+                      onClick={() => setRange(r.key)}
+                      className={`transition-colors ${
+                        r.key === range
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {r.key}
+                    </button>
+                  ))}
+                </nav>
                 <FreshnessBadge source={navSource ?? "onchain-indexed"} asOf={asOf ?? undefined} />
-                <span>raw snapshot series — no interpolation</span>
               </CardDescription>
             </CardHeader>
             <CardContent>
               {navRows === null ? (
                 <ChartBlockSkeleton label="Loading NAV history" />
+              ) : navFailed ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  NAV history is unavailable right now — the indexer could not be reached. Switching
+                  ranges or reloading retries.
+                </p>
               ) : (
-                <NavHistoryChart rows={navRows} />
+                <NavHistoryChart rows={navRows} fitYDomain />
               )}
             </CardContent>
           </Card>
 
-          {/* weights table — target vs actual vs drift */}
+          {/* holdings */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Constituents, weights, drift</CardTitle>
-              <CardDescription className="text-xs leading-relaxed">
-                {detail.drift?.basis ??
-                  "Drift = actual − target bps, computed from vault_holdings.scaled_amount. No auto-rebalance exists in V0."}
+              <CardTitle className="text-base font-medium">Holdings</CardTitle>
+              <CardDescription className="text-xs">
+                Target vs actual weights from indexed vault holdings — V0 has no auto-rebalance.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-4">Constituent mint</TableHead>
-                    <TableHead className="text-right">Target</TableHead>
+                  <TableRow className="h-11 hover:bg-transparent">
+                    <TableHead className="pl-4">Asset</TableHead>
+                    <TableHead className="text-right">Weight</TableHead>
                     <TableHead className="text-right">Actual</TableHead>
-                    <TableHead className="text-right">Drift</TableHead>
                     <TableHead className="text-right">Raw</TableHead>
                     <TableHead className="pr-4 text-right">Scaled</TableHead>
                   </TableRow>
@@ -308,42 +404,25 @@ export default function BasketDetailPage({
                     const target = weights[i];
                     const actual =
                       driftActual && driftActual[i] !== undefined ? driftActual[i] : null;
-                    const drift =
-                      driftBps && driftBps[i] !== undefined
-                        ? driftBps[i]
-                        : actual !== null && target !== undefined
-                          ? actual - target
-                          : null;
-                    const rawNumber = numericToNumber(holding?.raw_amount ?? null);
                     const scaledNumber = numericToNumber(holding?.scaled_amount ?? null);
                     const multiplier = numericToNumber(holding?.multiplier ?? null);
-                    const driftClass =
-                      drift === null
-                        ? "text-muted-foreground"
-                        : drift === 0
-                          ? "text-muted-foreground"
-                          : drift > 0
-                            ? "text-foreground"
-                            : "text-muted-foreground";
+                    const ticker = mintTickers.get(mint) ?? truncateAddress(mint, 4, 4);
                     return (
-                      <TableRow key={mint}>
-                        <TableCell className="pl-4 font-mono text-xs tabular-nums">
-                          {truncateAddress(mint, 6, 6)}
+                      <TableRow key={mint} className="h-11">
+                        <TableCell className="pl-4 py-0 font-mono text-xs tabular-nums" title={mint}>
+                          {ticker}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">
-                          {target !== undefined ? formatBps(target) : "—"}
+                        <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
+                          {target !== undefined ? `${(target / 100).toFixed(2)}%` : "—"}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">
-                          {actual !== null ? formatBps(actual) : "—"}
+                        <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
+                          {actual !== null ? `${(actual / 100).toFixed(2)}%` : "—"}
                         </TableCell>
-                        <TableCell className={`text-right font-mono text-xs tabular-nums ${driftClass}`}>
-                          {drift !== null ? formatBps(drift, { signed: true }) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">
+                        <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
                           {/* raw = onchain truth — printed as text, never through Number */}
                           {holding?.raw_amount ?? "—"}
                         </TableCell>
-                        <TableCell className="pr-4 text-right font-mono text-xs tabular-nums">
+                        <TableCell className="py-0 pr-4 text-right font-mono text-xs tabular-nums">
                           {scaledNumber !== null ? (
                             <span
                               title={
@@ -366,68 +445,35 @@ export default function BasketDetailPage({
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            {/* fee schedule + 90/10 split */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Fee schedule (immutable)</CardTitle>
-                <CardDescription className="text-xs">
-                  Caps 300 / 100 / 300 bps. Fees are paid in shares, never in underlying.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="pl-4">Fee</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="pr-4 text-right">Cap</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <FeeRow label="Entry (mint_in_kind)" rate={detail.entry_fee_bps} cap={300} />
-                    <FeeRow label="Exit (redeem_in_kind)" rate={detail.exit_fee_bps} cap={100} />
-                    <FeeRow label="Management (per year, streamed)" rate={detail.management_fee_bps} cap={300} />
-                  </TableBody>
-                </Table>
-                <p className="border-t border-border p-4 text-xs leading-relaxed text-muted-foreground">
-                  Every fee splits 90/10: 90% to the creator, 10% to the treasury
-                  (remainder to treasury so floor dust is never lost). Management fee ={" "}
-                  <span className="font-mono">supply × bps × elapsed / (10000 × 31536000)</span> —
-                  accrued by a permissionless crank, or inside the next mint/redeem.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* risk / redeem explainer */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Redeem mechanics and risk</CardTitle>
-                <CardDescription className="font-mono text-[11px]">
-                  redeem_in_kind · permissionless · oracle-free
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-xs leading-relaxed">
-                <p>
-                  Redeem burns shares and returns underlying pro-rata per constituent:{" "}
-                  <span className="font-mono">out = V × (shares − exit fee) / supply</span>, floored
-                  to the raw token unit. Rounding dust stays in the vault and favors remaining
-                  holders.
-                </p>
-                <p>
-                  No oracle, no whitelist pause and no backend account participate in redeem —
-                  it works over any RPC even if this indexer is offline. The whitelist pause
-                  blocks <span className="font-mono">mint</span> only, never redeem.
-                </p>
-                <p className="rounded-md border border-border/60 bg-muted/40 p-2 text-muted-foreground">
-                  Redeem is irreversible once confirmed: burned shares cannot be re-minted and the
-                  pro-rata output is transferred immediately. LEGAL_REVIEW_REQUIRED — not
-                  investment advice; xStocks are Backed Finance structured instruments with issuer
-                  and depeg risk, and carry the basket&apos;s Token-2022 multiplier mechanics.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          {/* fees + parameters */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium">Fees &amp; parameters</CardTitle>
+              <CardDescription className="text-xs">
+                Entry / exit / management, paid in shares — never in underlying.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="h-11 hover:bg-transparent">
+                    <TableHead className="pl-4">Parameter</TableHead>
+                    <TableHead className="text-right">Rate</TableHead>
+                    <TableHead className="pr-4 text-right">Cap</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <FeeRow label="Entry (mint)" rate={detail.entry_fee_bps} cap={300} />
+                  <FeeRow label="Exit (redeem)" rate={detail.exit_fee_bps} cap={100} />
+                  <FeeRow label="Management (per year)" rate={detail.management_fee_bps} cap={300} />
+                </TableBody>
+              </Table>
+              <p className="border-t border-border p-4 text-xs leading-relaxed text-muted-foreground">
+                Every fee splits 90/10 creator/treasury; management accrues via the permissionless
+                crank or inside the next mint/redeem. Weights and fees are immutable on-chain.
+              </p>
+            </CardContent>
+          </Card>
         </>
       ) : null}
 
@@ -435,37 +481,15 @@ export default function BasketDetailPage({
   );
 }
 
-function Metric({
-  label,
-  value,
-  sub,
-  mono,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  mono?: boolean;
-}) {
-  return (
-    <Card>
-      <CardContent className="space-y-1 p-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`${mono ? "font-mono tabular-nums" : ""} text-xl font-semibold tracking-tight`}>
-          {value}
-        </p>
-        {sub ? <p className="font-mono text-[11px] text-muted-foreground">{sub}</p> : null}
-      </CardContent>
-    </Card>
-  );
-}
-
 function FeeRow({ label, rate, cap }: { label: string; rate: number; cap: number }) {
   return (
-    <TableRow>
-      <TableCell className="pl-4 text-xs">{label}</TableCell>
-      <TableCell className="text-right font-mono text-xs tabular-nums">{formatBps(rate)}</TableCell>
-      <TableCell className="pr-4 text-right font-mono text-xs tabular-nums text-muted-foreground">
-        {formatBps(cap)}
+    <TableRow className="h-11">
+      <TableCell className="py-0 pl-4 text-xs">{label}</TableCell>
+      <TableCell className="py-0 text-right font-mono text-xs tabular-nums">
+        {(rate / 100).toFixed(2)}%
+      </TableCell>
+      <TableCell className="py-0 pr-4 text-right font-mono text-xs tabular-nums text-muted-foreground">
+        {(cap / 100).toFixed(2)}%
       </TableCell>
     </TableRow>
   );
@@ -479,9 +503,10 @@ function DetailSkeleton() {
         <Skeleton className="h-4 w-full max-w-xl" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {["NAV", "Share price", "Supply", "AUM"].map((label) => (
+        {["Share price", "AUM", "24h", "Supply"].map((label) => (
           <div key={label} className="rounded-lg border border-border bg-card p-5">
-            <MetricCardSkeleton label={label} />
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="mt-2 h-7 w-24" />
           </div>
         ))}
       </div>
@@ -489,7 +514,7 @@ function DetailSkeleton() {
         <ChartBlockSkeleton label="Loading NAV history" />
       </div>
       <div className="rounded-lg border border-border bg-card p-5">
-        <TableRowSkeleton rows={4} columns={5} label="Loading constituents" />
+        <TableRowSkeleton rows={4} columns={5} label="Loading holdings" />
       </div>
     </div>
   );

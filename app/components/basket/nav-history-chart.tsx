@@ -15,7 +15,14 @@ import { numericToNumber, type NavHistoryRow } from "@/components/basket/basket-
  * see components/charts/*). Raw snapshot series from
  * /baskets/:pubkey/nav/history; no interpolation, no fabricated points.
  */
-export function NavHistoryChart({ rows }: { rows: NavHistoryRow[] }) {
+export function NavHistoryChart({
+  rows,
+  fitYDomain,
+}: {
+  rows: NavHistoryRow[];
+  /** Tight y-domain around the visible window (stock-page chart treatment). */
+  fitYDomain?: boolean;
+}) {
   const data = useMemo(
     () =>
       rows
@@ -45,6 +52,7 @@ export function NavHistoryChart({ rows }: { rows: NavHistoryRow[] }) {
       <AreaChart
         data={data}
         xDataKey="date"
+        fitYDomain={fitYDomain}
         margin={{ top: 12, right: 16, bottom: 28, left: 64 }}
         className="h-full w-full"
       >

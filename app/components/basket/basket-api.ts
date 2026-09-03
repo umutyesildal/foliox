@@ -73,6 +73,10 @@ export interface NavHistoryRow {
   source?: string | null;
 }
 
+/** Bucketed /nav/history intervals the backend aggregates via date_bin. */
+export const NAV_INTERVALS = ["1m", "5m", "15m", "1h", "1d"] as const;
+export type NavInterval = (typeof NAV_INTERVALS)[number];
+
 export class ApiError extends Error {
   code?: string;
   status: number;
@@ -137,16 +141,93 @@ export async function fetchBasketHoldings(
   return payload.data ?? [];
 }
 
-/** GET /baskets/:pubkey/nav/history — raw snapshot series (ts ASC, capped 5000). */
+/**
+ * GET /baskets/:pubkey/nav/history — snapshot series (ts ASC, capped 5000).
+ * Optional `from` window and/or `interval` bucketing; bucketed rows
+ * (bucket/open/close/…) are normalized to {ts, nav: close} so callers see one
+ * shape. No interpolation — points are exactly what the indexer stored.
+ */
 export async function fetchNavHistory(
   pubkey: string,
   signal: AbortSignal,
+  opts?: { from?: Date; interval?: NavInterval },
 ): Promise<{ rows: NavHistoryRow[]; source: string | null }> {
+  const params = new URLSearchParams();
+  if (opts?.from) params.set("from", opts.from.toISOString());
+  if (opts?.interval) params.set("interval", opts.interval);
+  const qs = params.toString();
   const payload = await getJson<{
-    data: NavHistoryRow[];
+    data?: Array<{
+      ts?: string;
+      nav?: string;
+      bucket?: string;
+      close?: string;
+      supply?: string;
+      source?: string | null;
+    }>;
     source?: string | null;
-  }>(`/api/v1/baskets/${encodeURIComponent(pubkey)}/nav/history`, signal);
-  return { rows: payload.data ?? [], source: payload.source ?? null };
+  }>(
+    `/api/v1/baskets/${encodeURIComponent(pubkey)}/nav/history${qs ? `?${qs}` : ""}`,
+    signal,
+  );
+  const rows = (payload.data ?? []).map((row) => ({
+    ts: row.ts ?? row.bucket ?? "",
+    nav: row.nav ?? row.close ?? "",
+    supply: row.supply,
+    source: row.source ?? null,
+  }));
+  return { rows, source: payload.source ?? null };
+}
+
+/**
+ * GET /baskets/:pubkey/performance — windowed NAV returns. Only the 24h pct
+ * is consumed here (metric strip); null when the indexer has no baseline.
+ */
+export async function fetchBasketPerformance(
+  pubkey: string,
+  signal: AbortSignal,
+): Promise<{ change24hPct: number | null }> {
+  const payload = await getJson<{
+    data?: { windows?: Record<string, { pct?: number | null }> } | null;
+  }>(`/api/v1/baskets/${encodeURIComponent(pubkey)}/performance`, signal);
+  const pct = payload.data?.windows?.["24h"]?.pct;
+  return { change24hPct: typeof pct === "number" && Number.isFinite(pct) ? pct : null };
+}
+
+/** GET /whitelist — mint → ticker map for holdings/composition labels. */
+export async function fetchMintTickers(
+  signal: AbortSignal,
+): Promise<Map<string, string>> {
+  const payload = await getJson<{
+    data?: { mint?: string; ticker?: string; price_source?: string }[];
+  }>("/api/v1/whitelist", signal);
+  const map = new Map<string, string>();
+  for (const row of payload.data ?? []) {
+    if (typeof row.mint !== "string" || !row.mint) continue;
+    const fromField = typeof row.ticker === "string" ? row.ticker.trim() : "";
+    const fromSource =
+      typeof row.price_source === "string" ? row.price_source.split(":").pop() ?? "" : "";
+    const ticker = fromField || fromSource;
+    if (ticker) map.set(row.mint, ticker);
+  }
+  return map;
+}
+
+/**
+ * GET /market/overview?range=1mo — SPY 24h benchmark return from the last two
+ * daily closes (same approach as /explore). Null when unavailable; callers
+ * hide the vs-SPY metric rather than fabricate a comparison.
+ */
+export async function fetchSpy24h(signal: AbortSignal): Promise<number | null> {
+  const payload = await getJson<{
+    data?: { symbol?: string; candles?: { close?: number }[] }[];
+  }>("/api/v1/market/overview?range=1mo", signal);
+  const spy = payload.data?.find((s) => s.symbol === "SPY");
+  const closes = (spy?.candles ?? []).map((c) => c.close).filter((c): c is number => typeof c === "number");
+  if (closes.length < 2) return null;
+  const last = closes[closes.length - 1];
+  const prev = closes[closes.length - 2];
+  return prev ? ((last - prev) / prev) * 100 : null;
 }
 
 /**

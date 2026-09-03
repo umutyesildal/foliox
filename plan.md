@@ -245,10 +245,11 @@ After every phase or material decision:
 
 ## 8b. Current status snapshot (2026-09-03)
 
-- UI: new IA live on :3000 (12 routes), owner feedback rounds 1-2 applied, browser-verified. Monochrome chrome + ethereal chart palette (`brand.md` still describes Mineral Desk — treat chart tokens in `app/app/globals.css` as authority until re-run).
-- Protocol: real Token-2022 CPI, 178 Rust tests. Backend: real indexer/NAV/API, 373 TS tests; baskets list API carries constituents/weights/metadata_json (card composition strings).
-- Local dev demo data: 4 whitelisted mock xStocks + 2 demo baskets (Tech Duo, Index Plus) seeded in Postgres (`demo-seed` marker).
-- Paused: localnet E2E — resume via a fresh protocol worker referencing WIP `e961849` (stack-frame refactor of `CreateBasket::try_accounts`).
+- **Protocol: localnet E2E 8/8 PASS** (twice consecutive) — create_basket SBF stack-overflow fixed (try_accounts 4232 → 0 warnings; handler-side `#[inline(never)]` init helpers, factory authority signer-meta fix, 500k CU on client txs). 178 Rust + 392 backend TS tests green.
+- **DEVNET — BLOCKED ON FUNDING (paused by owner 2026-09-03, resume anytime):** faucet 429 hard-limited (CLI 11 attempts + browser form + owner GitHub login attempt — all 0 SOL). Everything is staged for an instant rerun: devnet state dir `scripts/.e2e-devnet/` (treasury AAb2TX…, user2 48CUGM…), scripts env-parameterized (`FOLIOX_E2E_RPC_URL/PAYER/STATE_DIR/TREASURY`), deploy keypairs verified. **To resume:** send ≥11 SOL (ideal ~12) devnet SOL to `y72KA263br7MtZw7BqC2dx5QYCBUciJGzShE8BRSwRE` (Phantom), then: deploy the 3 programs (`solana program deploy target/deploy/<name>.so --program-id target/deploy/<name>-keypair.json --url devnet`), `solana transfer 48CUGMWkw49EDkVQBq5TEb3M43oej9bJf7z8aF3zA3bg 1.5 --url devnet`, then run the four scripts with the env block above. Explorer links staged for whitelist `FRavMcY…` / factory `3hzoPep…` / basket `6Q43vFh…`.
+- UI: new IA live (12 routes), two owner feedback rounds + restyles applied (detail, buy/redeem, providers). Monochrome chrome + ethereal chart palette; `brand.md` rewritten accordingly. Positions indexer landed (user_positions writer, 392 tests).
+- Local dev demo data: 4 mock xStocks + Tech Duo / Index Plus baskets (`demo-seed`).
+- Owner redirected work to UI improvements while devnet funding is pending.
 
 ## 8. Immediate next actions
 

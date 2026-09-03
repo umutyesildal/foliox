@@ -19,3 +19,22 @@ Photographs downloaded for the FolioX landing page (branch `roman-empire`). All 
 
 - **CC0 / Public domain** (`roman-3`, `roman-4`, `roman-5`): no attribution required; safe for commercial use.
 - **CC BY-SA 4.0** (`roman-1`, `roman-2`, `roman-6`): attribution required (credit photographer, link to the Commons file page) and share-alike applies to the adapted image. If attribution on the page is undesirable, prefer the CC0/PD set — `roman-5` is the strongest stand-alone hero alternative.
+
+---
+
+# Hero watermark — Pantheon engraving (2026-09-03)
+
+`pantheon-engraving.jpg` in `app/public/brand/` — used as a barely-visible watermark layer BEHIND the hero text on the landing page (not a framed photo). Downloaded at 1920px via the Commons thumbnail API, resized to 1600x1093, recompressed to 671KB. Already grayscale natively (single-channel JPEG scan).
+
+| Field | Value |
+|---|---|
+| File | `app/public/brand/pantheon-engraving.jpg` (671KB, 1600x1093) |
+| Subject | Francesco Piranesi, *Veduta del Pantheon d'Agrippa oggi Chiesa di S. Maria ad Martyres* (1790) — full facade + dome + piazza figures under a dramatic etched sky; landscape plate, composes well wide |
+| Source page | https://commons.wikimedia.org/wiki/File:Piranesi-6023.jpg |
+| Direct image URL (original) | https://upload.wikimedia.org/wikipedia/commons/7/72/Piranesi-6023.jpg |
+| Thumbnail URL used | https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Piranesi-6023.jpg/1920px-Piranesi-6023.jpg |
+| License | Public domain (`{{PD-old}}`, 18th-century etching; no attribution required) |
+
+## Treatment note
+
+The plate is dark ink on light paper; on the near-black page it is rendered with CSS `invert(1) grayscale(1) contrast(1.06)` at `opacity: 0.16`, so only the etched strokes survive as faint light lines and the paper dissolves into the background. Top/bottom + left/right `linear-gradient` masks in `hsl(var(--background))` fade all four edges into the page.

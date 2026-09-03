@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { PantheonIllustration } from "@/components/home/pantheon-illustration";
 import { FlowSection } from "@/components/home/flow-section";
 import { LedgerSection } from "@/components/home/ledger-section";
 import { ClosingStrip } from "@/components/home/closing-strip";
@@ -35,54 +34,58 @@ function LaurelGlyph({ flip = false }: { flip?: boolean }) {
 /**
  * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02;
  * roman-empire redesign, 2026-09-03): laurel chip, Cinzel headline, one
- * subline, two CTAs — then a drawn Pantheon elevation on a faint vignette
- * (owner feedback: the hero photo band is out — vector line art instead),
- * the three-step Flow section (drawn Roman motifs), the Ledger inscription
+ * subline, two CTAs — with a public-domain Piranesi engraving of the Pantheon
+ * ghosted BEHIND the hero copy as a barely-visible watermark (owner feedback:
+ * real drawing, not a framed photo, not the hand-drawn SVG), then the
+ * three-step Flow section (drawn Roman motifs), the Ledger inscription
  * (traditional vs tokenized rails), and a closing navigation strip fed by
  * the live xStocks registry. No footer, no photography.
  */
 export default function LandingPage() {
   return (
     <div className="mx-auto w-full">
-      <section className="mx-auto flex max-w-3xl flex-col items-center px-4 pb-20 pt-24 text-center sm:px-6 md:pt-32">
-        <p className="inline-flex items-center gap-2.5 rounded-full border border-[hsl(var(--imperial)/0.45)] bg-muted/40 px-3.5 py-1 font-mono text-xs tracking-wide text-[hsl(var(--imperial))]">
-          <LaurelGlyph />
-          Onchain strategy baskets · xStocks
-          <LaurelGlyph flip />
-        </p>
-        <h1 className="mt-6 font-[family-name:var(--font-display)] text-balance text-6xl font-semibold leading-[1.08] tracking-normal md:text-7xl">
-          Create an index. Own your thesis.
-        </h1>
-        <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
-          Tokenized baskets of xStocks — immutable weights, capped fees,
-          permissionless redemption.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/create"
-            className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            Create an index
-          </Link>
-          <Link
-            href="/explore"
-            className="inline-flex h-10 items-center rounded-lg border border-border bg-transparent px-5 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            Explore baskets
-          </Link>
+      <section className="relative w-full overflow-hidden">
+        {/* Watermark — Francesco Piranesi, "Veduta del Pantheon d'Agrippa"
+            (1790, public domain). The plate is dark ink on light paper, so
+            `invert` flips it to light lines on dark; at 16% opacity over the
+            near-black canvas only the etched strokes survive as a faint
+            texture. Gradient masks dissolve every edge into the page. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <img
+            src="/brand/pantheon-engraving.jpg"
+            alt=""
+            className="absolute left-1/2 top-1/2 w-[94%] max-w-[1100px] -translate-x-1/2 -translate-y-1/2 select-none opacity-[0.16] [filter:invert(1)_grayscale(1)_contrast(1.06)]"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,hsl(var(--background))_0%,transparent_28%,transparent_70%,hsl(var(--background))_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--background))_0%,transparent_18%,transparent_82%,hsl(var(--background))_100%)]" />
         </div>
-      </section>
-
-      {/* Drawn Pantheon — the hero band replacement: full-width section, the
-          elevation centered at ~70% width on a whisper of a radial vignette.
-          Punctuation, not content: no headline on it. */}
-      <section aria-label="Line drawing of the Pantheon" className="relative w-full py-20">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_55%_60%_at_50%_50%,hsl(var(--foreground)/0.04),transparent_70%)]"
-        />
-        <div className="relative mx-auto w-[86%] text-foreground/85 sm:w-[70%]">
-          <PantheonIllustration className="h-auto w-full" />
+        <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center px-4 pb-20 pt-24 text-center sm:px-6 md:pt-32">
+          <p className="inline-flex items-center gap-2.5 rounded-full border border-[hsl(var(--imperial)/0.45)] bg-muted/40 px-3.5 py-1 font-mono text-xs tracking-wide text-[hsl(var(--imperial))]">
+            <LaurelGlyph />
+            Onchain strategy baskets · xStocks
+            <LaurelGlyph flip />
+          </p>
+          <h1 className="mt-6 font-[family-name:var(--font-display)] text-balance text-6xl font-semibold leading-[1.08] tracking-normal md:text-7xl">
+            Create an index. Own your thesis.
+          </h1>
+          <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
+            Tokenized baskets of xStocks — immutable weights, capped fees,
+            permissionless redemption.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/create"
+              className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              Create an index
+            </Link>
+            <Link
+              href="/explore"
+              className="inline-flex h-10 items-center rounded-lg border border-border bg-transparent px-5 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              Explore baskets
+            </Link>
+          </div>
         </div>
       </section>
 

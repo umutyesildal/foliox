@@ -20,11 +20,39 @@ const HERO_IMAGE = {
 /** Which monochrome visual anchor a gateway card carries (see SectionAnchor). */
 type SectionAnchorKind = "stocks" | "etfs" | "baskets";
 
+/** Small laurel-wreath glyph — two mirrored branches with leaf ticks, drawn
+ *  as plain strokes so it inherits color. Decorative only (aria-hidden). */
+function LaurelGlyph({ flip = false }: { flip?: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.1"
+      strokeLinecap="round"
+      style={flip ? { transform: "scaleX(-1)" } : undefined}
+      className="shrink-0 opacity-80"
+    >
+      {/* two branches rising from a shared base */}
+      <path d="M8 14.4C5.1 13.4 3.2 10.8 3.2 7.5c0-1.7.5-3.3 1.4-4.7" />
+      <path d="M8 14.4c2.9-1 4.8-3.6 4.8-6.9 0-1.7-.5-3.3-1.4-4.7" />
+      {/* left-branch leaves */}
+      <path d="M4.1 6.7 2.5 6.1M4.6 9.9 2.9 10.2M5.8 12.4l-1.4 1" />
+      {/* right-branch leaves */}
+      <path d="m11.9 6.7 1.6-.6M11.4 9.9l1.7.3M10.2 12.4l1.4 1" />
+    </svg>
+  );
+}
+
 /**
  * Section gateway — the three main areas of the product, as a bento grid of
- * cards. Each card: mono index, a small pure-CSS anchor (ticker rows or a
- * weight bar — typography only, no icons, no color), name, one short line,
- * and a ↗ that lifts on hover. Details live on the pages themselves.
+ * cards. Each card: roman-numeral index (I/II/III, display face), a small
+ * pure-CSS anchor (ticker rows or a weight bar — typography only, no icons,
+ * no color), name, one short line, and a ↗ that lifts on hover with a
+ * single pompeian-red accent. Details live on the pages themselves.
  */
 const SECTIONS: {
   index: string;
@@ -34,21 +62,21 @@ const SECTIONS: {
   anchor: SectionAnchorKind;
 }[] = [
   {
-    index: "01",
+    index: "I",
     name: "Stocks",
     line: "Tokenized stocks across providers.",
     href: "/stocks",
     anchor: "stocks",
   },
   {
-    index: "02",
+    index: "II",
     name: "Tokenized ETFs",
     line: "The tokenized ETF tickers FolioX lists today.",
     href: "/etfs",
     anchor: "etfs",
   },
   {
-    index: "03",
+    index: "III",
     name: "Baskets",
     line: "Community-made baskets, benchmarked on-chain.",
     href: "/explore",
@@ -107,10 +135,12 @@ export default function LandingPage() {
   return (
     <div className="mx-auto w-full">
       <section className="mx-auto flex max-w-3xl flex-col items-center px-4 pb-24 pt-24 text-center sm:px-6 md:pt-32">
-        <p className="rounded-full border border-border/60 bg-muted/40 px-3.5 py-1 font-mono text-xs tracking-wide text-muted-foreground">
+        <p className="inline-flex items-center gap-2.5 rounded-full border border-[hsl(var(--imperial)/0.45)] bg-muted/40 px-3.5 py-1 font-mono text-xs tracking-wide text-[hsl(var(--imperial))]">
+          <LaurelGlyph />
           Onchain strategy baskets · xStocks
+          <LaurelGlyph flip />
         </p>
-        <h1 className="mt-6 text-balance text-6xl font-semibold leading-[1.04] tracking-tight md:text-7xl">
+        <h1 className="mt-6 font-[family-name:var(--font-display)] text-balance text-6xl font-semibold leading-[1.08] tracking-normal md:text-7xl">
           Create an index. Own your thesis.
         </h1>
         <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
@@ -165,7 +195,7 @@ export default function LandingPage() {
         className="border-t border-border py-16 dark:border-border/60"
       >
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+          <p className="font-[family-name:var(--font-display)] text-sm uppercase tracking-[0.12em] text-muted-foreground">
             Traditional vs tokenized
           </p>
           <p className="mt-3 max-w-2xl text-balance text-base leading-7 text-muted-foreground">
@@ -193,13 +223,13 @@ export default function LandingPage() {
                   <div className="flex items-center justify-between">
                     <span
                       aria-hidden="true"
-                      className="font-mono text-xs text-muted-foreground"
+                      className="font-[family-name:var(--font-display)] text-xs font-medium tracking-[0.08em] text-muted-foreground"
                     >
                       {section.index}
                     </span>
                     <span
                       aria-hidden="true"
-                      className="font-mono text-sm text-muted-foreground transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
+                      className="font-mono text-sm text-muted-foreground transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[hsl(var(--pompeian))]"
                     >
                       ↗
                     </span>

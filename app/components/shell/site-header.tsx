@@ -34,7 +34,8 @@ function NavLink({ href, label }: { href: string; label: string }) {
 }
 
 /**
- * Site header: FolioX wordmark (text only), primary nav
+ * Site header: FolioX wordmark (a tiny monochrome column glyph + display-face
+ * text — roman-empire experiment; the suffix stays Geist), primary nav
  * (Stocks/ETFs/Baskets), contextual actions (Create/Portfolio), network
  * indicator, wallet button, and a no-dependency mobile disclosure nav.
  */
@@ -67,15 +68,29 @@ export function SiteHeader() {
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center rounded-sm font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="flex items-center rounded-sm font-[family-name:var(--font-display)] font-semibold tracking-normal text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          {/* Plain monochrome mark — pure CSS, no mascot */}
-          <span
+          {/* Tiny monochrome column mark — plain-stroke SVG, no mascot, no color */}
+          <svg
             aria-hidden="true"
-            className="mr-2 inline-block size-2.5 shrink-0 rounded-[2px] bg-foreground/40"
-          />
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            className="mr-2 shrink-0 text-foreground/50"
+          >
+            {/* abacus + capital */}
+            <path d="M2.5 3h11M4 5.6h8" />
+            {/* fluted shaft */}
+            <path d="M5.5 5.6v6.8M8 5.6v6.8M10.5 5.6v6.8" />
+            {/* base */}
+            <path d="M3.5 14h9" />
+          </svg>
           FolioX
-          <span className="hidden font-normal text-muted-foreground sm:inline">
+          <span className="hidden font-sans font-normal text-muted-foreground sm:inline">
             {" "}
             · xStocks baskets
           </span>

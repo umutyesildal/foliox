@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
  * (center, xs mono), Tokenized half (right, highlighted so the eye reads
  * "tokenized wins here" without prose). Clicking a column header focuses
  * that side (the other dims); clicking again clears. Single accent: the
- * Tokenized header carries a 2px chart-1 underline.
+ * Tokenized header carries a 2px imperial underline (--imperial, Tyrian
+ * purple — roman-empire experiment; replaces the old chart-1 accent).
  *
  * Lives on the HOME landing (moved from /etfs, 2026-09-02). No card header:
  * the page owns the section label and the one factual description line, so
@@ -63,7 +64,9 @@ export function TraditionalVsTokenized() {
             aria-pressed={focus === "tokenized"}
             className={cn(
               "flex h-9 items-center justify-start border-b-2 pb-1.5 text-left font-mono text-[11px] uppercase tracking-wide text-foreground transition-colors",
-              focus === "tokenized" ? "border-chart-1" : "border-chart-1/70 hover:border-chart-1",
+              focus === "tokenized"
+                ? "border-[hsl(var(--imperial))]"
+                : "border-[hsl(var(--imperial)/0.7)] hover:border-[hsl(var(--imperial))]",
             )}
           >
             Tokenized

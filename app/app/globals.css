@@ -45,6 +45,16 @@
     --chart-3: 215.0 34.0% 46.0%;
     --chart-4: 40.0 30.0% 40.0%;
     --chart-5: 265.0 28.0% 48.0%;
+    /* Roman experiment (roman-empire) — two imperial accents, used sparingly.
+       --imperial  = Tyrian purple: home eyebrow chip text/border + the
+                     Tokenized-column underline in Traditional-vs-Tokenized.
+       --pompeian  = Pompeian red: bento arrow hover accent ONLY.
+       The dark imperial value keeps the brief's hue/saturation identity but
+       lifts lightness (L30% → L62%) so it clears legible contrast on the
+       near-black canvas; the light value matches the brief as-is. Pompeian
+       reads on both canvases at L45%, so it is mode-invariant. */
+    --imperial: 315.0 50.0% 38.0%;
+    --pompeian: 4.0 55.0% 45.0%;
     --radius: 0.625rem;
     --chart-background: 0.0 0.0% 100.0%;
     --chart-foreground: 0.0 0.0% 3.9%;
@@ -83,6 +93,9 @@
     --chart-3: 215.0 35.0% 72.0%;
     --chart-4: 40.0 30.0% 68.0%;
     --chart-5: 265.0 30.0% 74.0%;
+    /* Imperial accents, dark-adapted (see light-mode note above). */
+    --imperial: 315.0 45.0% 62.0%;
+    --pompeian: 4.0 55.0% 45.0%;
     --radius: 0.625rem;
     --chart-background: 0.0 0.0% 3.9%;
     --chart-foreground: 0.0 0.0% 98.0%;

@@ -37,6 +37,7 @@
  */
 
 import {
+  ComputeBudgetProgram,
   PublicKey,
   TransactionInstruction,
   type Connection,
@@ -64,6 +65,21 @@ export const MAX_CONSTITUENTS = 20;
 /** Genesis share supply minted to the creator (basket::GENESIS_SHARES). */
 export const GENESIS_SHARES = 1_000_000;
 export const SHARE_MINT_DECIMALS = 6;
+/**
+ * Compute units `create_basket` needs: the atomic deploy (share-mint init +
+ * basket init CPI + per-constituent vault ATAs + raw seed transfers + genesis
+ * mint + mint-authority handoff) exceeds the 200k default per-instruction
+ * budget on localnet. Prepend this to the transaction carrying
+ * `buildCreateBasketInstruction`.
+ */
+export const CREATE_BASKET_COMPUTE_UNITS = 500_000;
+
+/** SetComputeUnitLimit instruction for the create_basket transaction. */
+export function createBasketComputeLimitInstruction(
+  units: number = CREATE_BASKET_COMPUTE_UNITS,
+): TransactionInstruction {
+  return ComputeBudgetProgram.setComputeUnitLimit({ units });
+}
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",

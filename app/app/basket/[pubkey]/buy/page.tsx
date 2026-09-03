@@ -10,11 +10,30 @@ import { ZapInForm } from "@/components/basket/zap-in-form";
 import {
   ApiError,
   fetchBasketDetail,
+  fetchMintTickers,
   type BasketDetail,
 } from "@/components/basket/basket-api";
 import { truncateAddress } from "@/lib/format";
 
 type Tab = "inkind" | "zap";
+
+const MAX_COMPOSITION_PARTS = 4;
+
+/** metadata_json may arrive as object or JSON text — parse defensively. */
+function metaName(mj: unknown): string | null {
+  if (!mj) return null;
+  let obj: unknown = mj;
+  if (typeof mj === "string") {
+    try {
+      obj = JSON.parse(mj);
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== "object") return null;
+  const n = (obj as Record<string, unknown>).name;
+  return typeof n === "string" && n.trim() ? n.trim() : null;
+}
 
 /**
  * Buy — transaction workspace with two paths: In-Kind (raw per-constituent
@@ -31,6 +50,7 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
   const [errorInfo, setErrorInfo] = useState<{ message: string; code?: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [tab, setTab] = useState<Tab>("inkind");
+  const [mintTickers, setMintTickers] = useState<Map<string, string>>(new Map());
   const TAB_ORDER: Tab[] = ["inkind", "zap"];
   const tablistRef = useRef<HTMLDivElement | null>(null);
 
@@ -76,6 +96,15 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
     return () => controller.abort();
   }, [pubkey, reloadKey]);
 
+  // Optional ticker context for the composition line — degrades to truncated mints.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchMintTickers(controller.signal)
+      .then(setMintTickers)
+      .catch(() => setMintTickers(new Map()));
+    return () => controller.abort();
+  }, [reloadKey]);
+
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   // Vault raw balances aligned to constituents order (null = not indexed).
@@ -87,6 +116,23 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
       return raw && /^\d+$/.test(raw.trim()) ? BigInt(raw.trim()) : null;
     });
   }, [detail]);
+
+  // Name-first identity, same resolution order as the detail page.
+  const name = useMemo(() => (detail ? metaName(detail.metadata_json) : null), [detail]);
+  const composition = useMemo(() => {
+    if (!detail) return null;
+    const parts = detail.constituents.map((mint, i) => {
+      const ticker = mintTickers.get(mint) ?? truncateAddress(mint, 4, 4);
+      const bps = detail.weights_bps[i];
+      return bps !== undefined ? `${ticker} ${Math.round(bps / 100)}` : ticker;
+    });
+    if (parts.length === 0) return null;
+    const shown = parts.slice(0, MAX_COMPOSITION_PARTS).join(" · ");
+    return parts.length > MAX_COMPOSITION_PARTS
+      ? `${shown} · +${parts.length - MAX_COMPOSITION_PARTS}`
+      : shown;
+  }, [detail, mintTickers]);
+  const headline = name ?? composition ?? truncateAddress(pubkey, 6, 6);
 
   return (
     <div className="space-y-6">
@@ -140,13 +186,23 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
 
       {status === "ready" && detail ? (
         <>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Buy shares</h1>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              Mint basket shares with the underlying xStocks (core path) or zap USDC through
-              Jupiter (periphery). Shares are minted net of the entry fee
-              {" "}{detail.entry_fee_bps} bps.
-            </p>
+          {/* compact identity header — name + composition, detail via the breadcrumb */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 space-y-1.5">
+              <h1 className="text-3xl font-semibold tracking-tight" title={detail.pubkey}>
+                {headline}
+              </h1>
+              {name && composition ? (
+                <p className="font-mono text-xs tabular-nums text-muted-foreground">{composition}</p>
+              ) : null}
+              <p className="text-sm text-muted-foreground">
+                Mint shares against the underlying xStocks or zap in with USDC — net of the{" "}
+                <span className="font-mono tabular-nums">
+                  {(detail.entry_fee_bps / 100).toFixed(2)}%
+                </span>{" "}
+                entry fee.
+              </p>
+            </div>
             <FreshnessBadge
               source={detail.source}
               asOf={detail.nav?.asOf ?? detail.asOf ?? undefined}
@@ -157,7 +213,7 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
             ref={tablistRef}
             role="tablist"
             aria-label="Buy method"
-            className="flex w-fit items-center gap-1 rounded-md border border-border bg-card p-1"
+            className="flex w-fit items-center gap-4 border-b border-border"
           >
             <TabButton
               id="buy-tab-inkind"
@@ -237,10 +293,10 @@ function TabButton({
       tabIndex={tabIndex}
       onClick={onChangeTab}
       onKeyDown={onArrowKeyDown}
-      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+      className={`-mb-px border-b-2 px-1 pb-2 pt-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
         active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          ? "border-foreground font-medium text-foreground"
+          : "border-transparent text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}

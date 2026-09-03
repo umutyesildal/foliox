@@ -20,6 +20,7 @@ import { computeRedeemPreview, formatRawShares6, parseRawInput } from "@/compone
 import {
   ApiError,
   fetchBasketDetail,
+  fetchMintTickers,
   numericToNumber,
   type BasketDetail,
 } from "@/components/basket/basket-api";
@@ -30,6 +31,24 @@ import {
 } from "@/lib/transactions";
 import { formatUsd, scaledFromRaw, truncateAddress } from "@/lib/format";
 import { RPC_ENDPOINT } from "@/lib/wallet";
+
+const MAX_COMPOSITION_PARTS = 4;
+
+/** metadata_json may arrive as object or JSON text — parse defensively. */
+function metaName(mj: unknown): string | null {
+  if (!mj) return null;
+  let obj: unknown = mj;
+  if (typeof mj === "string") {
+    try {
+      obj = JSON.parse(mj);
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== "object") return null;
+  const n = (obj as Record<string, unknown>).name;
+  return typeof n === "string" && n.trim() ? n.trim() : null;
+}
 
 /**
  * Redeem — burns basket shares and returns the underlying pro-rata, floored to
@@ -53,6 +72,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
   const [shareBalance, setShareBalance] = useState<bigint | null>(null);
   const [expectedAccounts, setExpectedAccounts] = useState<ExpectedAccount[] | null>(null);
   const [open, setOpen] = useState(false);
+  const [mintTickers, setMintTickers] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     const controller = new AbortController();
@@ -79,6 +99,15 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
     void load();
     return () => controller.abort();
   }, [pubkey, reloadKey]);
+
+  // Optional ticker context for the composition line — degrades to truncated mints.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchMintTickers(controller.signal)
+      .then(setMintTickers)
+      .catch(() => setMintTickers(new Map()));
+    return () => controller.abort();
+  }, [reloadKey]);
 
   const refreshShareBalance = useCallback(async () => {
     if (!publicKey || !detail) return;
@@ -135,6 +164,23 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
       ? Math.max(0, Math.floor(Date.now() / 1000) - lastAccrualSeconds)
       : null;
   const accrualStale = secondsSinceAccrual !== null && secondsSinceAccrual > 86400;
+
+  // Name-first identity, same resolution order as the detail page.
+  const name = useMemo(() => (detail ? metaName(detail.metadata_json) : null), [detail]);
+  const composition = useMemo(() => {
+    if (!detail) return null;
+    const parts = detail.constituents.map((mint, i) => {
+      const ticker = mintTickers.get(mint) ?? truncateAddress(mint, 4, 4);
+      const bps = detail.weights_bps[i];
+      return bps !== undefined ? `${ticker} ${Math.round(bps / 100)}` : ticker;
+    });
+    if (parts.length === 0) return null;
+    const shown = parts.slice(0, MAX_COMPOSITION_PARTS).join(" · ");
+    return parts.length > MAX_COMPOSITION_PARTS
+      ? `${shown} · +${parts.length - MAX_COMPOSITION_PARTS}`
+      : shown;
+  }, [detail, mintTickers]);
+  const headline = name ?? composition ?? truncateAddress(pubkey, 6, 6);
 
   const openReview = () => {
     if (!publicKey || !detail || shares === null || preview === null) return;
@@ -218,16 +264,23 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
 
       {status === "ready" && detail ? (
         <>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Redeem shares</h1>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              Burn shares, receive every underlying xStock pro-rata.{" "}
-              <span className="font-mono">
-                out = V × (shares − exit fee) / supply
-              </span>{" "}
-              per constituent, floored to the raw token unit. Exit fee {detail.exit_fee_bps} bps,
-              split 90/10 to creator/treasury.
-            </p>
+          {/* compact identity header — name + composition, detail via the breadcrumb */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 space-y-1.5">
+              <h1 className="text-3xl font-semibold tracking-tight" title={detail.pubkey}>
+                {headline}
+              </h1>
+              {name && composition ? (
+                <p className="font-mono text-xs tabular-nums text-muted-foreground">{composition}</p>
+              ) : null}
+              <p className="text-sm text-muted-foreground">
+                Burn shares, receive every underlying pro-rata — exit fee{" "}
+                <span className="font-mono tabular-nums">
+                  {(detail.exit_fee_bps / 100).toFixed(2)}%
+                </span>
+                .
+              </p>
+            </div>
             <FreshnessBadge
               source={detail.source}
               asOf={detail.nav?.asOf ?? detail.asOf ?? undefined}
@@ -237,9 +290,9 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
           {accrualStale ? (
             <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
               <span>
-                Management fee last accrued {secondsSinceAccrual !== null ? Math.floor(secondsSinceAccrual / 3600) : "?"}h
-                ago — running the crank first keeps the preview supply accurate (it runs inside
-                redeem anyway).
+                Management fee last accrued{" "}
+                {secondsSinceAccrual !== null ? Math.floor(secondsSinceAccrual / 3600) : "?"}h ago —
+                run the crank first to keep the preview accurate.
               </span>
               <AccrueCrankButton
                 basket={detail.pubkey}
@@ -256,14 +309,14 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
           ) : null}
 
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Shares to burn</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle>Shares to burn</CardTitle>
               <CardDescription className="text-xs">
-                Raw base units (share mint has 6 decimals). Max is your share ATA balance.
+                Raw base units (share mint has 6 decimals).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="flex flex-col gap-1">
                   <label htmlFor="redeem-shares" className="text-xs font-medium text-muted-foreground">
                     Shares (raw)
@@ -276,27 +329,31 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                     value={sharesInput}
                     onChange={(e) => setSharesInput(e.target.value)}
                     aria-invalid={sharesExceedBalance}
-                    className="h-9 w-56 rounded-md border border-border bg-card px-3 font-mono text-sm tabular-nums outline-none placeholder:font-sans placeholder:text-muted-foreground focus:border-ring"
+                    className="h-9 w-56 rounded-md border border-border bg-background px-3 font-mono text-sm tabular-nums outline-none placeholder:font-sans placeholder:text-muted-foreground focus:border-ring"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Wallet share balance</span>
-                  <span className="font-mono text-sm tabular-nums">
+                  <span className="text-xs text-muted-foreground">Balance</span>
+                  <span className="flex items-center gap-2 font-mono text-sm tabular-nums">
                     {connected
                       ? shareBalance === null
                         ? "no share ATA"
-                        : `${shareBalance} raw (${formatRawShares6(shareBalance)})`
+                        : `${formatRawShares6(shareBalance)} · ${shareBalance} raw`
                       : "connect a wallet"}
+                    {connected && shareBalance !== null && shareBalance > 0n ? (
+                      <button
+                        type="button"
+                        disabled={!connected || shareBalance === null || shareBalance === 0n}
+                        onClick={() =>
+                          shareBalance !== null && setSharesInput(shareBalance.toString())
+                        }
+                        className="font-mono text-xs font-medium text-foreground underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        MAX
+                      </button>
+                    ) : null}
                   </span>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!connected || shareBalance === null || shareBalance === 0n}
-                  onClick={() => shareBalance !== null && setSharesInput(shareBalance.toString())}
-                >
-                  Max
-                </Button>
               </div>
 
               {sharesExceedBalance ? (
@@ -306,10 +363,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
               ) : null}
 
               {preview && holdingsAligned ? (
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Pro-rata preview (floor)
-                  </h3>
+                <div className="space-y-3">
                   <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
                     {detail.constituents.map((mint, i) => {
                       const holding = holdingsAligned[i];
@@ -317,15 +371,18 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                       const decimals = holding?.decimals ?? 6;
                       const out = preview.outs[i] ?? 0n;
                       return (
-                        <li key={mint} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2">
-                          <span className="font-mono text-xs tabular-nums">
+                        <li key={mint} className="flex h-11 items-center gap-4 px-3">
+                          <span
+                            className="w-24 shrink-0 truncate font-mono text-xs tabular-nums"
+                            title={mint}
+                          >
                             {truncateAddress(mint, 6, 6)}
                           </span>
-                          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                          <span className="font-mono text-xs tabular-nums">
+                            {scaledFromRaw(out, multiplier, decimals)}
+                          </span>
+                          <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">
                             {out} raw
-                            <span className="ml-2 text-foreground">
-                              {scaledFromRaw(out, multiplier, decimals)} scaled
-                            </span>
                           </span>
                         </li>
                       );
@@ -333,7 +390,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                   </ul>
                   <dl className="grid gap-1 font-mono text-xs tabular-nums text-muted-foreground">
                     <div className="flex justify-between gap-4">
-                      <dt>exit fee ({detail.exit_fee_bps} bps, transferred not burned)</dt>
+                      <dt>exit fee ({detail.exit_fee_bps} bps)</dt>
                       <dd>{formatRawShares6(preview.exitFee)} shares</dd>
                     </div>
                     <div className="flex justify-between gap-4">
@@ -347,13 +404,9 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                       </div>
                     ) : null}
                   </dl>
-                  <p className="text-[11px] leading-4 text-muted-foreground">
-                    Preview uses the last indexed vault holdings and supply; the program accrues
-                    the management fee first and re-reads supply, and re-validates every vault
-                    balance on-chain.{" "}
-                    {usdEstimate !== null
-                      ? "The USD figure is a NAV reference estimate, not a quote."
-                      : ""}
+                  <p className="text-xs text-muted-foreground">
+                    From the last indexed snapshot — the program re-validates on-chain; USD is a NAV
+                    estimate, not a quote.
                   </p>
                 </div>
               ) : shares !== null && shares > 0n && (supply === null || vaultBalances.some((v) => v === null)) ? (
@@ -366,31 +419,10 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">What redeem does</CardTitle>
-              <CardDescription className="font-mono text-[11px]">
-                redeem_in_kind · permissionless · oracle-free
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs leading-relaxed">
-              <p>
-                No oracle, no whitelist, no pauser and no backend account is part of the
-                instruction — redeem works over any RPC even if this indexer is offline. The
-                whitelist pause blocks <span className="font-mono">mint</span> only, never redeem.
-              </p>
-              <p>
-                Missing constituent ATAs are created for you inside the transaction (you pay the
-                rent). Rounding dust stays in the vault and favors remaining holders.
-              </p>
-              <p className="rounded-md border border-border/60 bg-muted/40 p-2 text-muted-foreground">
-                IRREVERSIBLE — burned shares cannot be re-minted, and the pro-rata underlying is
-                transferred immediately on confirmation. Review the account list before signing.
-                LEGAL_REVIEW_REQUIRED: not investment advice; xStocks are Backed Finance
-                structured instruments carrying issuer, depeg and multiplier risk.
-              </p>
-            </CardContent>
-          </Card>
+          <p className="text-xs text-muted-foreground">
+            Redeem is permissionless and oracle-free — no whitelist, no backend, works over any RPC —
+            and irreversible once confirmed.
+          </p>
 
           <div className="flex flex-wrap items-center gap-3">
             <Button

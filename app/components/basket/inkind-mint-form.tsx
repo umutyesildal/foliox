@@ -5,6 +5,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/states";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
@@ -170,197 +171,230 @@ export function InKindMintForm({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm leading-6 text-muted-foreground">
-        Deposits must be proportional to the vault&apos;s <em>current</em> holdings within the 1%
-        tolerance, or the program rejects the mint. Amounts are raw Token-2022 base units — the
-        scaled display is derived from each mint&apos;s multiplier.
-      </p>
-
-      <div className="space-y-3">
-        {detail.constituents.map((mint, i) => {
-          const holding = holdings[i];
-          const multiplier = Number(holding?.multiplier ?? 1);
-          const decimals = holding?.decimals ?? 6;
-          const raw = amounts[i];
-          const balance = balances?.[i];
-          return (
-            <div key={mint} className="rounded-md border border-border p-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <label
-                  htmlFor={`inkind-${i}`}
-                  className="font-mono text-xs font-medium tabular-nums"
-                >
-                  {truncateAddress(mint, 6, 6)}
-                  <span className="ml-2 font-sans text-muted-foreground">
-                    target {detail.weights_bps[i] ?? "—"} bps
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle>Deposit amounts</CardTitle>
+        <CardDescription className="text-xs">
+          Raw base units per constituent — deposits must track current vault ratios within the 1%
+          tolerance.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <ul className="divide-y divide-border">
+          {detail.constituents.map((mint, i) => {
+            const holding = holdings[i];
+            const multiplier = Number(holding?.multiplier ?? 1);
+            const decimals = holding?.decimals ?? 6;
+            const raw = amounts[i];
+            const balance = balances?.[i];
+            return (
+              <li key={mint} className="py-1.5">
+                <div className="flex h-11 items-center gap-4">
+                  <label
+                    htmlFor={`inkind-${i}`}
+                    className="w-24 shrink-0 truncate font-mono text-xs tabular-nums"
+                    title={mint}
+                  >
+                    {truncateAddress(mint, 6, 6)}
+                  </label>
+                  <input
+                    id={`inkind-${i}`}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="raw amount"
+                    value={inputs[i]}
+                    onChange={(e) =>
+                      setInputs((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+                    }
+                    className="h-8 w-44 rounded-md border border-border bg-background px-3 font-mono text-xs tabular-nums outline-none placeholder:font-sans placeholder:text-muted-foreground focus:border-ring"
+                    aria-invalid={balanceErrors[i] !== null}
+                  />
+                  <span
+                    className="ml-auto font-mono text-xs tabular-nums text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    {raw !== null ? scaledFromRaw(raw, multiplier, decimals) : "—"}
                   </span>
-                </label>
-                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                  balance:{" "}
-                  {balance === undefined ? "…" : balance === null ? "no ATA" : `${balance} raw`}
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <input
-                  id={`inkind-${i}`}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="raw amount (base units)"
-                  value={inputs[i]}
-                  onChange={(e) =>
-                    setInputs((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
-                  }
-                  className="h-9 w-56 rounded-md border border-border bg-card px-3 font-mono text-sm tabular-nums outline-none placeholder:font-sans placeholder:text-muted-foreground focus:border-ring"
-                  aria-invalid={balanceErrors[i] !== null}
-                />
-                <span className="font-mono text-xs tabular-nums text-muted-foreground" aria-live="polite">
-                  {raw !== null
-                    ? `scaled ${scaledFromRaw(raw, multiplier, decimals)}`
-                    : "scaled —"}
-                </span>
-              </div>
-              {balanceErrors[i] ? (
-                <p role="alert" className="mt-1 text-xs text-destructive">
-                  {balanceErrors[i]}
-                </p>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            // Anchor on the largest filled leg; every other leg follows the vault ratio.
-            const best = amounts.reduce<number>(
-              (best, a, i) => (a !== null && a > (amounts[best] ?? 0n) ? i : best),
-              -1,
+                  <span
+                    className="w-32 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground"
+                    title={mint}
+                  >
+                    {balance === undefined
+                      ? "…"
+                      : balance === null
+                        ? "no ATA"
+                        : `${balance} raw`}
+                  </span>
+                </div>
+                {balanceErrors[i] ? (
+                  <p role="alert" className="pb-1 text-xs text-destructive">
+                    {balanceErrors[i]}
+                  </p>
+                ) : null}
+              </li>
             );
-            if (best === -1) return;
-            const proportional = proportionalDeposits(amounts as bigint[], vaultsForCheck, best);
-            setInputs(proportional.map((a) => (a > 0n ? a.toString() : "")));
-          }}
-        >
-          Fill proportional to vault ratios
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => void refreshBalances()}>
-          Refresh balances
-        </Button>
-      </div>
+          })}
+        </ul>
 
-      {/* live weight-check report */}
-      <div aria-live="polite" className="rounded-md border border-border p-3 text-xs leading-relaxed">
-        {!allFilled ? (
-          <p className="text-muted-foreground">
-            Enter a raw amount for every constituent to validate the ratio.
-          </p>
-        ) : check?.ok ? (
-          <p>
-            Ratio valid — gross{" "}
-            <span className="font-mono tabular-nums">{formatRawShares6(check.gross)}</span> shares
-            (leg {check.limitingIndex + 1} is limiting). Entry fee{" "}
-            <span className="font-mono tabular-nums">
-              {formatRawShares6(entryFee ?? 0n)}
-            </span>{" "}
-            ({detail.entry_fee_bps} bps) → net{" "}
-            <span className="font-mono tabular-nums">{formatRawShares6(net ?? 0n)}</span> shares to
-            your wallet. Preview uses the last indexed supply; the program accrues the management
-            fee first and re-reads supply.
-          </p>
-        ) : (
-          <p role="alert" className="text-muted-foreground">
-            {weightError?.kind === "WeightMismatch"
-              ? `WeightMismatch — deposits are off the vault ratios by more than 1%. Leg ${
-                  weightError.minIndex + 1
-                } is limiting${offTolerance.length ? `; off-tolerance: ${offTolerance.map((i) => i + 1).join(", ")}` : ""}.`
-              : weightError?.kind === "ZeroAmount"
-                ? "Every leg needs an amount greater than zero."
-                : weightError?.kind === "ZeroVault"
-                  ? `Vault leg ${weightError.index + 1} holds zero raw units — mint against it is impossible.`
-                  : "The deposit does not produce shares (ZeroShares)."}
-          </p>
-        )}
-      </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              // Anchor on the largest filled leg; every other leg follows the vault ratio.
+              const best = amounts.reduce<number>(
+                (best, a, i) => (a !== null && a > (amounts[best] ?? 0n) ? i : best),
+                -1,
+              );
+              if (best === -1) return;
+              const proportional = proportionalDeposits(amounts as bigint[], vaultsForCheck, best);
+              setInputs(proportional.map((a) => (a > 0n ? a.toString() : "")));
+            }}
+          >
+            Fill proportional
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => void refreshBalances()}>
+            Refresh balances
+          </Button>
+        </div>
 
-      <Button onClick={openReview} disabled={!canReview}>
-        Review &amp; mint
-      </Button>
-      {!connected ? (
-        <p className="text-xs text-muted-foreground">Connect a wallet to mint.</p>
-      ) : null}
+        {/* live weight-check report — thin per-leg bar + one line */}
+        <div aria-live="polite" className="space-y-2">
+          {check?.ok ? (
+            <div className="flex h-1 gap-px overflow-hidden rounded-full" aria-hidden="true">
+              {check.perLeg.map((g, i) => {
+                const max = check.perLeg.reduce((m, x) => (x > m ? x : m), check.gross);
+                const pct = max > 0n ? Number((g * 100n) / max) : 0;
+                const off = offTolerance.includes(i);
+                return (
+                  <div key={i} className="h-1 flex-1 bg-muted">
+                    <div
+                      className={`h-1 rounded-full ${off ? "bg-foreground" : "bg-foreground/70"}`}
+                      style={{ width: `${Math.max(pct, 2)}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+          {!allFilled ? (
+            <p className="text-xs text-muted-foreground">
+              Enter an amount for every constituent to validate the ratio.
+            </p>
+          ) : check?.ok ? (
+            <p className="text-xs text-muted-foreground">
+              Within the 1% tolerance — leg {check.limitingIndex + 1} is limiting.
+            </p>
+          ) : (
+            <p role="alert" className="text-xs text-destructive">
+              {weightError?.kind === "WeightMismatch"
+                ? `WeightMismatch — deposits exceed the 1% tolerance. Leg ${
+                    weightError.minIndex + 1
+                  } is limiting${offTolerance.length ? `; off-tolerance: ${offTolerance.map((i) => i + 1).join(", ")}` : ""}.`
+                : weightError?.kind === "ZeroAmount"
+                  ? "Every leg needs an amount greater than zero."
+                  : weightError?.kind === "ZeroVault"
+                    ? `Vault leg ${weightError.index + 1} holds zero raw units — mint against it is impossible.`
+                    : "The deposit does not produce shares (ZeroShares)."}
+            </p>
+          )}
+        </div>
 
-      <TxReviewModal
-        open={open}
-        onClose={close}
-        title="Review in-kind mint"
-        description="mint_in_kind — the entry fee splits 90/10 to creator/treasury; net shares mint to your wallet."
-        accounts={[...(createAccounts ?? []), ...(expectedAccounts ?? [])]}
-        summary={
-          <dl className="grid gap-1 font-mono text-xs tabular-nums">
-            {detail.constituents.map((mint, i) => (
-              <div key={mint} className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">
-                  deposit[{i}] {truncateAddress(mint, 4, 4)}
-                </dt>
-                <dd>{amounts[i]?.toString() ?? "—"}</dd>
-              </div>
-            ))}
+        {check?.ok ? (
+          <dl className="grid gap-1 rounded-md border border-border p-3 font-mono text-xs tabular-nums">
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">gross shares</dt>
-              <dd>{gross !== null ? `${gross} raw` : "—"}</dd>
+              <dd>{formatRawShares6(check.gross)}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">entry fee ({detail.entry_fee_bps} bps)</dt>
-              <dd>{entryFee !== null ? `${entryFee} raw` : "—"}</dd>
+              <dt className="text-muted-foreground">entry fee · {detail.entry_fee_bps} bps</dt>
+              <dd>−{formatRawShares6(entryFee ?? 0n)}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">net shares</dt>
-              <dd>{net !== null ? `${net} raw` : "—"}</dd>
+              <dd className="font-medium text-foreground">{formatRawShares6(net ?? 0n)}</dd>
             </div>
           </dl>
-        }
-        flowState={flow.state}
-        onConfirm={() => {
-          if (!publicKey || !check?.ok) return;
-          void flow.run(() => [
-            ...createIxs,
-            ...buildMintInKind({
-              keys: {
-                basket: new PublicKey(detail.pubkey),
-                factory: new PublicKey(detail.factory),
-                creator: new PublicKey(detail.creator),
-                treasury: new PublicKey(detail.treasury),
-                shareMint: new PublicKey(detail.share_mint),
-                constituents: detail.constituents,
-                user: publicKey,
-              },
-              amounts: amounts as bigint[],
-              vaultBalances: vaultsForCheck,
-            }).instructions,
-          ]);
-        }}
-        confirmLabel="Simulate & sign"
-        endpoint={RPC_ENDPOINT}
-        errorSlot={
-          flow.state.mintPaused ? (
-            <div
-              role="alert"
-              className="mt-4 rounded-md border border-border/60 bg-muted/40 p-3 text-xs leading-relaxed"
-            >
-              <p className="font-medium">MintPaused — the on-chain whitelist gate stopped this mint</p>
-              <p className="mt-1 text-muted-foreground">
-                One of the basket&apos;s constituents is set to <span className="font-mono">PausedNewMints</span>{" "}
-                in the whitelist program, which blocks new mints before any token moves. Nothing was
-                signed. Redeem is never affected by this pause.
-              </p>
-            </div>
-          ) : undefined
-        }
-      />
-    </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={openReview} disabled={!canReview}>
+            Review &amp; mint
+          </Button>
+          {!connected ? (
+            <span className="text-xs text-muted-foreground">Connect a wallet to mint.</span>
+          ) : null}
+        </div>
+
+        <TxReviewModal
+          open={open}
+          onClose={close}
+          title="Review in-kind mint"
+          description="mint_in_kind — the entry fee splits 90/10 to creator/treasury; net shares mint to your wallet."
+          accounts={[...(createAccounts ?? []), ...(expectedAccounts ?? [])]}
+          summary={
+            <dl className="grid gap-1 font-mono text-xs tabular-nums">
+              {detail.constituents.map((mint, i) => (
+                <div key={mint} className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">
+                    deposit[{i}] {truncateAddress(mint, 4, 4)}
+                  </dt>
+                  <dd>{amounts[i]?.toString() ?? "—"}</dd>
+                </div>
+              ))}
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">gross shares</dt>
+                <dd>{gross !== null ? `${gross} raw` : "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">entry fee ({detail.entry_fee_bps} bps)</dt>
+                <dd>{entryFee !== null ? `${entryFee} raw` : "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">net shares</dt>
+                <dd>{net !== null ? `${net} raw` : "—"}</dd>
+              </div>
+            </dl>
+          }
+          flowState={flow.state}
+          onConfirm={() => {
+            if (!publicKey || !check?.ok) return;
+            void flow.run(() => [
+              ...createIxs,
+              ...buildMintInKind({
+                keys: {
+                  basket: new PublicKey(detail.pubkey),
+                  factory: new PublicKey(detail.factory),
+                  creator: new PublicKey(detail.creator),
+                  treasury: new PublicKey(detail.treasury),
+                  shareMint: new PublicKey(detail.share_mint),
+                  constituents: detail.constituents,
+                  user: publicKey,
+                },
+                amounts: amounts as bigint[],
+                vaultBalances: vaultsForCheck,
+              }).instructions,
+            ]);
+          }}
+          confirmLabel="Simulate & sign"
+          endpoint={RPC_ENDPOINT}
+          errorSlot={
+            flow.state.mintPaused ? (
+              <div
+                role="alert"
+                className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-xs leading-relaxed"
+              >
+                <p className="font-medium">MintPaused — the on-chain whitelist gate stopped this mint</p>
+                <p className="mt-1 text-muted-foreground">
+                  One of the basket&apos;s constituents is set to <span className="font-mono">PausedNewMints</span>{" "}
+                  in the whitelist program, which blocks new mints before any token moves. Nothing was
+                  signed. Redeem is never affected by this pause.
+                </p>
+              </div>
+            ) : undefined
+          }
+        />
+      </CardContent>
+    </Card>
   );
 }

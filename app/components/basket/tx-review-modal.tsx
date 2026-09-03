@@ -95,7 +95,7 @@ export function TxReviewModal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-md border border-border bg-card p-4 shadow-lg outline-none"
+        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -116,15 +116,15 @@ export function TxReviewModal({
         </div>
 
         {summary ? (
-          <div className="mt-4 rounded-md border border-border bg-background/40 p-3 text-sm">
+          <div className="mt-5 rounded-md border border-border bg-muted/30 p-3 text-sm">
             {summary}
           </div>
         ) : null}
 
-        <h3 className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <h3 className="mt-5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Accounts this transaction touches ({accounts.length})
         </h3>
-        <ul className="mt-2 divide-y divide-border rounded-md border border-border">
+        <ul className="mt-2 divide-y divide-border overflow-hidden rounded-md border border-border">
           {accounts.map((account) => (
             <li key={`${account.label}-${account.pubkey.toBase58()}`} className="px-3 py-2">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
@@ -133,22 +133,24 @@ export function TxReviewModal({
                   {truncateAddress(account.pubkey.toBase58(), 6, 6)}
                 </span>
               </div>
-              <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{account.note}</p>
-              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80">
-                {account.signer ? "signer " : ""}
-                {account.writable ? "writable" : "read-only"}
-              </p>
+              <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <p className="text-[11px] leading-4 text-muted-foreground">{account.note}</p>
+                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80">
+                  {account.signer ? "signer " : ""}
+                  {account.writable ? "writable" : "read-only"}
+                </p>
+              </div>
             </li>
           ))}
         </ul>
 
         {errorSlot}
 
-        <div aria-live="polite" className="mt-4">
+        <div aria-live="polite" className="mt-5">
           <StatusLine state={flowState} explorerHref={explorerHref} />
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={inFlight}>
             {terminal ? "Close" : "Cancel"}
           </Button>

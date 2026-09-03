@@ -29,6 +29,7 @@ import {
   type DecodedFolioxEvent,
   type FolioxEventType,
 } from "./events.js";
+import { applyPositionEvent } from "./positions.js";
 
 /** Minimal structural slice of @solana/web3.js Connection used here. */
 export interface SolanaRpc {
@@ -260,6 +261,8 @@ export class EventIndexer {
         }
         const programKey = new PublicKey(programId);
         const rows: EventRow[] = [];
+        // Events decoded from THIS transaction only (for the positions sync).
+        const txEvents: DecodedFolioxEvent[] = [];
         let basketCreated: Extract<DecodedFolioxEvent, { type: "BasketCreated" }> | null = null;
         let createArgs: CreateBasketArgs | null = null;
 
@@ -269,6 +272,7 @@ export class EventIndexer {
           const event = decodeAnchorEvent(type, payload);
           if (!event) continue;
           events.push(event);
+          txEvents.push(event);
           const tsSec = sigInfo.blockTime ?? (event.type === "BasketCreated" ? event.ts : Math.floor(Date.now() / 1000));
           const data: Record<string, unknown> = { ...event, programId };
           if (event.type === "BasketCreated") {
@@ -310,6 +314,22 @@ export class EventIndexer {
                 console.warn(`[indexer] could not decode FactoryConfig treasury for basket ${basketCreated.basket}`);
               }
             }
+          }
+        }
+
+        // user_positions sync — AFTER the core upserts. The position_events
+        // (sig, kind) ledger makes each write idempotent on its own, so this
+        // runs even when the events row insert above was not fresh (recovery
+        // after a crash between the two writes). Degrades to a warn when db
+        // is null; per-event failures never break the poll loop.
+        for (const ev of txEvents) {
+          try {
+            await applyPositionEvent(this.db, sigInfo.signature, ev);
+          } catch (err) {
+            console.warn(
+              `[indexer] user_positions sync failed for ${sigInfo.signature} (${ev.type}):`,
+              err instanceof Error ? err.message : err,
+            );
           }
         }
       } catch (err) {

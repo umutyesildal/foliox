@@ -133,6 +133,25 @@ CREATE TABLE IF NOT EXISTS user_positions (
 );
 CREATE INDEX IF NOT EXISTS user_positions_user_idx ON user_positions("user");
 CREATE INDEX IF NOT EXISTS user_positions_basket_idx ON user_positions(basket);
+-- cost_basis provenance: 'reference' = blended from nav_snapshots.share_price
+-- by the indexer (an estimate, not a fill price). NULL = cost basis unknown.
+ALTER TABLE user_positions ADD COLUMN IF NOT EXISTS cost_basis_source TEXT;
+
+-- ---------------------------------------------------------------------------
+-- position_events — idempotency ledger for user_positions writes (indexer).
+-- Every Minted/Redeemed/FeeAccrued applied to balances INSERTs (sig, kind)
+-- here first with ON CONFLICT DO NOTHING; a replayed signature loses the
+-- race and is skipped, so re-processing can never double-count balances.
+-- Keyed (sig, kind), mirroring the events table's per-signature dedupe.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS position_events (
+  sig TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('Minted','Redeemed','FeeAccrued')),
+  basket TEXT,                              -- informational (no FK: fee splits
+                                           -- may run before baskets is indexed)
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (sig, kind)
+);
 
 -- ---------------------------------------------------------------------------
 -- basket_rankings — materialized view per spec §7, refreshed by the NAV

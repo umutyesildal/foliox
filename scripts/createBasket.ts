@@ -24,7 +24,7 @@
  * treasury, fees, weights, seedAmounts.
  */
 
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, PublicKey, Transaction } from "@solana/web3.js";
 import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
@@ -36,6 +36,7 @@ import {
   deriveVaultAuthority,
   deriveWhitelistedMint,
   ensureSol,
+  E2E_COMPUTE_UNITS,
   fmtRaw,
   ixCreateBasket,
   ixInitFactory,
@@ -153,13 +154,22 @@ async function main() {
         basket,
       });
       try {
+        // The compute-unit limit comes from lib.ts send() — the atomic deploy
+        // (share mint + basket init CPI + 3 vault ATAs + seed transfers +
+        // genesis mint + authority handoff) exceeds the 200k default budget.
         await send(conn, "create_basket", [createIx], [payer]);
       } catch (err) {
         // A failed tx has no on-chain effect, so re-simulating reproduces the
         // failure and surfaces the program logs (silent 3xxx codes otherwise).
         console.error(`  create_basket send failed: ${err}`);
         try {
-          const sim = await conn.simulateTransaction(new Transaction().add(createIx), [payer]);
+          const sim = await conn.simulateTransaction(
+            new Transaction().add(
+              ComputeBudgetProgram.setComputeUnitLimit({ units: E2E_COMPUTE_UNITS }),
+              createIx,
+            ),
+            [payer],
+          );
           console.error(`  simulation err: ${JSON.stringify(sim.value.err)}`);
           for (const line of sim.value.logs ?? []) console.error(`    ${line}`);
         } catch (simErr) {

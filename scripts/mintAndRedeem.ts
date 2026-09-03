@@ -195,12 +195,23 @@ async function main() {
     console.log(
       `  structural check: ${ix.keys.length} accounts, NO whitelist PDA — and constituent[0] is PAUSED on-chain`,
     );
+    // user2's constituent ATAs still hold the leftover top-up funding, so the
+    // post-redeem check must compare DELTAS, not absolute balances.
+    const tokenBalBefore: bigint[] = [];
+    for (const m of mints) {
+      const b = await readTokenAmount(conn, deriveAta(user2.publicKey, m));
+      if (b === null) throw new Error(`user2 ATA missing for ${m.toBase58()}`);
+      tokenBalBefore.push(b);
+    }
     await send(conn, "redeem_in_kind", [ix], [user2]);
 
     // verify received amounts match the floor math exactly
     for (let i = 0; i < mints.length; i++) {
       const bal = (await readTokenAmount(conn, deriveAta(user2.publicKey, mints[i])))!;
-      if (bal !== outs[i]) throw new Error(`user2 token[${i}] ${bal} != expected out ${outs[i]}`);
+      const received = bal - tokenBalBefore[i];
+      if (received !== outs[i]) {
+        throw new Error(`user2 token[${i}] received ${received} != expected out ${outs[i]}`);
+      }
       console.log(`  out[${i}] = ${fmtRaw(outs[i])} (received exactly)`);
     }
     const shareBalAfter = await readTokenAmount(conn, deriveAta(user2.publicKey, shareMint));

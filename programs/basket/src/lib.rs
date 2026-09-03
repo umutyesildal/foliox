@@ -160,13 +160,13 @@ pub mod basket {
     ) -> Result<()> {
         use anchor_lang::{AnchorSerialize, Discriminator};
         // 1. Only the canonical factory PDA (signing via the factory's CPI
-        //    signer seeds) may initialize Basket accounts.
+        //    signer seeds) may initialize Basket accounts. The `Signer<'info>`
+        //    type on the context field makes Anchor's generated CPI mirror
+        //    serialize the AccountMeta with is_signer = true, so the runtime
+        //    verifies the PDA signature against the caller's invoke_signed
+        //    seeds at CPI time (try_accounts rejects non-signers).
         let factory_key = ctx.accounts.authority.key();
         require_keys_eq!(factory_key, factory_pda(), BasketError::InvalidFactoryAuthority);
-        require!(
-            ctx.accounts.authority.is_signer,
-            BasketError::InvalidFactoryAuthority
-        );
         // 2. Genuine basket PDA under the FACTORY program id, canonical bump.
         let (expected_basket, expected_bump) = Pubkey::find_program_address(
             &[BASKET_SEED, factory_key.as_ref(), creator.as_ref(), &nonce.to_le_bytes()],
@@ -999,9 +999,12 @@ pub struct InitBasket<'info> {
     /// derivation are all verified in the handler before anything is written.
     #[account(mut)]
     pub basket: UncheckedAccount<'info>,
-    /// CHECK: must be the canonical factory PDA (`factory_pda()`) and a signer
-    /// — enforced in the handler; only the factory program can sign with it.
-    pub authority: UncheckedAccount<'info>,
+    /// The canonical factory PDA (`factory_pda()`), key-checked in the handler.
+    /// Typed `Signer` so the Anchor-generated CPI mirror marks the AccountMeta
+    /// as a signer — the factory satisfies it via its PDA signer seeds (a PDA
+    /// cannot be a transaction-level signer, so only the factory program's
+    /// `create_basket` CPI can pass this check).
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]

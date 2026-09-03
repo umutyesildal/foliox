@@ -241,12 +241,24 @@ pub mod basket_factory {
         {
             let factory_bump_arr = [ctx.accounts.factory.bump];
             let factory_signer_seeds: [&[u8]; 2] = [FACTORY_SEED, &factory_bump_arr];
+            // The factory PDA signs the CPI via `invoke_signed` + the seeds
+            // above, but Anchor serializes the AccountMeta's `is_signer` from
+            // the caller's AccountInfo flag (false for a PDA that is not a tx
+            // signer), and `init_basket` requires `authority.is_signer` — so
+            // mark the flag on our local clone. This is NOT a privilege
+            // escalation: the runtime rejects the CPI unless the flagged
+            // account is genuinely derived from [FACTORY_SEED, bump] under
+            // THIS program id (the seeds passed to invoke_signed), and the
+            // handler-side keys_eq! against `factory_pda()` still pins the
+            // canonical factory PDA.
+            let mut authority_info = ctx.accounts.factory.to_account_info();
+            authority_info.is_signer = true;
             basket::cpi::init_basket(
                 CpiContext::new_with_signer(
                     ctx.accounts.basket_program.to_account_info(),
                     basket::cpi::accounts::InitBasket {
                         basket: ctx.accounts.basket.to_account_info(),
-                        authority: ctx.accounts.factory.to_account_info(),
+                        authority: authority_info,
                     },
                     &[&factory_signer_seeds],
                 ),

@@ -23,6 +23,7 @@
  */
 
 import {
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
@@ -683,6 +684,18 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Compute-unit limit prepended to every e2e transaction: single-instruction
+ * protocol flows (create_basket, mint/redeem with ATA creation + multi-CPI
+ * loops) sit at or above the 200k default per-transaction budget, and CU usage
+ * varies slightly per run — request headroom (no fee: only PRICE costs lamports).
+ */
+export const E2E_COMPUTE_UNITS = 500_000;
+
+function withCuLimit(ixs: TransactionInstruction[]): TransactionInstruction[] {
+  return [ComputeBudgetProgram.setComputeUnitLimit({ units: E2E_COMPUTE_UNITS }), ...ixs];
+}
+
 /** Send + confirm, printing the signature. */
 export async function send(
   conn: Connection,
@@ -690,7 +703,7 @@ export async function send(
   ixs: TransactionInstruction[],
   signers: Keypair[],
 ): Promise<string> {
-  const tx = new Transaction().add(...ixs);
+  const tx = new Transaction().add(...withCuLimit(ixs));
   const sig = await sendAndConfirmTransaction(conn, tx, signers, {
     skipPreflight: false,
   });
@@ -709,7 +722,7 @@ export async function trySend(
   signers: Keypair[],
 ): Promise<boolean> {
   try {
-    const tx = new Transaction().add(...ixs);
+    const tx = new Transaction().add(...withCuLimit(ixs));
     await sendAndConfirmTransaction(conn, tx, signers, { skipPreflight: true });
     return true;
   } catch {

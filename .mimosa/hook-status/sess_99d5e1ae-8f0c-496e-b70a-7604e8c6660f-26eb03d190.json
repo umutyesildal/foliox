@@ -1,14 +1,14 @@
 {
   "schemaVersion": "mimosa-hook-status/v1",
-  "recordedAt": "2026-09-04T20:07:37.224Z",
+  "recordedAt": "2026-09-04T21:30:22.523Z",
   "sessionId": "sess_99d5e1ae-8f0c-496e-b70a-7604e8c6660f",
   "event": "PostToolUse",
   "toolName": "Edit",
-  "file": "plan.md",
-  "outcome": "clear",
-  "coverage": "complete",
+  "file": "package.json",
+  "outcome": "inconclusive",
+  "coverage": "partial",
   "findingCount": 0,
-  "durationMs": 3,
+  "durationMs": 6,
   "hostState": "hook_complete",
   "reportHint": ".mimosa/reports/"
 }

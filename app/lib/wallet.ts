@@ -110,16 +110,23 @@ export function explorerClusterQuery(
 
 /**
  * Human-readable message for a wallet-adapter error. Covers the
- * rejected-signature/rejected-connection case explicitly; unknown errors fall
- * through to the wallet's own message.
+ * rejected-signature/rejected-connection case explicitly; rate-limited public
+ * RPC errors get calm honest copy (web3.js already retries internally with
+ * backoff — "Server responded with 429. Retrying after 4000ms delay…" is the
+ * shared api.devnet.solana.com limit, not a broken wallet); unknown errors
+ * fall through to the wallet's own message.
  */
 export function describeWalletError(
   error: { name?: string; message?: string } | null | undefined,
 ): string {
   if (!error) return "The wallet request failed.";
   const name = error.name ?? "";
-  const message = (error.message ?? "").toLowerCase();
-  if (message.includes("reject")) return "The request was rejected in the wallet.";
+  const message = error.message ?? "";
+  const lowered = message.toLowerCase();
+  if (isRateLimitErrorText(`${name} ${message}`)) {
+    return describeRpcRateLimit();
+  }
+  if (lowered.includes("reject")) return "The request was rejected in the wallet.";
   if (name === "WalletWindowClosedError") {
     return "The wallet window was closed before the request finished.";
   }
@@ -138,6 +145,37 @@ export function describeWalletError(
   if (name === "WalletDisconnectedError") {
     return "The wallet was disconnected.";
   }
-  const raw = error.message?.trim();
+  const raw = message.trim();
   return raw ? raw : "The wallet request failed.";
+}
+
+/** Matches HTTP 429 / rate-limit wording out of raw RPC or wallet errors. */
+function isRateLimitErrorText(text: string): boolean {
+  return /\b429\b|too many requests|rate.?limit/i.test(text);
+}
+
+/** True when an error is the public devnet RPC rate limit (429). */
+export function isRateLimitError(error: unknown): boolean {
+  if (!error) return false;
+  const text =
+    error instanceof Error
+      ? `${error.name} ${error.message}`
+      : typeof error === "string"
+        ? error
+        : String(error);
+  return isRateLimitErrorText(text);
+}
+
+/**
+ * Calm inline copy for rate-limit errors — the honest state: the public
+ * cluster is throttling shared traffic and web3.js retries automatically.
+ */
+export function describeRpcRateLimit(endpoint: string = RPC_ENDPOINT): string {
+  return `devnet public RPC is rate-limited — retrying automatically (${endpoint}). This usually clears in a few seconds; no action needed.`;
+}
+
+/** Map a thrown error to display text: calm copy for 429s, raw otherwise. */
+export function describeRpcError(err: unknown): string {
+  if (isRateLimitError(err)) return describeRpcRateLimit();
+  return err instanceof Error ? err.message : String(err);
 }

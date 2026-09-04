@@ -10,6 +10,7 @@ import { ZapInForm } from "@/components/basket/zap-in-form";
 import {
   ApiError,
   fetchBasketDetail,
+  fetchMintPriceSources,
   fetchMintTickers,
   type BasketDetail,
 } from "@/components/basket/basket-api";
@@ -51,6 +52,7 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
   const [reloadKey, setReloadKey] = useState(0);
   const [tab, setTab] = useState<Tab>("inkind");
   const [mintTickers, setMintTickers] = useState<Map<string, string>>(new Map());
+  const [priceSources, setPriceSources] = useState<Map<string, string>>(new Map());
   const TAB_ORDER: Tab[] = ["inkind", "zap"];
   const tablistRef = useRef<HTMLDivElement | null>(null);
 
@@ -104,6 +106,31 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
       .catch(() => setMintTickers(new Map()));
     return () => controller.abort();
   }, [reloadKey]);
+
+  // Price-source context for the Zap gate — degrades to "unknown" (map empty).
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchMintPriceSources(controller.signal)
+      .then(setPriceSources)
+      .catch(() => setPriceSources(new Map()));
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  // Zap USDC honesty gate: Jupiter can never quote `mock:*` devnet mints, so
+  // the zap path is disabled up-front (via the API's price_source field)
+  // instead of letting every leg fail at quote time. Unknown sources (no
+  // whitelist data) do not disable — the quote error then speaks for itself.
+  const zapUsdcUnavailable = useMemo(() => {
+    if (!detail || priceSources.size === 0) return false;
+    return detail.constituents.some(
+      (mint) => (priceSources.get(mint) ?? "").startsWith("mock:"),
+    );
+  }, [detail, priceSources]);
+
+  // Guard in case a keyboard path lands on the disabled tab.
+  useEffect(() => {
+    if (tab === "zap" && zapUsdcUnavailable) setTab("inkind");
+  }, [tab, zapUsdcUnavailable]);
 
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -232,10 +259,17 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
               onChangeTab={() => setTab("zap")}
               onArrowKeyDown={handleTabArrowKeys}
               tabIndex={tab === "zap" ? 0 : -1}
+              disabled={zapUsdcUnavailable}
+              disabledReason="Zap needs Jupiter-listed tokens — unavailable on devnet. Use In-Kind."
             >
               Zap USDC
             </TabButton>
           </div>
+          {zapUsdcUnavailable ? (
+            <p className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
+              Zap needs Jupiter-listed tokens — unavailable on devnet. Use In-Kind.
+            </p>
+          ) : null}
 
           <div
             role="tabpanel"
@@ -273,6 +307,8 @@ function TabButton({
   onChangeTab,
   onArrowKeyDown,
   tabIndex,
+  disabled = false,
+  disabledReason,
   children,
 }: {
   id: string;
@@ -281,6 +317,8 @@ function TabButton({
   onChangeTab: () => void;
   onArrowKeyDown: (event: React.KeyboardEvent) => void;
   tabIndex: 0 | -1;
+  disabled?: boolean;
+  disabledReason?: string;
   children: string;
 }) {
   return (
@@ -290,13 +328,22 @@ function TabButton({
       type="button"
       aria-selected={active}
       aria-controls={panelId}
-      tabIndex={tabIndex}
-      onClick={onChangeTab}
-      onKeyDown={onArrowKeyDown}
+      aria-disabled={disabled || undefined}
+      title={disabled ? disabledReason : undefined}
+      tabIndex={disabled ? -1 : tabIndex}
+      onClick={() => {
+        if (!disabled) onChangeTab();
+      }}
+      onKeyDown={(event) => {
+        if (disabled) return;
+        onArrowKeyDown(event);
+      }}
       className={`-mb-px border-b-2 px-1 pb-2 pt-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
-        active
-          ? "border-foreground font-medium text-foreground"
-          : "border-transparent text-muted-foreground hover:text-foreground"
+        disabled
+          ? "cursor-not-allowed border-transparent text-muted-foreground/50"
+          : active
+            ? "border-foreground font-medium text-foreground"
+            : "border-transparent text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}

@@ -91,6 +91,18 @@ export function percentToBps(percent: number): number {
 }
 
 /**
+ * Percent string from bps, LOCALE-INDEPENDENT: 1666 bps -> "16.67%"
+ * (always "." as the decimal separator). `toLocaleString` variants rendered
+ * "1.666 bps" for 1666 bps in dot-grouping locales (de/tr/es) — an integer
+ * weight misread as a fraction. Show this as the primary figure; put the raw
+ * bps value (String(bps), no grouping) in a title/tooltip.
+ */
+export function formatBpsAsPercent(bps: number, fractionDigits = 2): string {
+  if (!Number.isFinite(bps)) return NOT_A_NUMBER_LABEL;
+  return `${(bps / 100).toFixed(fractionDigits)}%`;
+}
+
+/**
  * Format a bps value for display, e.g. 40 -> "40 bps". With `signed`, positive
  * values get an explicit "+" (drift convention: +40 bps / -25 bps).
  */

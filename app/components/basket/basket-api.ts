@@ -217,6 +217,27 @@ export async function fetchMintTickers(
 }
 
 /**
+ * GET /whitelist — mint → raw price_source map ("mock:tsla", "jupiter:TSLAx",
+ * …). This is the honest signal for Jupiter-path availability: `mock:*` mints
+ * are repo-issued devnet tokens that Jupiter can NEVER quote, so the Zap USDC
+ * tab is disabled instead of letting every leg fail.
+ */
+export async function fetchMintPriceSources(
+  signal: AbortSignal,
+): Promise<Map<string, string>> {
+  const payload = await getJson<{
+    data?: { mint?: string; price_source?: string | null }[];
+  }>("/api/v1/whitelist", signal);
+  const map = new Map<string, string>();
+  for (const row of payload.data ?? []) {
+    if (typeof row.mint === "string" && typeof row.price_source === "string") {
+      map.set(row.mint, row.price_source);
+    }
+  }
+  return map;
+}
+
+/**
  * GET /market/overview?range=1mo — SPY 24h benchmark return from the last two
  * daily closes (same approach as /explore). Null when unavailable; callers
  * hide the vs-SPY metric rather than fabricate a comparison.

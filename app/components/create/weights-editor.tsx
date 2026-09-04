@@ -85,10 +85,12 @@ export function WeightsEditor({
             valid ? "text-foreground" : "text-destructive",
           )}
         >
-          {sum.toLocaleString()} / 10,000 bps
+          {/* Raw bps, locale-independent (no thousands grouping): grouped
+              rendering made the integer 1666 read as "1.666" in de/tr locales. */}
+          {String(sum)} / 10,000 bps
           {!valid && (
             <span className="font-sans">
-              — {diff > 0 ? "over" : "under"} by {Math.abs(diff).toLocaleString()}, adjust the
+              — {diff > 0 ? "over" : "under"} by {String(Math.abs(diff))}, adjust the
               sliders or Normalize
             </span>
           )}

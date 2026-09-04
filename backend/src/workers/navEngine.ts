@@ -26,6 +26,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { isPgLike, type PgLike } from "../db/client.js";
 import { fetchPriceQuotes, type PriceQuoteMap } from "./priceFetch.js";
 import { createMockAwareQuoteFetcher } from "./mockPriceFill.js";
+import { withRpcBackoff, createPacer } from "../rpc/backoff.js";
 
 // ---------------------------------------------------------------------------
 // Legacy numeric API — kept byte-for-byte compatible (existing vitest suite
@@ -370,10 +371,13 @@ export interface SupplyRpc {
   getTokenSupply(mint: PublicKey): Promise<{ value: { amount: string; decimals: number; uiAmount: number | null } }>;
 }
 
-/** Real on-chain supply via getTokenSupply (u64 → decimal string). */
+/** Real on-chain supply via getTokenSupply (u64 → decimal string). 429s go
+ *  through the shared RPC backoff before the events-derived fallback runs. */
 export async function fetchSupplyRawFromRpc(rpc: SupplyRpc, shareMint: string): Promise<SupplyFetch | null> {
   try {
-    const res = await rpc.getTokenSupply(new PublicKey(shareMint));
+    const res = await withRpcBackoff(() => rpc.getTokenSupply(new PublicKey(shareMint)), {
+      logKey: "navEngine:getTokenSupply",
+    });
     const amount = res.value?.amount;
     if (typeof amount !== "string" || amount === "") return null;
     return { supply: amount, source: "rpc" };
@@ -454,6 +458,12 @@ export interface NavRunSummary {
 export const NAV_SNAPSHOT_TTL_SECONDS = 15; // spec §7: nav:{basket} TTL 15s
 const DEFAULT_INTERVAL_MS = 60_000;
 const DEFAULT_RANKINGS_REFRESH_MS = 300_000;
+/**
+ * Minimum spacing between the NAV engine's sequential RPC supply reads
+ * (getTokenSupply per basket). The 60s NAV cadence is unchanged; the reads
+ * inside one pass are staggered so they cannot land as a burst.
+ */
+const NAV_SUPPLY_RPC_GAP_MS = 150;
 
 interface BasketCoreRow {
   pubkey: string;
@@ -719,9 +729,14 @@ export function createNavEngineFromEnv(opts: {
   const rpcUrl = opts.rpcUrl ?? env.RPC_URL ?? null;
   if (rpcUrl) {
     // Real on-chain supply first; events-derived estimate as fallback.
+    // Sequential reads are staggered (NAV_SUPPLY_RPC_GAP_MS) so a multi-basket
+    // pass spreads its RPC load instead of bursting it.
     const conn = new Connection(rpcUrl);
-    fetchSupply = (shareMint: string, basket: string) =>
-      fetchSupplyRawFromRpc(conn, shareMint).then((s) => s ?? fetchSupplyFromEvents(db, basket));
+    const supplyPacer = createPacer(NAV_SUPPLY_RPC_GAP_MS);
+    fetchSupply = async (shareMint: string, basket: string) => {
+      await supplyPacer.wait();
+      return (await fetchSupplyRawFromRpc(conn, shareMint)) ?? fetchSupplyFromEvents(db, basket);
+    };
   } else {
     fetchSupply = (_shareMint: string, basket: string) => fetchSupplyFromEvents(db, basket);
   }

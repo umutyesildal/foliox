@@ -32,6 +32,7 @@ import {
 } from "./events.js";
 import { applyPositionEvent } from "./positions.js";
 import { syncWhitelistedMints, type WhitelistRpc } from "./whitelistSync.js";
+import { withRpcBackoff } from "../rpc/backoff.js";
 
 /** Minimal structural slice of @solana/web3.js Connection used here. */
 export interface SolanaRpc {
@@ -71,21 +72,46 @@ export interface IndexerConfig {
   whitelistProgramId?: string;
   /** PROGRAM_BASKET — enables the periodic vault_holdings refresh pass. */
   basketProgramId?: string;
+  /**
+   * vault_holdings refresh cadence override (env HOLDINGS_SYNC_INTERVAL_MS on
+   * the devnet profile; schema §7 default stays 30s). Lower request pressure
+   * against the shared public RPC without changing the default profile.
+   */
+  holdingsSyncIntervalMs?: number;
+  /**
+   * Minimum spacing between sequential RPC reads inside the periodic state
+   * syncs — spreads a mint-facts batch over time instead of bursting it
+   * (bursty sequential reads were the main 429 trigger on public devnet).
+   */
+  stateSyncSpacingMs?: number;
+  /**
+   * Injectable sleep for the shared 429 backoff (tests: instant). Defaults to
+   * the real timer — production waits exponential-with-jitter, 60s cap.
+   */
+  backoffSleep?: (ms: number) => Promise<void>;
 }
+
+/** WhitelistedMint account sync cadence (schema §7: whitelist is slow-moving). */
+const WHITELIST_SYNC_INTERVAL_MS = 60_000;
+/** vault_holdings refresh cadence (schema §7: "updated every 30s or on event"). */
+const HOLDINGS_SYNC_INTERVAL_MS = 30_000;
+/**
+ * Spacing between sequential RPC reads in the periodic state syncs (the
+ * holdings pass reads mint facts one getAccountInfo at a time — spacing turns
+ * that burst into a gentle stream, which is what public devnet 429s on).
+ */
+const STATE_SYNC_SPACING_MS = 100;
+/** Failed signatures are retried this many polls before being dropped. */
+const MAX_PROCESS_ATTEMPTS = 5;
 
 export const DEFAULT_INDEXER_CONFIG: IndexerConfig = {
   programIds: [],
   pollIntervalMs: 15_000,
   signaturesPerPoll: 50,
   maxSeenCache: 10_000,
+  holdingsSyncIntervalMs: HOLDINGS_SYNC_INTERVAL_MS,
+  stateSyncSpacingMs: STATE_SYNC_SPACING_MS,
 };
-
-/** WhitelistedMint account sync cadence (schema §7: whitelist is slow-moving). */
-const WHITELIST_SYNC_INTERVAL_MS = 60_000;
-/** vault_holdings refresh cadence (schema §7: "updated every 30s or on event"). */
-const HOLDINGS_SYNC_INTERVAL_MS = 30_000;
-/** Failed signatures are retried this many polls before being dropped. */
-const MAX_PROCESS_ATTEMPTS = 5;
 
 export interface EventRow {
   sig: string;
@@ -283,6 +309,7 @@ export class EventIndexer {
     const full = this.rpc as ChainStateRpc;
     if (typeof full.getProgramAccounts !== "function") return; // hand-rolled test rpc
     const now = Date.now();
+    const spacing = this.cfg.stateSyncSpacingMs ?? STATE_SYNC_SPACING_MS;
     if (this.cfg.whitelistProgramId && now - this.lastWhitelistSyncMs >= WHITELIST_SYNC_INTERVAL_MS) {
       this.lastWhitelistSyncMs = now;
       try {
@@ -292,10 +319,11 @@ export class EventIndexer {
         console.warn("[indexer] whitelist sync failed:", err instanceof Error ? err.message : err);
       }
     }
-    if (now - this.lastHoldingsSyncMs >= HOLDINGS_SYNC_INTERVAL_MS) {
+    const holdingsIntervalMs = this.cfg.holdingsSyncIntervalMs ?? HOLDINGS_SYNC_INTERVAL_MS;
+    if (now - this.lastHoldingsSyncMs >= holdingsIntervalMs) {
       this.lastHoldingsSyncMs = now;
       try {
-        const n = await syncIndexedBaskets(full, this.db);
+        const n = await syncIndexedBaskets(full, this.db, { spacingMs: spacing });
         if (n > 0) console.log(`[indexer] holdings sync: ${n} baskets refreshed`);
       } catch (err) {
         console.warn("[indexer] holdings sync failed:", err instanceof Error ? err.message : err);
@@ -308,9 +336,16 @@ export class EventIndexer {
     let signaturesSeen = 0;
     let sigInfos;
     try {
-      sigInfos = await this.rpc.getSignaturesForAddress(new PublicKey(programId), {
-        limit: this.cfg.signaturesPerPoll,
-      });
+      // The shared backoff is the ONLY retry layer: when this batch already
+      // went through 429 backoff and still failed, the catch below logs and
+      // returns — it never re-fires the batch (no double-fire).
+      sigInfos = await withRpcBackoff(
+        () =>
+          this.rpc.getSignaturesForAddress(new PublicKey(programId), {
+            limit: this.cfg.signaturesPerPoll,
+          }),
+        { logKey: "indexer:getSignaturesForAddress", sleep: this.cfg.backoffSleep },
+      );
     } catch (err) {
       console.warn(`[indexer] getSignaturesForAddress failed for ${programId}:`, err instanceof Error ? err.message : err);
       return { programId, signaturesSeen, events };
@@ -324,9 +359,13 @@ export class EventIndexer {
       if (this.seen.has(sigInfo.signature)) continue;
       signaturesSeen++;
       try {
-        const tx = await this.rpc.getParsedTransaction(sigInfo.signature, {
-          maxSupportedTransactionVersion: 0,
-        });
+        const tx = await withRpcBackoff(
+          () =>
+            this.rpc.getParsedTransaction(sigInfo.signature, {
+              maxSupportedTransactionVersion: 0,
+            }),
+          { logKey: "indexer:getParsedTransaction", sleep: this.cfg.backoffSleep },
+        );
         if (!tx?.meta?.logMessages) {
           this.markSeen(sigInfo.signature);
           continue;
@@ -477,7 +516,10 @@ export class EventIndexer {
 
   private async fetchTreasury(factory: string): Promise<string | null> {
     try {
-      const info = await this.rpc.getAccountInfo(new PublicKey(factory));
+      const info = await withRpcBackoff(
+        () => this.rpc.getAccountInfo(new PublicKey(factory)),
+        { logKey: "indexer:getAccountInfo", sleep: this.cfg.backoffSleep },
+      );
       return decodeFactoryTreasury(info?.data ?? null);
     } catch {
       return null;
@@ -539,6 +581,8 @@ export function indexerConfigFromEnv(env: NodeJS.ProcessEnv = process.env): (Ind
     pollIntervalMs: Number(env.INDEXER_POLL_MS || DEFAULT_INDEXER_CONFIG.pollIntervalMs),
     signaturesPerPoll: Number(env.INDEXER_POLL_LIMIT || DEFAULT_INDEXER_CONFIG.signaturesPerPoll),
     maxSeenCache: DEFAULT_INDEXER_CONFIG.maxSeenCache,
+    holdingsSyncIntervalMs: Number(env.HOLDINGS_SYNC_INTERVAL_MS || HOLDINGS_SYNC_INTERVAL_MS),
+    stateSyncSpacingMs: DEFAULT_INDEXER_CONFIG.stateSyncSpacingMs,
   };
 }
 

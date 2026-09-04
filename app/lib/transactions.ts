@@ -645,7 +645,11 @@ export async function buildCreateBasketTransaction(params: {
       tables.push(table.value);
     }
   }
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("finalized");
+  // Fresh CONFIRMED blockhash (same as scripts/lib.ts sendFitting): a
+  // finalized-blockhash is already ~32 slots old when fetched, which left the
+  // wizard's tx ~48s of validity — long enough to expire while the user
+  // reviews the wallet popup. Confirmed gives the full 150-slot window.
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   const instructions = needsAlt
     ? [ComputeBudgetProgram.setComputeUnitLimit({ units: CREATE_BASKET_COMPUTE_UNITS }), instruction]
     : [instruction];
@@ -684,14 +688,22 @@ export interface EnsureCreateBasketAltResult {
 /**
  * Ensure an Address Lookup Table covering every non-signer create_basket
  * account exists on-chain, owned by (and paid for by) the connected creator
- * wallet. Idempotent:
+ * wallet. Idempotent, and mirrors the PROVEN devnet flow in
+ * scripts/lib.ts `getOrCreateAlt` (which landed the 6-constituent basket
+ * CZCHnprMPvBFLCs5jwApLMPj1MEUMGJ4SWr4WWzKXYCo):
  *
  * 1. The table address is derived deterministically from (creator, a recent
  *    finalized slot); if the account already exists it is reused.
- * 2. Otherwise the wallet signs a createLookupTable transaction.
- * 3. Any addresses missing from the table are extended in packet-sized
- *    chunks (each extension is a separate wallet signature — the extension
- *    instruction carries addresses in its data, so one transaction fits ~20).
+ * 2. Otherwise the wallet signs a createLookupTable transaction, and the table
+ *    account is POLLED until visible (create-confirm and RPC-visible are not
+ *    the same moment on a load-balanced public cluster).
+ * 3. Any addresses missing from the table are extended in packet-sized chunks
+ *    (each extension is a separate wallet signature), and the on-chain table
+ *    is then RE-READ and VERIFIED to contain every wanted address — with
+ *    jittered retries for RPC convergence. Compiling against a table whose
+ *    on-chain content lags the local copy is exactly what produced
+ *    "Transaction address table lookup uses an invalid index": the message
+ *    referenced indexes the executing node had not indexed yet.
  *
  * The wizard calls this BEFORE buildCreateBasketTransaction() whenever
  * `createBasketNeedsAlt()` is true; both consumer transactions (mint/redeem)
@@ -718,6 +730,11 @@ export async function ensureCreateBasketAlt(params: {
     AddressLookupTableProgram.programId,
   )[0];
 
+  const uniqueWanted: PublicKey[] = [];
+  for (const a of addresses) {
+    if (!uniqueWanted.some((w) => w.equals(a))) uniqueWanted.push(a);
+  }
+
   let created = false;
   if (!(await connection.getAccountInfo(lookupTableAddress))) {
     const [createIx, derived] = AddressLookupTableProgram.createLookupTable({
@@ -738,11 +755,27 @@ export async function ensureCreateBasketAlt(params: {
       onAwaitingWallet,
     );
     created = true;
+    // The table account must be visible before it can be extended or compiled
+    // against — poll (mirrors scripts/lib.ts getOrCreateAlt).
+    let visible = false;
+    for (let i = 0; i < 20 && !visible; i++) {
+      visible = Boolean(await connection.getAccountInfo(lookupTableAddress));
+      if (!visible) await sleepMs(500);
+    }
+    if (!visible) {
+      throw new Error(
+        `lookup table ${lookupTableAddress.toBase58()} was created but never became visible on ${connection.rpcEndpoint}`,
+      );
+    }
   }
 
-  const table = await connection.getAddressLookupTable(lookupTableAddress);
-  const have: PublicKey[] = table.value ? [...table.value.state.addresses] : [];
-  const missing = addresses.filter((a) => !have.some((h) => h.equals(a)));
+  const readTableAddresses = async (): Promise<PublicKey[]> => {
+    const table = await connection.getAddressLookupTable(lookupTableAddress);
+    return table.value ? [...table.value.state.addresses] : [];
+  };
+
+  const haveBefore = await readTableAddresses();
+  const missing = uniqueWanted.filter((a) => !haveBefore.some((h) => h.equals(a)));
   for (let i = 0; i < missing.length; i += 20) {
     const chunk = missing.slice(i, i + 20);
     const extendIx = AddressLookupTableProgram.extendLookupTable({
@@ -759,7 +792,40 @@ export async function ensureCreateBasketAlt(params: {
       onAwaitingWallet,
     );
   }
+
+  if (missing.length > 0 || !created) {
+    // Verify the on-chain table contains every wanted address before the
+    // consumer tx compiles against it. Public devnet is load-balanced: the
+    // node that served the compile read and the node that executes the
+    // transaction can lag each other, and an unverified compile produced the
+    // "address table lookup uses an invalid index" failure. Jittered backoff
+    // (no tight loop) while the cluster converges.
+    let converged: PublicKey[] | null = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const have = await readTableAddresses();
+      if (uniqueWanted.every((a) => have.some((h) => h.equals(a)))) {
+        converged = have;
+        break;
+      }
+      await sleepMs(750 + Math.floor(Math.random() * 750));
+    }
+    if (!converged) {
+      const have = await readTableAddresses();
+      const stillMissing = uniqueWanted.filter((a) => !have.some((h) => h.equals(a)));
+      throw new Error(
+        `lookup table ${lookupTableAddress.toBase58()} is missing ${stillMissing.length} address(es) after extension (${stillMissing
+          .slice(0, 3)
+          .map((a) => a.toBase58())
+          .join(", ")}${stillMissing.length > 3 ? "…" : ""}) — the extension transaction may not have landed`,
+      );
+    }
+  }
   return { lookupTableAddress, created, extended: missing.length };
+}
+
+/** Bounded wait helper (jittered by callers) — no tight RPC polling. */
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Compile → wallet-sign → confirm a small management transaction. */
@@ -770,7 +836,9 @@ async function sendWithWallet(
   payer: PublicKey,
   onAwaitingWallet?: (awaiting: boolean) => void,
 ): Promise<TransactionSignature> {
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("finalized");
+  // Confirmed blockhash — a finalized one is already ~32 slots old, which
+  // starves the confirmation window on a throttled public RPC.
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: payer,
     recentBlockhash: blockhash,

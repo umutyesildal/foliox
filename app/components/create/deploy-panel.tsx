@@ -22,7 +22,7 @@ import {
   validateCreateBasketArgs,
   type CreateBasketArgs,
 } from "@/lib/create-basket";
-import { RPC_ENDPOINT, describeWalletError } from "@/lib/wallet";
+import { RPC_ENDPOINT, describeRpcError, describeWalletError } from "@/lib/wallet";
 // Sibling contract: shared helpers from the basket-group worker's lib.
 import {
   buildCreateBasketTransaction,
@@ -248,7 +248,9 @@ export function DeployPanel({
       setPhase("idle");
       await loadBalances();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      // 429s render as a calm rate-limit notice instead of the raw
+      // "Server responded with 429. Retrying after 4000ms delay…" string.
+      const message = describeRpcError(error);
       setErrorMessage(`Simulation failed to run: ${message}`);
       setPhase("simulation-failed");
     }

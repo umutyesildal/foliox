@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FolioX — Pitch Deck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* FolioX brand — monochrome + imperial accent (matches site identity) */
+      --c-bg: #0a0a09;
+      --c-bg-alt: #12110d;
+      --c-bg-card: #171610;
+      --c-surface: #1c1a14;
+      --c-border: rgba(242,238,233,0.09);
+
+      --c-primary: #f2eee9;
+      --c-primary-dim: rgba(242,238,233,0.10);
+      --c-accent: #66ccba;
+      --c-accent-dim: rgba(102,204,186,0.10);
+      --c-imperial: #c48ab8;
+      --c-imperial-dim: rgba(196,138,184,0.14);
+      --c-danger: #ef4444;
+      --c-warning: #cba960;
+
+      --c-text: #f2eee9;
+      --c-text-secondary: rgba(242,238,233,0.66);
+      --c-text-muted: rgba(242,238,233,0.42);
+
+      --f-hero: 92px;
+      --f-h1: 60px;
+      --f-h2: 46px;
+      --f-h3: 34px;
+      --f-body: 27px;
+      --f-small: 21px;
+      --f-caption: 17px;
+
+      --font-cinzel: 'Cinzel', Georgia, serif;
+      --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+
+      --s-xs: 8px; --s-sm: 16px; --s-md: 32px; --s-lg: 48px; --s-xl: 64px; --s-2xl: 96px;
+
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --duration-enter: 0.6s;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: var(--c-bg); color: var(--c-text); }
+
+    .deck { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 80px 100px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s var(--ease-out);
+      font-family: var(--font-display);
+      background: var(--c-bg);
+    }
+    .slide.active { opacity: 1; pointer-events: auto; }
+
+    .slide.active .animate-in { animation: slideUp var(--duration-enter) var(--ease-out) both; }
+    .slide.active .animate-in:nth-child(1) { animation-delay: 0s; }
+    .slide.active .animate-in:nth-child(2) { animation-delay: 0.08s; }
+    .slide.active .animate-in:nth-child(3) { animation-delay: 0.16s; }
+    .slide.active .animate-in:nth-child(4) { animation-delay: 0.24s; }
+    .slide.active .animate-in:nth-child(5) { animation-delay: 0.32s; }
+    .slide.active .animate-in:nth-child(6) { animation-delay: 0.4s; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Display headings in Cinzel — the Roman voice */
+    .hero, .h1, .h2 { font-family: var(--font-cinzel); font-weight: 600; letter-spacing: 0; }
+    .h3, .metric-value { font-family: var(--font-mono); }
+
+    .hero { font-size: var(--f-hero); font-weight: 700; line-height: 1.06; }
+    .h1 { font-size: var(--f-h1); line-height: 1.12; }
+    .h2 { font-size: var(--f-h2); line-height: 1.2; }
+    .h3 { font-size: var(--f-h3); font-weight: 600; line-height: 1.3; }
+    .body { font-size: var(--f-body); font-weight: 400; line-height: 1.5; color: var(--c-text-secondary); }
+    .small { font-size: var(--f-small); line-height: 1.5; color: var(--c-text-secondary); }
+    .caption { font-size: var(--f-caption); font-weight: 600; color: var(--c-text-muted); letter-spacing: 3px; text-transform: uppercase; }
+    .mono { font-family: var(--font-mono); }
+
+    .text-primary { color: var(--c-primary); }
+    .text-accent { color: var(--c-accent); }
+    .text-imperial { color: var(--c-imperial); }
+    .text-muted { color: var(--c-text-muted); }
+    .text-danger { color: var(--c-danger); }
+    .text-emphasis { color: var(--c-primary); font-weight: 800; }
+
+    .flex { display: flex; } .flex-col { flex-direction: column; }
+    .items-center { align-items: center; } .justify-center { justify-content: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-sm { gap: var(--s-sm); } .gap-md { gap: var(--s-md); } .gap-lg { gap: var(--s-lg); }
+    .flex-1 { flex: 1; } .w-full { width: 100%; } .text-center { text-align: center; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-lg); }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-md); }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-md); }
+
+    .card { background: var(--c-bg-card); border: 1px solid var(--c-border); border-radius: 14px; padding: var(--s-lg); }
+    .card-glow { background: var(--c-bg-card); border: 1px solid rgba(196,138,184,0.25); border-radius: 14px; padding: var(--s-lg); box-shadow: 0 0 40px rgba(196,138,184,0.05); }
+
+    .metric-card { text-align: center; padding: var(--s-md); }
+    .metric-value { font-size: 64px; font-weight: 600; color: var(--c-accent); line-height: 1; }
+    .metric-label { font-size: var(--f-small); color: var(--c-text-muted); margin-top: var(--s-xs); font-weight: 500; }
+
+    .badge { display: inline-block; padding: 6px 16px; border-radius: 100px; font-size: var(--f-caption); font-weight: 600; letter-spacing: 1px; }
+    .badge-imperial { background: var(--c-imperial-dim); color: var(--c-imperial); }
+    .badge-outline { border: 1px solid var(--c-border); color: var(--c-text-secondary); }
+    .badge-accent { background: var(--c-accent-dim); color: var(--c-accent); }
+
+    .divider { width: 64px; height: 3px; border-radius: 2px; background: var(--c-imperial); opacity: 0.7; margin: var(--s-md) 0; }
+
+    .bullet-list { list-style: none; }
+    .bullet-list li { padding: var(--s-sm) 0; padding-left: var(--s-md); position: relative; font-size: var(--f-body); color: var(--c-text-secondary); border-bottom: 1px solid var(--c-border); }
+    .bullet-list li:last-child { border-bottom: none; }
+    .bullet-list li::before { content: ''; position: absolute; left: 0; top: 50%; width: 8px; height: 8px; border-radius: 50%; background: var(--c-imperial); transform: translateY(-50%); }
+
+    .comparison-table { width: 100%; border-collapse: collapse; }
+    .comparison-table th { text-align: left; padding: var(--s-sm) var(--s-md); font-size: var(--f-small); color: var(--c-text-muted); border-bottom: 1px solid var(--c-border); font-weight: 600; }
+    .comparison-table td { padding: var(--s-sm) var(--s-md); font-size: var(--f-body); border-bottom: 1px solid var(--c-border); color: var(--c-text-secondary); }
+    .comparison-table tr.highlight td { color: var(--c-text); background: var(--c-imperial-dim); font-weight: 600; }
+
+    .timeline { position: relative; padding-left: var(--s-lg); }
+    .timeline::before { content: ''; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: var(--c-border); }
+    .timeline-item { position: relative; padding-bottom: var(--s-lg); }
+    .timeline-dot { position: absolute; left: -42px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--c-imperial); border: 2px solid var(--c-bg); }
+    .timeline-item.active .timeline-dot { background: var(--c-accent); box-shadow: 0 0 12px rgba(102,204,186,0.4); }
+
+    .bg-default { background: var(--c-bg); }
+    .bg-alt { background: var(--c-bg-alt); }
+
+    .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 16px 40px; background: linear-gradient(0deg, rgba(10,10,9,0.95) 0%, transparent 100%); z-index: 100; opacity: 0; transition: opacity 0.3s; }
+    .deck:hover .nav-bar { opacity: 1; }
+    .nav-counter { font-size: 16px; color: var(--c-text-muted); font-family: var(--font-mono); }
+    .nav-progress { flex: 1; max-width: 200px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.1); margin: 0 24px; }
+    .nav-progress-fill { height: 100%; border-radius: 2px; background: var(--c-imperial); transition: width 0.3s var(--ease-out); }
+    .nav-btn { background: none; border: 1px solid var(--c-border); color: var(--c-text-secondary); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-family: var(--font-display); }
+    .nav-btn:hover { border-color: var(--c-imperial); color: var(--c-text); }
+
+    .notes { display: none; position: fixed; bottom: 60px; left: 40px; right: 40px; background: rgba(0,0,0,0.92); border: 1px solid var(--c-border); border-radius: 12px; padding: 20px 24px; font-size: 16px; color: var(--c-text-secondary); line-height: 1.6; z-index: 200; max-height: 220px; overflow-y: auto; }
+    .notes.visible { display: block; }
+    .notes-label { font-size: 12px; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+
+    @media print {
+      .deck { overflow: visible; }
+      .slide { position: relative; opacity: 1; pointer-events: auto; page-break-after: always; height: 100vh; break-inside: avoid; }
+      .nav-bar, .notes { display: none !important; }
+      .animate-in { animation: none !important; opacity: 1 !important; transform: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck" id="deck">
+
+    <!-- 1 · TITLE -->
+    <div class="slide bg-default" style="justify-content: center; align-items: center; text-align: center;">
+      <p class="caption animate-in" style="color: var(--c-imperial);">FOLIOX · MMXXVI</p>
+      <h1 class="hero animate-in" style="margin-top: 28px;">Create an index.<br>Own your thesis.</h1>
+      <p class="h3 animate-in" style="color: var(--c-text-secondary); margin-top: 28px; max-width: 760px;">
+        Onchain strategy baskets of tokenized stocks — immutable weights, capped fees, permissionless redemption.
+      </p>
+      <div class="animate-in" style="margin-top: 44px; display: flex; gap: 14px;">
+        <span class="badge badge-imperial">SOLANA</span>
+        <span class="badge badge-outline">TOKEN-2022</span>
+        <span class="badge badge-outline">XSTOCKS</span>
+      </div>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES</div>
+        Bar test: "FolioX lets anyone build their own ETF from tokenized stocks — in one transaction, self-custodied, redeemable anytime."
+        Hold 3 seconds. Do NOT say ETF in product copy — "strategy basket / index" only. Tease: "it already works — E2E on localnet."
+      </div>
+    </div>
+
+    <!-- 2 · PROBLEM -->
+    <div class="slide bg-alt">
+      <span class="caption animate-in">THE PROBLEM</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px; max-width: 1000px;">
+        You can buy tokenized stocks.<br>You still can't <span class="text-imperial">build with them.</span>
+      </h1>
+      <div class="divider animate-in"></div>
+      <ul class="bullet-list animate-in" style="max-width: 880px;">
+        <li>Single tokens only — no way to bundle a thesis</li>
+        <li>Traditional ETFs: T+1, broker custody, market hours</li>
+        <li>Index access = minimums, paperwork, geography</li>
+      </ul>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES + OBJECTION PREP</div>
+        Let the problem breathe. The audience has felt this: you can buy TSLAx on Solana, but making your own
+        "mega-cap tech 50/30/20" requires scripts, custody decisions, and rebalancing math.
+        Pre-empt: someone will say "just buy SPYx" — that's one stock, not a thesis.
+      </div>
+    </div>
+
+    <!-- 3 · WHY NOW -->
+    <div class="slide bg-default">
+      <span class="caption animate-in">WHY NOW</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px;">
+        The raw material just arrived.
+      </h1>
+      <div class="divider animate-in"></div>
+      <div class="grid-3 animate-in" style="margin-top: 32px;">
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">MARKET SHIFT</p>
+          <p class="h3" style="margin-top: 12px;">+422%</p>
+          <p class="small" style="margin-top: 8px;">tokenized equities growth in 2026; Kraken xStocks volume passed $25B in 8 months</p>
+        </div>
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">LIQUIDITY</p>
+          <p class="h3" style="margin-top: 12px;">$1B+ TVL</p>
+          <p class="small" style="margin-top: 8px;">first tokenized-equity platforms crossed $1B on-chain TVL; xStocks: $5B volume in 4 months</p>
+        </div>
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">TECH UNLOCK</p>
+          <p class="h3" style="margin-top: 12px;">Token-2022</p>
+          <p class="small" style="margin-top: 8px;">Scaled UI Amount + transfer hooks are live on Solana — equity-grade token mechanics exist now</p>
+        </div>
+      </div>
+      <p class="small animate-in" style="margin-top: 32px; color: var(--c-text-muted);">
+        Sources: xstocks.fi · Kraken/Backed announcements · Ondo Global Markets reports — 2026. Composition layer on Solana: none.
+      </p>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES</div>
+        This answers "why hasn't anyone done it": the underlying tokens only went live recently and only crossed
+        real liquidity in 2026. FolioX is first because the raw material arrived first.
+        Numbers cross-checked: xstocks.fi, Ondo blog ($1B TVL milestone), Kraken $25B volume.
+      </div>
+    </div>
+
+    <!-- 4 · SOLUTION -->
+    <div class="slide bg-alt">
+      <span class="caption animate-in">THE SOLUTION — FOLIOX</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px;">Three steps. One transaction. Zero custody.</h1>
+      <div class="divider animate-in"></div>
+      <div class="grid-3 animate-in" style="margin-top: 32px;">
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">I · CREATE</p>
+          <p class="h3" style="margin-top: 12px;">Fix your weights</p>
+          <p class="small" style="margin-top: 8px;">2–20 tokenized stocks, weights in bps — immutable after deploy</p>
+        </div>
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">II · MINT</p>
+          <p class="h3" style="margin-top: 12px;">Seed the vault</p>
+          <p class="small" style="margin-top: 8px;">Deposit in-kind or zap USDC — receive one share token, pro-rata</p>
+        </div>
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">III · REDEEM</p>
+          <p class="h3" style="margin-top: 12px;">Burn for your share</p>
+          <p class="small" style="margin-top: 8px;">Permissionless, oracle-free, wallet-to-wallet — cannot be paused</p>
+        </div>
+      </div>
+      <p class="small animate-in" style="margin-top: 32px; color: var(--c-text-muted);">
+        Fees capped: entry 3% · exit 1% · management 3%/yr — 90% to the basket creator.
+      </p>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES</div>
+        Emphasize immutability: weights and fees can NEVER change after deployment — no rug-by-rebalance.
+        The vault is a PDA; the program cannot be paused for redemptions. That is the product's soul.
+      </div>
+    </div>
+
+    <!-- 5 · WHY SOLANA -->
+    <div class="slide bg-default">
+      <span class="caption animate-in">WHY SOLANA</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px;">
+        The only chain where this exists.
+      </h1>
+      <div class="divider animate-in"></div>
+      <ul class="bullet-list animate-in" style="max-width: 900px;">
+        <li>Live tokenized equities — Backed xStocks are Solana-native Token-2022</li>
+        <li>Token-2022 extensions: Scaled UI Amount, transfer hooks — equity-grade mechanics</li>
+        <li>Sub-second settlement, fraction-of-a-cent fees — baskets in one transaction</li>
+        <li>Kamino + Jupiter integration surface — liquidity already on Solana</li>
+      </ul>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES</div>
+        EVM competitors wrap ERC-20s without equity-grade extensions — no scaled amounts for splits/dividends.
+        On Solana, xStocks ARE Token-2022 with these extensions live. This is a Solana-first design, not a port.
+      </div>
+    </div>
+
+    <!-- 6 · WHY CRYPTO (necessity) -->
+    <div class="slide bg-alt">
+      <span class="caption animate-in">WHY CRYPTO</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px;">
+        Rip out the chain and it breaks.
+      </h1>
+      <div class="divider animate-in"></div>
+      <div class="grid-3 animate-in" style="margin-top: 32px;">
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">CUSTODY</p>
+          <p class="small" style="margin-top: 12px;">Shares sit in a PDA vault you redeem from directly — remove the chain and a broker holds your assets again.</p>
+        </div>
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">PERMISSIONLESS EXIT</p>
+          <p class="small" style="margin-top: 12px;">Redemption is a program instruction — no oracle, no operator, no pause button. Anyone, any time.</p>
+        </div>
+        <div class="card">
+          <p class="caption" style="color: var(--c-imperial);">COMPOSABILITY</p>
+          <p class="small" style="margin-top: 12px;">Share tokens are SPL tokens — other protocols can lend, collateralize, and build on baskets.</p>
+        </div>
+      </div>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES + OBJECTION PREP</div>
+        This is the blockchain-necessity slide. If a broker can replicate it, the pitch fails — it can't:
+        24/7 wallet-to-wallcket redemption without an operator is the chain's job.
+      </div>
+    </div>
+
+    <!-- 7 · DEMO / BUILD PROOF -->
+    <div class="slide bg-default">
+      <span class="caption animate-in">BUILT — AND VERIFIED</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px;">This already works.</h1>
+      <div class="divider animate-in"></div>
+      <div class="grid-4 animate-in" style="margin-top: 32px;">
+        <div class="metric-card">
+          <p class="metric-value">552</p>
+          <p class="metric-label">automated tests green</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-value">8/8</p>
+          <p class="metric-label">localnet E2E — twice</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-value">15</p>
+          <p class="metric-label">app routes live</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-value">0</p>
+          <p class="metric-label">stubs in protocol paths</p>
+        </div>
+      </div>
+      <div class="grid-2 animate-in" style="margin-top: 40px;">
+        <img src="app/public/brand/flow/create.png" alt="Create wizard" style="width: 100%; border-radius: 12px; border: 1px solid var(--c-border);">
+        <img src="app/public/brand/flow/holdings.png" alt="Basket holdings" style="width: 100%; border-radius: 12px; border: 1px solid var(--c-border);">
+      </div>
+      <p class="small animate-in" style="margin-top: 20px; color: var(--c-text-muted);">
+        Real Token-2022 transfers, mint, burn — verified on localnet validator. Devnet deployment staged (faucet funding).
+      </p>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES</div>
+        Be honest per the skill: devnet demo pending faucet funding — but localnet E2E passed twice consecutively with
+        real Token-2022 CPIs on a live validator. 178 Rust + 392 backend TS tests. If asked for a live demo:
+        localnet validator boots in ~30s via scripts/e2e.sh.
+      </div>
+    </div>
+
+    <!-- 8 · ECOSYSTEM IMPACT -->
+    <div class="slide bg-alt">
+      <span class="caption animate-in">ECOSYSTEM IMPACT</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px;">A new primitive for Solana DeFi.</h1>
+      <div class="divider animate-in"></div>
+      <ul class="bullet-list animate-in" style="max-width: 900px;">
+        <li>First basket/index layer for tokenized equities on Solana</li>
+        <li>Open source — share tokens compose with lending and perps</li>
+        <li>Creator economy: anyone publishes a basket, earns 90% of fees</li>
+        <li>Pulls xStocks depth into Solana DeFi legos</li>
+      </ul>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES</div>
+        For a grant committee: this is infrastructure other teams build on. Baskets are composable SPL tokens —
+        collateral on Kamino, priced by Pyth feeds, etc. The spec and 552 tests are public.
+      </div>
+    </div>
+
+    <!-- 9 · ASK + ROADMAP -->
+    <div class="slide bg-default">
+      <span class="caption animate-in">THE ASK</span>
+      <h1 class="h1 animate-in" style="margin-top: 16px;">Ship devnet. Ship mainnet-beta.</h1>
+      <div class="divider animate-in"></div>
+      <div class="timeline animate-in" style="max-width: 860px; margin-top: 24px;">
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <p class="h3">Devnet E2E complete</p>
+          <p class="small">3 programs deployed, seeded mock xStocks, full mint/redeem cycle — funding in place</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <p class="h3">Security review</p>
+          <p class="small">External review of P0/P1 checklist + strategy-basket legal sign-off</p>
+        </div>
+        <div class="timeline-item active">
+          <div class="timeline-dot"></div>
+          <p class="h3">Mainnet-beta, capped TVL</p>
+          <p class="small">8-decimal xStock integration, creator onboarding, capped exposure</p>
+        </div>
+      </div>
+      <p class="small animate-in" style="margin-top: 24px; color: var(--c-text-muted); max-width: 860px;">
+        Grant scope: devnet completion · external security review · mainnet-beta launch · open-source spec —
+        amount and instrument TBD with the foundation. Solo builder, full-stack, shipping weekly.
+      </p>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES + OBJECTION PREP</div>
+        The ask is intentionally scoped as a grant milestone plan, not a valuation event.
+        Hardest question ("why has nobody done this") answer: the underlying tokens only crossed $1B TVL in 2026 —
+        the raw material arrived months ago; FolioX is the composition layer that was missing.
+        Second hardest ("solo founder?"): the 552-test suite and E2E pipeline ARE the team's output —
+        systems that let one builder ship like five.
+      </div>
+    </div>
+
+    <!-- 10 · CLOSING -->
+    <div class="slide bg-alt" style="justify-content: center; align-items: center; text-align: center;">
+      <p class="caption animate-in" style="color: var(--c-imperial);">FOLIOX · MMXXVI</p>
+      <h1 class="hero animate-in" style="margin-top: 28px;">Create an index.<br>Own your thesis.</h1>
+      <p class="h3 animate-in" style="color: var(--c-text-secondary); margin-top: 28px;">
+        github.com/umutyesildal/foliox
+      </p>
+      <div class="animate-in" style="margin-top: 40px; display: flex; gap: 14px;">
+        <span class="badge badge-imperial">LOCALNET E2E 8/8</span>
+        <span class="badge badge-outline">552 TESTS</span>
+        <span class="badge badge-outline">OPEN SOURCE</span>
+      </div>
+      <div class="notes">
+        <div class="notes-label">SPEAKER NOTES</div>
+        Close with the thesis line. Then invite the live localnet demo: one command, 30 seconds,
+        full create → mint → redeem cycle on a real validator.
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-bar">
+      <button class="nav-btn" onclick="prev()">← Prev</button>
+      <span class="nav-counter"><span id="current">1</span> / <span id="total"></span></span>
+      <div class="nav-progress"><div class="nav-progress-fill" id="progress"></div></div>
+      <button class="nav-btn" onclick="next()">Next →</button>
+    </div>
+  </div>
+
+  <script>
+    let current = 0;
+    const slides = document.querySelectorAll('.slide');
+    const total = slides.length;
+    let notesVisible = false;
+    document.getElementById('total').textContent = total;
+    function show(i) {
+      slides.forEach(s => s.classList.remove('active'));
+      current = Math.max(0, Math.min(i, total - 1));
+      slides[current].classList.add('active');
+      document.getElementById('current').textContent = current + 1;
+      document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+      document.querySelectorAll('.notes').forEach(n => n.classList.remove('visible'));
+      const note = slides[current].querySelector('.notes');
+      if (note && notesVisible) note.classList.add('visible');
+    }
+    function next() { show(current + 1); }
+    function prev() { show(current - 1); }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+      if (e.key === 'n' || e.key === 'N') {
+        notesVisible = !notesVisible;
+        document.querySelectorAll('.notes').forEach(n => {
+          n.classList.toggle('visible', notesVisible && n.closest('.slide').classList.contains('active'));
+        });
+      }
+    });
+    document.getElementById('deck').addEventListener('click', (e) => {
+      if (e.target.closest('.nav-bar') || e.target.closest('.nav-btn')) return;
+      if (e.clientX > window.innerWidth / 2) next(); else prev();
+    });
+    show(0);
+  </script>
+</body>
+</html>

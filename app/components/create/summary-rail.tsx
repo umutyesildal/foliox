@@ -78,7 +78,8 @@ export function SummaryRail({
               : "text-muted-foreground",
           )}
         >
-          {summary.weightSum.toLocaleString()} / 10,000 bps
+          {/* raw bps without locale grouping — grouping made 1666 read as "1.666" */}
+          {String(summary.weightSum)} / 10,000 bps
         </dd>
         {feeRows.map(([label, value, cap]) => (
           <div key={label} className="col-span-2 grid grid-cols-[subgrid]">

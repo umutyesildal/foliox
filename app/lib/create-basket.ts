@@ -155,13 +155,24 @@ function concat(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-/** ATA of (owner, mint) under the Token-2022 program. */
+/**
+ * ATA of (owner, mint) under the Token-2022 program — the CANONICAL
+ * associated-token derivation, identical to
+ * `getAssociatedTokenAddressSync(owner, mint, true, TOKEN_2022_PROGRAM_ID,
+ * ASSOCIATED_TOKEN_PROGRAM_ID)`: the PDA seeds are [owner, token_program,
+ * mint] under the ATA program (token program BEFORE mint). The basket program
+ * requires the creator/vault ATAs to be exactly this address under the MINT's
+ * own token program (Token-2022 for every whitelisted mock), so this must
+ * never drift — the previous (wrong) seeds [owner, mint, ataProgram] produced
+ * a different address and the factory rejected the tx with
+ * InvalidCreatorAta/6016.
+ */
 export function associatedTokenAddress(
   owner: PublicKey,
   mint: PublicKey,
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [owner.toBytes(), mint.toBytes(), ASSOCIATED_TOKEN_PROGRAM_ID.toBytes()],
+    [owner.toBytes(), TOKEN_2022_PROGRAM_ID.toBytes(), mint.toBytes()],
     ASSOCIATED_TOKEN_PROGRAM_ID,
   )[0];
 }

@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatUsd } from "@/lib/format";
+import { formatBpsAsPercent, formatUsd } from "@/lib/format";
 import { TextField } from "./field";
 import {
   formatRawAsTokenUnits,
@@ -138,8 +138,15 @@ export function SeedPreview({
                   <TableCell className="font-mono text-xs font-medium">
                     {constituent.ticker}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {constituent.weightBps.toLocaleString()} bps
+                  <TableCell
+                    className="text-right font-mono text-xs tabular-nums"
+                    title={`${constituent.weightBps} bps raw`}
+                  >
+                    {/* Percent first, locale-independent ("16.67%"); the raw
+                        bps integer sits in the tooltip — never grouped through
+                        toLocaleString, which rendered 1666 as "1.666" in
+                        dot-grouping locales. */}
+                    {formatBpsAsPercent(constituent.weightBps)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs tabular-nums">
                     {value !== null ? (

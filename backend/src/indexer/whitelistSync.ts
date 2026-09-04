@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { PublicKey, type AccountInfo } from "@solana/web3.js";
 import bs58 from "bs58";
 import { isPgLike, type PgLike } from "../db/client.js";
+import { withRpcBackoff } from "../rpc/backoff.js";
 
 /** sha256("account:WhitelistedMint")[0..8] — Anchor account discriminator. */
 export function whitelistedMintDiscriminator(): Buffer {
@@ -84,9 +85,13 @@ export async function syncWhitelistedMints(
     console.warn("[whitelistSync] skipped (no DB)");
     return 0;
   }
-  const accounts = await rpc.getProgramAccounts(new PublicKey(programId), {
-    filters: [{ memcmp: { offset: 0, bytes: bs58.encode(WHITELISTED_MINT_DISC) } }],
-  });
+  const accounts = await withRpcBackoff(
+    () =>
+      rpc.getProgramAccounts(new PublicKey(programId), {
+        filters: [{ memcmp: { offset: 0, bytes: bs58.encode(WHITELISTED_MINT_DISC) } }],
+      }),
+    { logKey: "whitelistSync:getProgramAccounts" },
+  );
   let synced = 0;
   for (const { pubkey, account } of accounts) {
     const decoded = decodeWhitelistedMint(account.data);

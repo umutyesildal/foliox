@@ -1,5 +1,6 @@
 "use client";
 
+import { formatBpsAsPercent } from "@/lib/format";
 import { RangeField } from "./field";
 import {
   ENTRY_FEE_CAP_BPS,
@@ -40,8 +41,9 @@ export function FeesEditor({
     exit: exitFeeBps,
     management: managementFeeBps,
   };
-  const pct = (bps: number) =>
-    `${(bps / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+  // Locale-independent ("." decimal separator) — toLocaleString rendered
+  // 1.5 as "1,5"/"1.500" depending on the browser locale.
+  const pct = (bps: number) => formatBpsAsPercent(bps);
 
   return (
     <div className="flex flex-col gap-5">

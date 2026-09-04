@@ -146,7 +146,9 @@ describe("listener — baskets-before-events ordering (FK fix)", () => {
 // --- 2. listener retry: failed signatures are retried, not dropped -----------
 
 describe("listener — retry on processing failure", () => {
-  it("retries a signature whose transaction fetch throws, then caches it", async () => {
+  const instantBackoff = { ...cfg, backoffSleep: async () => {} };
+
+  it("retries a signature whose transaction fetch 429s — in-place backoff, then caches it", async () => {
     const db = fakeDb(1);
     let fetches = 0;
     const tx = fakeTx(
@@ -159,7 +161,62 @@ describe("listener — retry on processing failure", () => {
       },
       async getParsedTransaction() {
         fetches++;
-        if (fetches === 1) throw new Error("429 Too Many Requests");
+        if (fetches <= 2) throw new Error("429 Too Many Requests");
+        return tx;
+      },
+      async getAccountInfo() {
+        return accountInfo(FACTORY_PROGRAM, factoryAccount);
+      },
+    };
+    const indexer = new EventIndexer(rpc, instantBackoff, db as never);
+    const first = await indexer.pollOnce(); // 429s retried in place via shared backoff, then lands
+    expect(fetches).toBe(3); // initial + 2 backoff retries — ONE retry layer per poll
+    expect(first[0].events).toHaveLength(1);
+    expect(db.calls.find((c) => c.sql.includes("INSERT INTO baskets"))).toBeDefined();
+
+    await indexer.pollOnce(); // seen cache prevents a refetch
+    expect(fetches).toBe(3);
+  });
+
+  it("keeps an always-429 signature unseen for the next poll after backoff is exhausted", async () => {
+    const db = fakeDb(1);
+    let fetches = 0;
+    const rpc: SolanaRpc = {
+      async getSignaturesForAddress() {
+        return [{ signature: "SIG429X", slot: 1, err: null, blockTime: 1725148800 }];
+      },
+      async getParsedTransaction() {
+        fetches++;
+        throw new Error("429 Too Many Requests");
+      },
+      async getAccountInfo() {
+        return accountInfo(FACTORY_PROGRAM, factoryAccount);
+      },
+    };
+    const indexer = new EventIndexer(rpc, instantBackoff, db as never);
+    const first = await indexer.pollOnce(); // backoff exhausted → sig left unseen
+    expect(first[0].events).toHaveLength(0);
+    expect(fetches).toBe(3);
+
+    const second = await indexer.pollOnce(); // next poll retries it (attempt ledger)
+    expect(fetches).toBe(6);
+    expect(second[0].events).toHaveLength(0);
+  });
+
+  it("propagates non-429 failures immediately and retries the signature next poll", async () => {
+    const db = fakeDb(1);
+    let fetches = 0;
+    const tx = fakeTx(
+      [`Program data: ${buildBasketCreatedPayload().toString("base64")}`],
+      [{ programId: FACTORY_PROGRAM, accounts: [pk(5), pk(10), pk(12), pk(11)], data: bs58.encode(buildCreateBasketData()) }],
+    );
+    const rpc: SolanaRpc = {
+      async getSignaturesForAddress() {
+        return [{ signature: "SIGDOWN", slot: 1, err: null, blockTime: 1725148800 }];
+      },
+      async getParsedTransaction() {
+        fetches++;
+        if (fetches === 1) throw new Error("rpc unreachable");
         return tx;
       },
       async getAccountInfo() {
@@ -167,7 +224,7 @@ describe("listener — retry on processing failure", () => {
       },
     };
     const indexer = new EventIndexer(rpc, cfg, db as never);
-    const first = await indexer.pollOnce(); // throws → sig left unseen
+    const first = await indexer.pollOnce(); // non-429 → no backoff retries, sig left unseen
     expect(first[0].events).toHaveLength(0);
     expect(fetches).toBe(1);
 

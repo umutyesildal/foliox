@@ -696,6 +696,7 @@ describe(".env.devnet — profile parses with the exact env names from code", ()
       "DATABASE_URL", "RPC_URL",
       "PROGRAM_WHITELIST", "PROGRAM_FACTORY", "PROGRAM_BASKET",
       "PORT", "NAV_ENGINE", "FEE_CRANK", "INDEXER_POLL_MS", "INDEXER_POLL_LIMIT",
+      "HOLDINGS_SYNC_INTERVAL_MS",
     ]) {
       expect(parsed[key], `missing ${key}`).toBeTruthy();
     }
@@ -735,8 +736,10 @@ describe(".env.devnet — profile parses with the exact env names from code", ()
       "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF",
       "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k",
     ]);
-    expect(cfg?.pollIntervalMs).toBe(15000);
-    expect(cfg?.signaturesPerPoll).toBe(50);
+    // Devnet pacing (shared public RPC): 30s poll, 20 sigs, 60s holdings pass.
+    expect(cfg?.pollIntervalMs).toBe(30000);
+    expect(cfg?.signaturesPerPoll).toBe(20);
+    expect(cfg?.holdingsSyncIntervalMs).toBe(60000);
   });
 
   it("factories gate honestly on the profile: no DB ⇒ no engines (never started here)", async () => {

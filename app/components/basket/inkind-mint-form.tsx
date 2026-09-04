@@ -25,7 +25,7 @@ import {
   type ExpectedAccount,
 } from "@/lib/transactions";
 import { scaledFromRaw, truncateAddress } from "@/lib/format";
-import { RPC_ENDPOINT } from "@/lib/wallet";
+import { CLUSTER, RPC_ENDPOINT } from "@/lib/wallet";
 
 /**
  * In-kind mint: per-constituent RAW deposit inputs with live, exact-BigInt
@@ -103,6 +103,15 @@ export function InKindMintForm({
     }
     return null;
   });
+
+  // One honest devnet line when any leg lacks an ATA (holds no position):
+  // the repo's own faucet funds every mock mint, so say how instead of
+  // leaving the user stuck.
+  const showFaucetHint =
+    CLUSTER === "devnet" &&
+    connected &&
+    balances !== null &&
+    balances.some((b) => b === null);
 
   const gross = check?.ok ? check.gross : null;
   const entryFee = gross !== null ? entryFeeOf(gross, detail.entry_fee_bps) : null;
@@ -259,6 +268,16 @@ export function InKindMintForm({
             Refresh balances
           </Button>
         </div>
+
+        {showFaucetHint ? (
+          <p className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
+            Devnet test tokens: run{" "}
+            <code className="break-all rounded bg-background px-1 py-0.5 font-mono text-[11px]">
+              npx tsx scripts/faucet.ts --to {publicKey?.toBase58() ?? "<YOUR_WALLET>"}
+            </code>{" "}
+            in the repo, then Refresh balances.
+          </p>
+        ) : null}
 
         {/* live weight-check report — thin per-leg bar + one line */}
         <div aria-live="polite" className="space-y-2">

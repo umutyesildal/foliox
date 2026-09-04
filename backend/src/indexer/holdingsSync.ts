@@ -32,6 +32,7 @@ import {
   unpackMint,
 } from "@solana/spl-token";
 import { isPgLike } from "../db/client.js";
+import { withRpcBackoff, createPacer } from "../rpc/backoff.js";
 
 /** Minimal structural slice of @solana/web3.js Connection used here. */
 export interface SolanaRpc {
@@ -84,7 +85,9 @@ export function parseMintDecimalsFromMintData(data: Buffer): number | null {
  */
 export async function fetchMintFacts(rpc: SolanaRpc, mint: PublicKey): Promise<MintFacts> {
   try {
-    const info = await rpc.getAccountInfo(mint);
+    const info = await withRpcBackoff(() => rpc.getAccountInfo(mint), {
+      logKey: "holdings:getAccountInfo",
+    });
     if (!info) {
       console.warn(`[holdings] mint ${mint.toBase58()} not found — multiplier 1.0, decimals 6 (fallback)`);
       return { multiplier: 1.0, decimals: 6 };
@@ -135,7 +138,9 @@ export function parseScaledUiMultiplierFromMintData(data: Buffer): number | null
  */
 export async function fetchMultiplier(rpc: SolanaRpc, mint: PublicKey): Promise<number> {
   try {
-    const info = await rpc.getAccountInfo(mint);
+    const info = await withRpcBackoff(() => rpc.getAccountInfo(mint), {
+      logKey: "holdings:getAccountInfo",
+    });
     if (!info) return 1.0;
     if (!info.owner.equals(TOKEN_2022_PROGRAM_ID)) return 1.0; // legacy SPL token
     return parseScaledUiMultiplierFromMintData(info.data) ?? 1.0;
@@ -186,15 +191,27 @@ export async function syncHoldings(
   basket: PublicKey,
   vaultAtas: PublicKey[],
   mints: PublicKey[],
-  opts: { db?: unknown } = {},
+  opts: { db?: unknown; spacingMs?: number } = {},
 ): Promise<HoldingsRow[]> {
   const db = isPgLike(opts?.db) ? opts.db : null;
+  // Optional pacing: minimum spacing between sequential RPC reads so a
+  // holdings pass cannot burst 10+ reads at a public RPC (default 0 = the
+  // unspaced legacy behavior; the devnet listener wires a small gap).
+  const pacer = createPacer(opts.spacingMs ?? 0);
   const facts = new Map<string, MintFacts>();
-  for (const mint of mints) facts.set(mint.toBase58(), await fetchMintFacts(rpc, mint));
+  for (const mint of mints) {
+    await pacer.wait();
+    facts.set(mint.toBase58(), await fetchMintFacts(rpc, mint));
+  }
 
   const infos: Array<AccountInfo<Buffer> | null> = [];
   for (const batch of chunk(vaultAtas, 100)) {
-    infos.push(...(await rpc.getMultipleAccountsInfo(batch)));
+    await pacer.wait();
+    infos.push(
+      ...(await withRpcBackoff(() => rpc.getMultipleAccountsInfo(batch), {
+        logKey: "holdings:getMultipleAccountsInfo",
+      })),
+    );
   }
 
   const rows: HoldingsRow[] = [];
@@ -334,6 +351,7 @@ export function getVaultAtas(basketPda: PublicKey, mints: PublicKey[]): PublicKe
 export async function syncIndexedBaskets(
   rpc: SolanaRpc,
   db: unknown,
+  opts: { spacingMs?: number } = {},
 ): Promise<number> {
   if (!isPgLike(db)) {
     console.warn("[holdings] syncIndexedBaskets skipped (no DB)");
@@ -355,7 +373,7 @@ export async function syncIndexedBaskets(
       const basketPda = deriveBasketPda(new PublicKey(b.factory), new PublicKey(b.creator), b.nonce);
       const mints = b.constituents.map((m) => new PublicKey(m));
       const atas = getVaultAtas(basketPda, mints);
-      await syncHoldings(rpc, basketPda, atas, mints, { db });
+      await syncHoldings(rpc, basketPda, atas, mints, { db, spacingMs: opts.spacingMs });
       refreshed++;
     } catch (err) {
       console.warn(`[holdings] refresh failed for basket ${b.pubkey}:`,

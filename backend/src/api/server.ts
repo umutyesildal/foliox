@@ -13,7 +13,7 @@
  */
 import http from "http";
 import { PublicKey } from "@solana/web3.js";
-import { comparePrices, getChartSeries, TICKER_MINTS, YAHOO_MAP } from "../workers/priceCompare.js";
+import { comparePrices, getChartSeries, readMockWhitelistRows, TICKER_MINTS, YAHOO_MAP } from "../workers/priceCompare.js";
 import { fetchYahooSeries } from "../workers/yahooFetch.js";
 import { connectFromEnv, isPgLike, type PgLike } from "../db/client.js";
 import { computeDriftExact, computePerformanceFromBaselines, type KeyValueCache } from "../workers/navEngine.js";
@@ -716,10 +716,18 @@ export function createHandler(ctx: ApiContext = { db: null }) {
 
     // --- Price compare: xStock (Jupiter) vs gerçek (Yahoo) ---
     // GET /api/v1/prices/compare?tickers=TSLAx,NVDAx
+    // Real Backed mints compare Jupiter vs Yahoo. Devnet mock mints (a ticker
+    // not in TICKER_MINTS whose whitelisted_mints row is "mock:<slug>") are
+    // quoted from the REAL US-equity market via the guarded Yahoo path
+    // (source "yahoo"), falling back to the dev catalog (source "mock"), then
+    // to null (source "unavailable") — never a fabricated price.
     if (pathname === "/api/v1/prices/compare" && req.method === "GET") {
       const tickersParam = url.searchParams.get("tickers");
       const tickers = tickersParam ? tickersParam.split(",") : undefined;
-      const data = await comparePrices(tickers);
+      const db = await resolveDb(ctx);
+      const data = await comparePrices(tickers, {
+        mockRows: db ? await readMockWhitelistRows(db) : [],
+      });
       sendJson(res, 200, { data, ts: new Date().toISOString(), note: "diffBps = (jupiter - yahoo)/yahoo*10000, LEGAL: xStock is structured instrument" });
       return;
     }

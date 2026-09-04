@@ -738,8 +738,43 @@ export function rpcUrl(): string {
   return process.env.FOLIOX_E2E_RPC_URL || "http://127.0.0.1:8899";
 }
 
+/**
+ * Custom fetch with jittered backoff for the public cluster's 429 rate limit.
+ * web3.js's built-in retry gives up after ~7.5s (500ms→4s ×5); on
+ * api.devnet.solana.com that is nowhere near enough when the backend indexer,
+ * NAV jobs and the UI share the same endpoint. This fetch keeps retrying with
+ * spaced, jittered waits (no tight loop) and only returns when the call
+ * succeeds or attempts are exhausted — web3.js then applies its own loop on
+ * top of whatever comes back. NOTE: fetchMiddleware cannot do this in this
+ * web3.js version (its third arg resolves fetch ARGS; it cannot retry), and a
+ * naive middleware that calls the third arg as a function silently doubles
+ * every request. Localnet never throttles, so it is skipped there.
+ */
+async function retryFetch(
+  url: RequestInfo | URL,
+  options: RequestInit | undefined,
+): Promise<Response> {
+  let last: Response | undefined;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    last = await fetch(url, options);
+    if (last.status !== 429 && last.status < 500) return last;
+    if (attempt < 7) {
+      const waitMs = Math.min(20_000, 4000 * (attempt + 1)) + Math.floor(Math.random() * 4000);
+      process.stdout.write(
+        `  rpc throttled (HTTP ${last.status}) — backing off ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/8)\n`,
+      );
+      await sleep(waitMs);
+    }
+  }
+  return last!;
+}
+
 export function newConnection(): Connection {
-  return new Connection(rpcUrl(), { commitment: "confirmed" });
+  const endpoint = rpcUrl();
+  return new Connection(endpoint, {
+    commitment: "confirmed",
+    ...(isLocalnet(endpoint) ? {} : { fetch: retryFetch as unknown as typeof fetch }),
+  });
 }
 
 /** Below this balance a non-localnet RPC refuses to continue (no airdrop there). */

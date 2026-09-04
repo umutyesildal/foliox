@@ -8,7 +8,7 @@ import {
 } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
-import { describeWalletError } from "@/lib/wallet";
+import { describeRpcError, describeWalletError } from "@/lib/wallet";
 import { decodeProgramError, isMintPausedError } from "@/lib/transactions";
 
 /**
@@ -108,7 +108,9 @@ export function useTransactionFlow() {
         setState({
           ...INITIAL,
           status: "failed",
-          error: err instanceof Error ? err.message : "Simulation failed.",
+          // 429s get calm honest copy instead of the raw "Server responded
+          // with 429. Retrying after 4000ms delay…" string.
+          error: describeRpcError(err) || "Simulation failed.",
         });
         inFlight.current = false;
         return false;
@@ -180,7 +182,7 @@ export function useTransactionFlow() {
           status: "failed",
           error:
             err instanceof Error
-              ? `Confirmation could not be verified: ${err.message}`
+              ? `Confirmation could not be verified: ${describeRpcError(err)}`
               : "Confirmation could not be verified.",
           signature,
         });

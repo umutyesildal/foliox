@@ -41,6 +41,7 @@ import {
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { anchorIxDiscriminator } from "../indexer/events.js";
 import { isPgLike, type PgLike } from "../db/client.js";
+import { withRpcBackoff } from "../rpc/backoff.js";
 
 export const BASKET_PROGRAM_ID = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k"; // programs/basket/src/lib.rs:4
 export const FEE_CRANK_INTERVAL_MS = 3_600_000; // hourly — spec §7 fee_accrue_crank
@@ -271,7 +272,9 @@ export class FeeCrank {
     let blockhash: string | null = null;
     let lastValidBlockHeight: number | null = null;
     if (this.deps.rpc) {
-      const bh = await this.deps.rpc.getLatestBlockhash();
+      const bh = await withRpcBackoff(() => this.deps.rpc!.getLatestBlockhash(), {
+        logKey: "feeCrank:getLatestBlockhash",
+      });
       blockhash = bh.blockhash;
       lastValidBlockHeight = bh.lastValidBlockHeight;
       // UNSIGNED versioned tx: signatures stay EMPTY — nothing here can sign

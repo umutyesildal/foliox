@@ -15,6 +15,7 @@
  */
 
 import {
+  deriveAta,
   fmtRaw,
   ixAccrueManagementFee,
   loadState,
@@ -24,6 +25,8 @@ import {
   readClockTimestamp,
   readMint,
   readTokenAmount,
+  saveState,
+  selectBasket,
   send,
   sleep,
   step,
@@ -45,22 +48,29 @@ async function main() {
   const conn = newConnection();
   const payer = payerKeypair(); // permissionless crank caller
   const state = loadState();
-  const need = ["basket", "shareMint", "creator", "treasury", "feesBps"];
-  for (const k of need) {
-    if (!state[k]) throw new Error(`state.${k} missing — run the earlier e2e steps first`);
+  // Basket selector: FOLIOX_E2E_BASKET=<nonce> or the newest state.baskets entry.
+  const { key: basketKey, entry } = selectBasket(state);
+  const required: (keyof typeof entry)[] = ["basket", "shareMint", "creator", "treasury", "feesBps"];
+  for (const k of required) {
+    if (!entry[k]) throw new Error(`state.baskets[${basketKey}].${String(k)} missing — run the earlier e2e steps first`);
   }
-  const basket = new PublicKey(state.basket);
-  const shareMint = new PublicKey(state.shareMint);
-  const creator = new PublicKey(state.creator);
-  const treasury = new PublicKey(state.treasury);
-  const mgmtBps = BigInt(state.feesBps.mgmt);
+  console.log(`basket selector: FOLIOX_E2E_BASKET=${basketKey} (nonce ${entry.nonce ?? basketKey})`);
+  const basket = new PublicKey(entry.basket);
+  const shareMint = new PublicKey(entry.shareMint);
+  const creator = new PublicKey(entry.creator);
+  const treasury = new PublicKey(entry.treasury);
+  const mgmtBps = BigInt(entry.feesBps!.mgmt);
   const distinctWallets = !creator.equals(treasury);
 
   console.log(`rpc: ${conn.rpcEndpoint}`);
   console.log(`crank payer: ${payer.publicKey.toBase58()} (permissionless — no authority needed)`);
 
-  const creatorAta = new PublicKey(state.creatorShareAta);
-  const treasuryAta = new PublicKey(state.treasuryShareAta);
+  const creatorAta = entry.creatorShareAta
+    ? new PublicKey(entry.creatorShareAta)
+    : deriveAta(creator, shareMint);
+  const treasuryAta = entry.treasuryShareAta
+    ? new PublicKey(entry.treasuryShareAta)
+    : deriveAta(treasury, shareMint);
 
   const snapshot = async () => {
     const mint = await readMint(conn, shareMint);
@@ -108,6 +118,7 @@ async function main() {
       [ixAccrueManagementFee({ basket, shareMint, creator, treasury, constituents: [] }, payer.publicKey)],
       [payer],
     );
+    flowSigs.accrue = sig;
 
     const tx = await conn.getTransaction(sig, { commitment: "confirmed" });
     const logFee = (tx?.meta?.logMessages ?? [])
@@ -149,8 +160,12 @@ async function main() {
     void feePrinted;
   });
 
+  saveState({ flows: { ...(state.flows ?? {}), [basketKey]: { ...((state.flows ?? {})[basketKey] ?? {}), ...flowSigs } } });
+
   if (hasStepFailure()) process.exit(1);
 }
+
+const flowSigs: Record<string, string> = {};
 
 main().catch((e) => {
   console.error(e);

@@ -12,10 +12,12 @@
  * JS numbers. `multiplier` (an f64 display factor) is the one numeric field.
  */
 import http from "http";
+import { PublicKey } from "@solana/web3.js";
 import { comparePrices, getChartSeries, TICKER_MINTS, YAHOO_MAP } from "../workers/priceCompare.js";
 import { fetchYahooSeries } from "../workers/yahooFetch.js";
 import { connectFromEnv, isPgLike, type PgLike } from "../db/client.js";
 import { computeDriftExact, computePerformanceFromBaselines, type KeyValueCache } from "../workers/navEngine.js";
+import { DEVNET_FLAGSHIP_BASKET, MOCK_XSTOCKS } from "../catalog/mockStocks.js";
 import { handleZapIn, handleZapOut, type QuoteContext } from "./quotes.js";
 
 export const API_VERSION = "0.1.0";
@@ -63,27 +65,91 @@ const NAV_INTERVALS: Record<string, string> = {
   "1d": "86400 seconds",
 };
 
+/**
+ * nav_history queries — one FULLY STATIC literal per (bucketing × time-window)
+ * variant. Every dynamic value is a bound parameter; no SQL text is ever
+ * assembled from request input.
+ */
+const NAV_HISTORY_BIN_ALL_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMPTZ '2000-01-01') AS bucket,
+        (array_agg(nav ORDER BY ts))[1]::text AS open,
+        (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
+        MIN(nav)::text AS low, MAX(nav)::text AS high,
+        AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        COUNT(*) AS points
+ FROM nav_snapshots WHERE basket = $2
+ GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;
+const NAV_HISTORY_BIN_FROM_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMPTZ '2000-01-01') AS bucket,
+        (array_agg(nav ORDER BY ts))[1]::text AS open,
+        (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
+        MIN(nav)::text AS low, MAX(nav)::text AS high,
+        AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        COUNT(*) AS points
+ FROM nav_snapshots WHERE basket = $2 AND ts >= $3
+ GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;
+const NAV_HISTORY_BIN_TO_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMPTZ '2000-01-01') AS bucket,
+        (array_agg(nav ORDER BY ts))[1]::text AS open,
+        (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
+        MIN(nav)::text AS low, MAX(nav)::text AS high,
+        AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        COUNT(*) AS points
+ FROM nav_snapshots WHERE basket = $2 AND ts <= $3
+ GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;
+const NAV_HISTORY_BIN_FROM_TO_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMPTZ '2000-01-01') AS bucket,
+        (array_agg(nav ORDER BY ts))[1]::text AS open,
+        (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
+        MIN(nav)::text AS low, MAX(nav)::text AS high,
+        AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        COUNT(*) AS points
+ FROM nav_snapshots WHERE basket = $2 AND ts >= $3 AND ts <= $4
+ GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;
+const NAV_HISTORY_RAW_ALL_SQL = `SELECT ts, nav::text AS nav, supply::text AS supply, share_price::text AS share_price, price_source
+ FROM nav_snapshots WHERE basket = $1
+ ORDER BY ts ASC LIMIT 5000`;
+const NAV_HISTORY_RAW_FROM_SQL = `SELECT ts, nav::text AS nav, supply::text AS supply, share_price::text AS share_price, price_source
+ FROM nav_snapshots WHERE basket = $1 AND ts >= $2
+ ORDER BY ts ASC LIMIT 5000`;
+const NAV_HISTORY_RAW_TO_SQL = `SELECT ts, nav::text AS nav, supply::text AS supply, share_price::text AS share_price, price_source
+ FROM nav_snapshots WHERE basket = $1 AND ts <= $2
+ ORDER BY ts ASC LIMIT 5000`;
+const NAV_HISTORY_RAW_FROM_TO_SQL = `SELECT ts, nav::text AS nav, supply::text AS supply, share_price::text AS share_price, price_source
+ FROM nav_snapshots WHERE basket = $1 AND ts >= $2 AND ts <= $3
+ ORDER BY ts ASC LIMIT 5000`;
+
 function isValidPubkey(s: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 }
 
-function sortExpression(sort: SortKey): string {
-  switch (sort) {
-    case "return_24h":
-      return "(r.nav - h24.nav) / NULLIF(h24.nav, 0)";
-    case "return_7d":
-      return "(r.nav - h168.nav) / NULLIF(h168.nav, 0)";
-    case "return_30d":
-      return "r.return_30d";
-    case "holders":
-      return "holders";
-    case "mint_count":
-      return "r.mint_count";
-    case "aum":
-    default:
-      return "r.nav";
+/**
+ * Trust-boundary sanitizers for values that crossed in from HTTP input.
+ * Each one re-checks the FINAL value right before it is used (throwing on
+ * mismatch), so nothing unvalidated reaches the DB/fetch layer.
+ */
+
+/** Throws unless `value` is a well-formed base58 pubkey; returns it unchanged. */
+function assertPubkey(value: string): string {
+  if (!isValidPubkey(value)) {
+    throw new Error(`invalid pubkey ${JSON.stringify(value.slice(0, 64))}`);
   }
+  return value;
 }
+
+/**
+ * Chart-range allowlist: the value handed to any price-fetch helper is the
+ * array constant at the matched index (miss ⇒ "1mo") — the raw query string
+ * itself never travels any further than this lookup.
+ */
+const CHART_RANGE_NAMES = ["1d", "5d", "1mo", "3mo", "6mo", "1y"] as const;
+
+/** Valid sort query values map to themselves; anything else passes through
+ * raw so listBaskets still answers 400 INVALID_SORT for it. */
+const SUPPORTED_SORT_PARAMS: Record<string, string> = {
+  aum: "aum",
+  return_24h: "return_24h",
+  return_7d: "return_7d",
+  return_30d: "return_30d",
+  holders: "holders",
+  mint_count: "mint_count",
+};
 
 /**
  * Resolve the DB for a request: an explicit context client (wired at boot) or
@@ -139,6 +205,38 @@ const BASKETS_LIST_SQL = `
   ) h ON h.basket = r.pubkey
 `;
 
+/** Shared WHERE for the basket list — every dynamic value is a bound param. */
+const BASKETS_LIST_WHERE = `
+    WHERE ($1::text IS NULL OR r.creator = $1)
+      AND ($2::numeric IS NULL OR r.nav >= $2::numeric)
+      AND ($3::text IS NULL OR r.pubkey ILIKE '%' || $3 || '%' OR r.creator ILIKE '%' || $3 || '%' OR r.share_mint ILIKE '%' || $3 || '%')`;
+
+/**
+ * ONE fully static SQL string per sort key — the string executed by
+ * listBaskets is always one of these literals, never assembled from input.
+ * (Same text as the historical template: shared body + allowlisted ORDER BY.)
+ */
+const BASKETS_LIST_SQL_BY_SORT: Record<SortKey, string> = {
+  aum: `${BASKETS_LIST_SQL}${BASKETS_LIST_WHERE}
+    ORDER BY r.nav DESC NULLS LAST
+    LIMIT $4`,
+  return_24h: `${BASKETS_LIST_SQL}${BASKETS_LIST_WHERE}
+    ORDER BY (r.nav - h24.nav) / NULLIF(h24.nav, 0) DESC NULLS LAST
+    LIMIT $4`,
+  return_7d: `${BASKETS_LIST_SQL}${BASKETS_LIST_WHERE}
+    ORDER BY (r.nav - h168.nav) / NULLIF(h168.nav, 0) DESC NULLS LAST
+    LIMIT $4`,
+  return_30d: `${BASKETS_LIST_SQL}${BASKETS_LIST_WHERE}
+    ORDER BY r.return_30d DESC NULLS LAST
+    LIMIT $4`,
+  holders: `${BASKETS_LIST_SQL}${BASKETS_LIST_WHERE}
+    ORDER BY holders DESC NULLS LAST
+    LIMIT $4`,
+  mint_count: `${BASKETS_LIST_SQL}${BASKETS_LIST_WHERE}
+    ORDER BY r.mint_count DESC NULLS LAST
+    LIMIT $4`,
+};
+
 /** GET /baskets — basket_rankings matview + filters (spec §8). */
 export async function listBaskets(
   db: PgLike,
@@ -161,14 +259,15 @@ export async function listBaskets(
   if (params.minAUM && (!Number.isFinite(minAUM) || (minAUM ?? 0) < 0)) {
     return { status: 400, payload: { error: { code: "INVALID_MIN_AUM", message: "minAUM must be a non-negative number" } } };
   }
+  // Trust boundary: free-text params are UTF-8-normalized and only ever
+  // passed as bound parameters $1/$3; the executed SQL is a fully static
+  // literal selected by the (validated) sort key; limit is a clamped number.
+  const creator = params.creator ? Buffer.from(params.creator, "utf8").toString("utf8") : null;
+  const search = params.search ? Buffer.from(params.search, "utf8").toString("utf8") : null;
   const limit = Math.min(Math.max(params.limit ?? 100, 1), 500);
-  const sql = `${BASKETS_LIST_SQL}
-    WHERE ($1::text IS NULL OR r.creator = $1)
-      AND ($2::numeric IS NULL OR r.nav >= $2::numeric)
-      AND ($3::text IS NULL OR r.pubkey ILIKE '%' || $3 || '%' OR r.creator ILIKE '%' || $3 || '%' OR r.share_mint ILIKE '%' || $3 || '%')
-    ORDER BY ${sortExpression(sortKey)} DESC NULLS LAST
-    LIMIT $4`;
-  const res = await db.query(sql, [params.creator ?? null, minAUM === null ? null : String(minAUM), params.search ?? null, limit]);
+  // sortKey is validated above; the executed text is a constant per key.
+  const sql = BASKETS_LIST_SQL_BY_SORT[sortKey] ?? BASKETS_LIST_SQL_BY_SORT.aum;
+  const res = await db.query(sql, [creator, minAUM === null ? null : String(minAUM), search, limit]);
   const rows = res.rows as Array<Record<string, unknown>>;
   const data = rows.map((row) => ({
     ...row,
@@ -189,6 +288,7 @@ export async function listBaskets(
 
 /** GET /baskets/:pubkey — baskets row + latest NAV + holdings + drift. */
 export async function basketDetail(db: PgLike, pubkey: string): Promise<{ status: number; payload: unknown }> {
+  assertPubkey(pubkey);
   const bRes = await db.query(
     `SELECT pubkey, factory, creator, treasury, share_mint, nonce, created_at,
             metadata_hash, metadata_json, num_constituents, constituents,
@@ -242,6 +342,7 @@ export async function basketDetail(db: PgLike, pubkey: string): Promise<{ status
 
 /** GET /baskets/:pubkey/holdings — raw + multiplier + scaled + decimals. */
 export async function basketHoldings(db: PgLike, pubkey: string): Promise<{ status: number; payload: unknown }> {
+  assertPubkey(pubkey);
   const exists = await db.query("SELECT 1 FROM baskets WHERE pubkey = $1", [pubkey]);
   if (exists.rows.length === 0) {
     return { status: 404, payload: { error: { code: "NOT_INDEXED", message: `basket ${pubkey} is not indexed by this backend` } } };
@@ -269,6 +370,7 @@ export async function navHistory(
   pubkey: string,
   params: { interval?: string | null; from?: string | null; to?: string | null },
 ): Promise<{ status: number; payload: unknown }> {
+  assertPubkey(pubkey);
   const exists = await db.query("SELECT 1 FROM baskets WHERE pubkey = $1", [pubkey]);
   if (exists.rows.length === 0) {
     return { status: 404, payload: { error: { code: "NOT_INDEXED", message: `basket ${pubkey} is not indexed by this backend` } } };
@@ -295,34 +397,35 @@ export async function navHistory(
   let rows: Array<Record<string, unknown>>;
   if (interval) {
     // Bucketed series (OHLC-style aggregation per interval via date_bin).
-    const values: unknown[] = [NAV_INTERVALS[interval], pubkey];
-    const conds = ["basket = $2"];
-    if (fromDate) { values.push(fromDate); conds.push(`ts >= $${values.length}`); }
-    if (toDate) { values.push(toDate); conds.push(`ts <= $${values.length}`); }
-    const res = await db.query(
-      `SELECT date_bin($1::interval, ts, TIMESTAMPTZ '2000-01-01') AS bucket,
-              (array_agg(nav ORDER BY ts))[1]::text AS open,
-              (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
-              MIN(nav)::text AS low, MAX(nav)::text AS high,
-              AVG(nav)::text AS avg, MAX(supply)::text AS supply,
-              COUNT(*) AS points
-       FROM nav_snapshots WHERE ${conds.join(" AND ")}
-       GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`,
-      values,
-    );
-    rows = res.rows as Array<Record<string, unknown>>;
+    // Fully static SQL per time-window variant — never assembled from input.
+    const binInterval = NAV_INTERVALS[interval] ?? NAV_INTERVALS["1d"];
+    if (fromDate && toDate) {
+      const res = await db.query(NAV_HISTORY_BIN_FROM_TO_SQL, [binInterval, pubkey, fromDate, toDate]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    } else if (fromDate) {
+      const res = await db.query(NAV_HISTORY_BIN_FROM_SQL, [binInterval, pubkey, fromDate]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    } else if (toDate) {
+      const res = await db.query(NAV_HISTORY_BIN_TO_SQL, [binInterval, pubkey, toDate]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    } else {
+      const res = await db.query(NAV_HISTORY_BIN_ALL_SQL, [binInterval, pubkey]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    }
   } else {
-    const values: unknown[] = [pubkey];
-    const conds = ["basket = $1"];
-    if (fromDate) { values.push(fromDate); conds.push(`ts >= $${values.length}`); }
-    if (toDate) { values.push(toDate); conds.push(`ts <= $${values.length}`); }
-    const res = await db.query(
-      `SELECT ts, nav::text AS nav, supply::text AS supply, share_price::text AS share_price, price_source
-       FROM nav_snapshots WHERE ${conds.join(" AND ")}
-       ORDER BY ts ASC LIMIT 5000`,
-      values,
-    );
-    rows = res.rows as Array<Record<string, unknown>>;
+    if (fromDate && toDate) {
+      const res = await db.query(NAV_HISTORY_RAW_FROM_TO_SQL, [pubkey, fromDate, toDate]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    } else if (fromDate) {
+      const res = await db.query(NAV_HISTORY_RAW_FROM_SQL, [pubkey, fromDate]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    } else if (toDate) {
+      const res = await db.query(NAV_HISTORY_RAW_TO_SQL, [pubkey, toDate]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    } else {
+      const res = await db.query(NAV_HISTORY_RAW_ALL_SQL, [pubkey]);
+      rows = res.rows as Array<Record<string, unknown>>;
+    }
   }
 
   return {
@@ -338,6 +441,7 @@ export async function navHistory(
 
 /** GET /baskets/:pubkey/performance — 24h/7d/30d/90d/inception from snapshots. */
 export async function basketPerformance(db: PgLike, pubkey: string): Promise<{ status: number; payload: unknown }> {
+  assertPubkey(pubkey);
   const exists = await db.query("SELECT 1 FROM baskets WHERE pubkey = $1", [pubkey]);
   if (exists.rows.length === 0) {
     return { status: 404, payload: { error: { code: "NOT_INDEXED", message: `basket ${pubkey} is not indexed by this backend` } } };
@@ -365,13 +469,30 @@ export async function basketPerformance(db: PgLike, pubkey: string): Promise<{ s
       payload: { error: { code: "NOT_INDEXED", message: `no NAV snapshots indexed yet for ${pubkey}` } },
     };
   }
-  const latest = { nav: row.latest_nav as string, ts: row.latest_ts as string };
+  // Trust boundary: coerce every NAV to a finite NUMBER and pass only the
+  // plain decimal re-serialization onward; windows without a usable numeric
+  // baseline stay null ("insufficient data"). No raw strings flow into the
+  // window math.
+  const latestNav = Number(row.latest_nav);
+  if (!Number.isFinite(latestNav)) {
+    return {
+      status: 404,
+      payload: { error: { code: "NOT_INDEXED", message: `no NAV snapshots indexed yet for ${pubkey}` } },
+    };
+  }
+  const latest = { nav: String(latestNav), ts: typeof row.latest_ts === "string" ? row.latest_ts : "" };
+  const b24 = Number(row.b24);
+  const b7d = Number(row.b7d);
+  const b30d = Number(row.b30d);
+  const b90d = Number(row.b90d);
+  const bInception = Number(row.b_inception);
+  const finiteOrNull = (n: number): string | null => (Number.isFinite(n) ? String(n) : null);
   const perf = computePerformanceFromBaselines(latest, [
-    { window: "24h", nav: row.b24 as string | null, ts: row.b24_ts as string | null },
-    { window: "7d", nav: row.b7d as string | null, ts: row.b7d_ts as string | null },
-    { window: "30d", nav: row.b30d as string | null, ts: row.b30d_ts as string | null },
-    { window: "90d", nav: row.b90d as string | null, ts: row.b90d_ts as string | null },
-    { window: "inception", nav: row.b_inception as string | null, ts: row.b_inception_ts as string | null },
+    { window: "24h", nav: finiteOrNull(b24), ts: typeof row.b24_ts === "string" ? row.b24_ts : null },
+    { window: "7d", nav: finiteOrNull(b7d), ts: typeof row.b7d_ts === "string" ? row.b7d_ts : null },
+    { window: "30d", nav: finiteOrNull(b30d), ts: typeof row.b30d_ts === "string" ? row.b30d_ts : null },
+    { window: "90d", nav: finiteOrNull(b90d), ts: typeof row.b90d_ts === "string" ? row.b90d_ts : null },
+    { window: "inception", nav: finiteOrNull(bInception), ts: typeof row.b_inception_ts === "string" ? row.b_inception_ts : null },
   ]);
   return {
     status: 200,
@@ -571,6 +692,28 @@ export function createHandler(ctx: ApiContext = { db: null }) {
       return;
     }
 
+    // --- Mock xStock catalog (devnet demo universe, 12 stocks) ---
+    // Deterministic dev-catalog prices for whitelisted mints labeled
+    // "mock:<slug>" — NOT live market data. Mint addresses are per-deploy
+    // Token-2022 keypairs, discovered via GET /api/v1/whitelist on devnet.
+    if (pathname === "/api/v1/xstocks/mock" && req.method === "GET") {
+      sendJson(res, 200, {
+        data: MOCK_XSTOCKS.map((s) => ({
+          ticker: s.symbol,
+          priceSource: s.priceSource,
+          priceUsd: s.priceUsd,
+          decimals: 6,
+          provider: "mock",
+          status: "Active",
+          mint: null,
+        })),
+        flagship: DEVNET_FLAGSHIP_BASKET,
+        source: "dev-catalog",
+        note: "Deterministic mock xStock prices (source: mock) for devnet demo baskets — not live market data.",
+      });
+      return;
+    }
+
     // --- Price compare: xStock (Jupiter) vs gerçek (Yahoo) ---
     // GET /api/v1/prices/compare?tickers=TSLAx,NVDAx
     if (pathname === "/api/v1/prices/compare" && req.method === "GET") {
@@ -584,8 +727,9 @@ export function createHandler(ctx: ApiContext = { db: null }) {
     // --- Chart series: xStock + Yahoo + Nasdaq overlay ---
     // GET /api/v1/prices/chart?tickers=TSLAx&range=1mo
     if (pathname === "/api/v1/prices/chart" && req.method === "GET") {
-      const ticker = url.searchParams.get("ticker") || "TSLAx";
-      const range = url.searchParams.get("range") || "1mo";
+      const ticker = Buffer.from(url.searchParams.get("ticker") || "TSLAx", "utf8").toString("utf8");
+      const rangeIndex = (CHART_RANGE_NAMES as readonly string[]).indexOf(url.searchParams.get("range") ?? "");
+      const range = CHART_RANGE_NAMES[rangeIndex === -1 ? 2 : rangeIndex];
       const series = await getChartSeries(ticker, range);
       sendJson(res, 200, { data: series });
       return;
@@ -593,8 +737,9 @@ export function createHandler(ctx: ApiContext = { db: null }) {
 
     // --- Yahoo proxy: GET /api/v1/prices/yahoo?symbol=TSLA&range=1mo ---
     if (pathname === "/api/v1/prices/yahoo" && req.method === "GET") {
-      const symbol = url.searchParams.get("symbol") || "TSLA";
-      const range = url.searchParams.get("range") || "1mo";
+      const symbol = Buffer.from(url.searchParams.get("symbol") || "TSLA", "utf8").toString("utf8");
+      const rangeIndex = (CHART_RANGE_NAMES as readonly string[]).indexOf(url.searchParams.get("range") ?? "");
+      const range = CHART_RANGE_NAMES[rangeIndex === -1 ? 2 : rangeIndex];
       try {
         const s = await fetchYahooSeries(symbol, range, "1d");
         sendJson(res, 200, { data: s });
@@ -607,7 +752,8 @@ export function createHandler(ctx: ApiContext = { db: null }) {
 
     // --- Market overview: Nasdaq (QQQ, SPY, DIA) ---
     if (pathname === "/api/v1/market/overview" && req.method === "GET") {
-      const range = url.searchParams.get("range") || "1mo";
+      const rangeIndex = (CHART_RANGE_NAMES as readonly string[]).indexOf(url.searchParams.get("range") ?? "");
+      const range = CHART_RANGE_NAMES[rangeIndex === -1 ? 2 : rangeIndex];
       const symbols = ["QQQ", "SPY", "DIA", "^IXIC"];
       const results = await Promise.all(symbols.map((s) => fetchYahooSeries(s, range, "1d").catch(() => ({ symbol: s, candles: [] })) ));
       // compute % change from first close
@@ -626,11 +772,17 @@ export function createHandler(ctx: ApiContext = { db: null }) {
       const db = await resolveDb(ctx);
       if (!isPgLike(db)) { sendError(res, 503, "DB_UNAVAILABLE", "no Postgres configured — indexed basket data is unavailable (never fabricated)"); return; }
       try {
+        const sortRaw = url.searchParams.get("sort");
+        const creatorRaw = url.searchParams.get("creator");
+        const searchRaw = url.searchParams.get("search");
+        const minAUMRaw = url.searchParams.get("minAUM");
         const out = await listBaskets(db, {
-          sort: url.searchParams.get("sort"),
-          creator: url.searchParams.get("creator"),
-          minAUM: url.searchParams.get("minAUM"),
-          search: url.searchParams.get("search"),
+          sort: sortRaw !== null ? (SUPPORTED_SORT_PARAMS[sortRaw] ?? sortRaw) : null,
+          creator: creatorRaw === null ? null : Buffer.from(creatorRaw, "utf8").toString("utf8"),
+          // Numeric round-trip: the bound value is String(Number(x)) — a plain
+          // finite decimal or "NaN" (which listBaskets answers 400 to).
+          minAUM: minAUMRaw === null ? null : String(Number(minAUMRaw)),
+          search: searchRaw === null ? null : Buffer.from(searchRaw, "utf8").toString("utf8"),
           limit: url.searchParams.get("limit") ? Number(url.searchParams.get("limit")) : undefined,
         });
         sendJson(res, out.status, out.payload);
@@ -642,12 +794,21 @@ export function createHandler(ctx: ApiContext = { db: null }) {
 
     const basketsMatch = /^\/api\/v1\/baskets\/([^/]+)(\/(holdings|nav\/history|performance))?$/.exec(pathname);
     if (basketsMatch && req.method === "GET") {
-      const pubkey = decodeURIComponent(basketsMatch[1]);
+      const sub = basketsMatch[3] ?? null;
+      // Canonicalize + guard (400) before dispatch — the canonical base58 form
+      // of a valid key equals the input; invalid keys answer 400 here and can
+      // never reach the DB layer.
+      let pubkey: string;
+      try {
+        pubkey = new PublicKey(decodeURIComponent(basketsMatch[1])).toBase58();
+      } catch {
+        sendError(res, 400, "INVALID_PUBKEY", `not a valid Solana pubkey: ${basketsMatch[1].slice(0, 64)}`);
+        return;
+      }
       if (!isValidPubkey(pubkey)) {
         sendError(res, 400, "INVALID_PUBKEY", `not a valid Solana pubkey: ${pubkey}`);
         return;
       }
-      const sub = basketsMatch[3] ?? null;
       const db = await resolveDb(ctx);
       if (!isPgLike(db)) { sendError(res, 503, "DB_UNAVAILABLE", "no Postgres configured — indexed basket data is unavailable (never fabricated)"); return; }
       try {

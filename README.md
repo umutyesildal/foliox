@@ -2,7 +2,7 @@
 
 > "Create an index. Own your thesis." — Onchain strategy baskets powered by xStocks.
 > V0 spec: `docs/foliox-v0-spec.md` (normative product constraints). Execution plan: `plan.md`. Brand: `brand.md`.
-> Current state: **V0 implemented — protocol (real Token-2022 CPI, localnet E2E 8/8 PASS), backend (real indexer/NAV/API), frontend (new IA, Roman identity UI on `roman-empire` branch). 178 Rust + 392 backend TS tests.** DEVNET PAUSED ON FAUCET FUNDING (staged rerun in `plan.md` §8b) — not yet devnet/mainnet.
+> Current state: **LIVE ON DEVNET (2026-09-04) — 3 programs deployed at declared IDs, 12 mock xStocks whitelisted, one basket live with mint/redeem/fee verified on-chain (38 confirmed txs; redeem_in_kind proven permissionless under a paused constituent). Backend indexer/NAV/fee-crank live against devnet. 599 tests (178 Rust + 442 backend TS).** Not yet mainnet. Evidence: `docs/devnet-live-2026-09-04.md`.
 
 ## Tests (all green)
 
@@ -10,16 +10,30 @@
 cargo test                                  # 178 Rust tests
 npm --prefix backend install                # once (backend has its own lockfile)
 npm --prefix backend run build              # strict NodeNext, no suppressions
-npm --prefix backend test -- --run          # 373 TS tests
+npm --prefix backend test -- --run          # 421 TS tests
 (cd app && npx tsc --noEmit --incremental false)   # 0 errors
 npm --prefix app run build                  # 13 routes, no ignored errors
 ```
+
+## Devnet live (2026-09-04)
+
+- Deployed at declared IDs: `whitelist` `FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS`, `basket_factory` `3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF`, `basket` `6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k`.
+- 12 mock xStocks whitelisted (TSLAx…SPYx, Token-2022 ScaledUiAmountConfig); one live basket at 3 constituents — NVDAx/AAPLx/MSFTx 4000/3200/2800 bps, fees 100/50/200 — with mint, redeem, and management-fee flows confirmed on-chain (38 txs, all `err: null`; supply/fee/NAV reconcile exactly).
+- Known limit: `create_basket` at 4+ constituents exceeds the legacy 1232 B transaction wire limit — fix path is versioned (v0) txs + address lookup tables.
+
+Run the backend against devnet:
+
+```bash
+cd backend && set -a && . ./.env.devnet && set +a && npx tsx src/index.ts
+```
+
+Full evidence pack — signature tables, address tables, reconciliation, reproduction steps: `docs/devnet-live-2026-09-04.md`.
 
 ## Stack
 
 - **Solana programs (Anchor 0.30, real Token-2022 CPI):** `whitelist` (Token-2022 ownership + decimals verification), `basket_factory` (atomic seed transfers, genesis 1M with temp-mint-authority handoff), `basket` (real `transfer_checked`/`burn`/`mint_to`; `redeem_in_kind` permissionless + oracle-free, structurally tested)
 - **Backend:** Node 20 + TypeScript (strict) + PostgreSQL + optional Redis — real indexer (Anchor event decode), holdings sync with ScaledUiAmount multiplier, exact BigInt fixed-point NAV engine, REST API with `source`/`asOf` provenance on every row; backend never signs
-- **Frontend:** Next.js 15 + Tailwind 3.4 + **bklit UI** (registry provenance verified — see `docs/bklit-registry-findings-2026-09-01.md`; Brush = documented local adapter) + wallet-adapter (Phantom/Solflare, full state machine) — brand per `brand.md` (Mineral Desk, Geist/Geist Mono)
+- **Frontend:** Next.js 15 + Tailwind 3.4 + **bklit UI** (registry provenance verified — see `docs/bklit-registry-findings-2026-09-01.md`; Brush = documented local adapter) + wallet-adapter (Phantom/Solflare, full state machine) — brand per `brand.md` (monochrome base + Roman layer, Cinzel display)
 - **Token:** SPL Token-2022 — raw transfers on-chain, `scaled = raw × multiplier` for display/NAV
 
 ## Programs
@@ -64,15 +78,16 @@ UI chips were removed at the owner's request (2026-09-03); the review items live
 
 ## Local dev demo data
 
-The UI phase seeds the local Postgres so pages render with content: 4 whitelisted mock xStocks (TSLAx/AAPLx/NVDAx/SPYx from `docs/providers.md`) and two demo baskets (**Tech Duo** 50/50 AAPLx-TSLAx, **Index Plus** 60/25/15 SPYx-NVDAx-AAPLx) with 30d NAV history (`demo-seed` source marker). Dev-only — drop or re-seed freely.
+For local (non-devnet) development, `demo-seed` seeds the local Postgres so pages render with content: 4 whitelisted mock xStocks (TSLAx/AAPLx/NVDAx/SPYx from `docs/providers.md`) and two demo baskets (**Tech Duo** 50/50 AAPLx-TSLAx, **Index Plus** 60/25/15 SPYx-NVDAx-AAPLx) with 30d NAV history (`demo-seed` source marker). Dev-only — drop or re-seed freely. When the backend runs against devnet instead, pages serve on-chain-indexed data (see "Devnet live" above) and the seed is unnecessary.
 
 ## Milestones
 
-Execution state in `plan.md` §7-8. G0 brand superseded by the owner's **monochrome** decision (2026-09-03); G1 Bklit provenance resolved; protocol/backend truth waves complete; new-IA UI waves complete (owner feedback rounds 1-2 applied). **Paused (WIP commit `e961849`)**: localnet E2E + create_basket stack-overflow refactor — SBF pins and `idl-build` features are already in place; resume on owner request.
+Execution state in `plan.md` §7-8. G0 brand superseded by the owner's **monochrome** decision (2026-09-03); G1 Bklit provenance resolved; protocol/backend truth waves complete; new-IA UI waves complete (owner feedback rounds 1-2 applied). **DEVNET LIVE (2026-09-04)** — evidence in `docs/devnet-live-2026-09-04.md`, status snapshot in `plan.md` §8c; next: versioned (v0) txs + ALTs for >3 constituents, owner review / merge of `roman-empire`.
 
 ## Scripts
 
-- `scripts/e2e.sh` — deterministic localnet flow (validator → whitelist → basket → mint/redeem → fee crank); landing now, runnable once the SBF toolchain attempt concludes (status in `plan.md` §8)
+- `scripts/e2e.sh` — deterministic localnet flow (validator → whitelist → basket → mint/redeem → fee crank)
+- Devnet E2E — the same four scripts (`scripts/createWhitelist.ts` → `createBasket.ts` → `mintAndRedeem.ts` → `accrueFee.ts`) run against devnet via `FOLIOX_E2E_*` env vars; state + logs + evidence collector in `scripts/.e2e-devnet/` (reproduction commands in `docs/devnet-live-2026-09-04.md` §8)
 
 ---
 

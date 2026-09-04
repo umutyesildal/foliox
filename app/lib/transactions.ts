@@ -34,14 +34,23 @@
  */
 
 import {
+  AddressLookupTableProgram,
+  ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
+  type AddressLookupTableAccount,
+  type Connection,
+  type TransactionSignature,
 } from "@solana/web3.js";
 // web3.js types TransactionInstruction.data as Buffer; the `buffer` package is
 // a real (transitive) dependency of @solana/web3.js — imported explicitly so
 // the browser bundle uses the same module instance instead of a global.
 import { Buffer } from "buffer";
+
+import { CREATE_BASKET_COMPUTE_UNITS, buildCreateBasketInstruction, deriveCreateBasketPdas, estimateCreateBasketTxSize, type CreateBasketArgs } from "@/lib/create-basket";
 
 /**
  * UTF-8 seed bytes (stand-in for Buffer.from so no Buffer global/polyfill is
@@ -50,6 +59,7 @@ import { Buffer } from "buffer";
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 
 import { PROGRAMS } from "@/lib/solana";
+import { CLUSTER, explorerClusterQuery } from "@/lib/wallet";
 
 /** programs/basket — declare_id!("37VPG…") (programs/basket/src/lib.rs:10). */
 export const BASKET_PROGRAM_ID = PROGRAMS.basket;
@@ -518,6 +528,273 @@ export function buildCreateAtaInstructions(
   );
 }
 
+// ===================== v0 + address lookup tables (create_basket) =====================
+//
+// The 3-constituent basket ceiling is a WIRE limit, not a program limit: a
+// legacy transaction may not exceed the 1232-byte Solana packet size, and the
+// serialized create_basket transaction crosses it at 4 constituents
+// (measured on devnet: 4→1270B, 5→1444B, 6→1618B; 3→1096B fits). From 4
+// constituents on, the create wizard compiles the SAME instruction into a v0
+// message whose non-signer account keys are compressed to 1-byte indexes
+// through an Address Lookup Table (devnet-measured: 6 constituents → 631B).
+// The programs are untouched — this is purely client-side transaction
+// construction. ALT creation needs RPC signing, so the wizard calls
+// `ensureCreateBasketAlt()` first (the connected wallet signs the
+// create/extend transactions), then passes the table address into
+// `buildCreateBasketTransaction()`.
+
+/** Solana packet size limit. */
+export const PACKET_LIMIT = 1232;
+
+/**
+ * True when a create_basket transaction with this many constituents exceeds
+ * the 1232B packet limit without lookup tables (equivalently: n >= 4).
+ */
+export function createBasketNeedsAlt(numConstituents: number): boolean {
+  return estimateCreateBasketTxSize(numConstituents) > PACKET_LIMIT;
+}
+
+/**
+ * Every address a create_basket transaction references EXCEPT the creator —
+ * the exact payload for the wizard's lookup table. Signers (the creator/payer)
+ * must stay in the transaction's static keys, so they are excluded here.
+ */
+export function deriveCreateBasketAltAddresses(
+  creator: string,
+  args: CreateBasketArgs,
+): PublicKey[] {
+  const pda = deriveCreateBasketPdas(creator, args);
+  const creatorKey = new PublicKey(creator);
+  const candidates: PublicKey[] = [
+    pda.factory,
+    pda.basket,
+    pda.shareMint,
+    pda.vaultAuthority,
+    pda.creatorShareAta,
+    TOKEN_2022_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    SystemProgram.programId,
+    BASKET_PROGRAM_ID,
+  ];
+  args.constituents.forEach((mint, i) => {
+    candidates.push(
+      pda.whitelistedMints[i],
+      new PublicKey(mint),
+      pda.creatorAtas[i],
+      pda.vaultAtas[i],
+    );
+  });
+  const seen = new Set<string>();
+  const out: PublicKey[] = [];
+  for (const key of candidates) {
+    if (key.equals(creatorKey)) continue;
+    const base58 = key.toBase58();
+    if (!seen.has(base58)) {
+      seen.add(base58);
+      out.push(key);
+    }
+  }
+  return out;
+}
+
+export interface BuiltCreateBasketTx {
+  transaction: VersionedTransaction;
+  blockhash: string;
+  lastValidBlockHeight: number;
+  /** Exact serialized size in bytes (zeroed signatures). */
+  sizeBytes: number;
+  /** False = the legacy-shaped n<=3 message, unchanged. */
+  usedLookupTable: boolean;
+}
+
+/**
+ * Build the create_basket transaction exactly as the wizard sends it.
+ *
+ * - n <= 3: v0 message with NO lookup tables and no compute-budget
+ *   instructions — byte-identical behavior to the previous builder.
+ * - n >= 4: requires `lookupTableAddresses` (call `ensureCreateBasketAlt()`
+ *   first); compiles a v0 message through the tables with a compute-unit
+ *   limit prepended (the 4+ constituent CPI chain exceeds the 200k default).
+ *
+ * Throws when the result would still exceed the packet limit — honest failure
+ * instead of a wallet rejection downstream.
+ */
+export async function buildCreateBasketTransaction(params: {
+  connection: Connection;
+  creator: string;
+  args: CreateBasketArgs;
+  /** Required for n >= 4 — from ensureCreateBasketAlt(). Ignored for n <= 3. */
+  lookupTableAddresses?: PublicKey[];
+}): Promise<BuiltCreateBasketTx> {
+  const { connection, creator, args } = params;
+  const instruction = buildCreateBasketInstruction(creator, args);
+  const needsAlt = createBasketNeedsAlt(args.constituents.length);
+  const tables: AddressLookupTableAccount[] = [];
+  if (needsAlt) {
+    const provided = params.lookupTableAddresses ?? [];
+    if (provided.length === 0) {
+      throw new Error(
+        `create_basket with ${args.constituents.length} constituents exceeds the ${PACKET_LIMIT}B packet limit — call ensureCreateBasketAlt() first and pass the lookup table address`,
+      );
+    }
+    for (const address of provided) {
+      const table = await connection.getAddressLookupTable(address);
+      if (!table.value) {
+        throw new Error(`address lookup table ${address.toBase58()} not found on ${connection.rpcEndpoint}`);
+      }
+      tables.push(table.value);
+    }
+  }
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("finalized");
+  const instructions = needsAlt
+    ? [ComputeBudgetProgram.setComputeUnitLimit({ units: CREATE_BASKET_COMPUTE_UNITS }), instruction]
+    : [instruction];
+  const message = new TransactionMessage({
+    payerKey: new PublicKey(creator),
+    recentBlockhash: blockhash,
+    instructions,
+  }).compileToV0Message(tables);
+  const transaction = new VersionedTransaction(message);
+  // Version-safe size measurement: message bytes + one 64-byte signature per
+  // required signer (VersionedTransaction.serialize() takes no args in the
+  // web3.js version the app resolves).
+  const sizeBytes = transaction.message.serialize().length + transaction.signatures.length * 64;
+  if (sizeBytes > PACKET_LIMIT) {
+    throw new Error(
+      `serialized create_basket transaction is ${sizeBytes}B > ${PACKET_LIMIT}B — lookup-table compression was insufficient`,
+    );
+  }
+  return { transaction, blockhash, lastValidBlockHeight, sizeBytes, usedLookupTable: needsAlt };
+}
+
+/** Wallet-adapter sender shape (mirrors the create wizard's prop). */
+export type WalletSendTransaction = <T extends VersionedTransaction>(
+  transaction: T,
+  connection: Connection,
+) => Promise<TransactionSignature>;
+
+export interface EnsureCreateBasketAltResult {
+  lookupTableAddress: PublicKey;
+  /** True when this call created the table (vs reusing an existing one). */
+  created: boolean;
+  /** How many addresses were newly extended into the table. */
+  extended: number;
+}
+
+/**
+ * Ensure an Address Lookup Table covering every non-signer create_basket
+ * account exists on-chain, owned by (and paid for by) the connected creator
+ * wallet. Idempotent:
+ *
+ * 1. The table address is derived deterministically from (creator, a recent
+ *    finalized slot); if the account already exists it is reused.
+ * 2. Otherwise the wallet signs a createLookupTable transaction.
+ * 3. Any addresses missing from the table are extended in packet-sized
+ *    chunks (each extension is a separate wallet signature — the extension
+ *    instruction carries addresses in its data, so one transaction fits ~20).
+ *
+ * The wizard calls this BEFORE buildCreateBasketTransaction() whenever
+ * `createBasketNeedsAlt()` is true; both consumer transactions (mint/redeem)
+ * are unaffected — they still fit in a legacy-shaped message for the sizes the
+ * app produces today.
+ */
+export async function ensureCreateBasketAlt(params: {
+  connection: Connection;
+  /** Connected wallet — becomes the table authority and pays its rent. */
+  creator: string;
+  args: CreateBasketArgs;
+  sendTransaction: WalletSendTransaction;
+  /** Optional hook so the UI can flip into an "awaiting wallet" phase. */
+  onAwaitingWallet?: (awaiting: boolean) => void;
+  /** Override the derivation slot (testing only — defaults to last finalized). */
+  recentSlot?: number;
+}): Promise<EnsureCreateBasketAltResult> {
+  const { connection, creator, args, sendTransaction, onAwaitingWallet } = params;
+  const authority = new PublicKey(creator);
+  const addresses = deriveCreateBasketAltAddresses(creator, args);
+  const recentSlot = params.recentSlot ?? (await connection.getSlot("finalized"));
+  const lookupTableAddress = PublicKey.findProgramAddressSync(
+    [authority.toBuffer(), borshU64(BigInt(recentSlot))],
+    AddressLookupTableProgram.programId,
+  )[0];
+
+  let created = false;
+  if (!(await connection.getAccountInfo(lookupTableAddress))) {
+    const [createIx, derived] = AddressLookupTableProgram.createLookupTable({
+      authority,
+      payer: authority,
+      recentSlot,
+    });
+    if (!derived.equals(lookupTableAddress)) {
+      throw new Error(
+        `lookup table derivation mismatch: ${derived.toBase58()} != ${lookupTableAddress.toBase58()}`,
+      );
+    }
+    await sendWithWallet(
+      connection,
+      sendTransaction,
+      [createIx],
+      authority,
+      onAwaitingWallet,
+    );
+    created = true;
+  }
+
+  const table = await connection.getAddressLookupTable(lookupTableAddress);
+  const have: PublicKey[] = table.value ? [...table.value.state.addresses] : [];
+  const missing = addresses.filter((a) => !have.some((h) => h.equals(a)));
+  for (let i = 0; i < missing.length; i += 20) {
+    const chunk = missing.slice(i, i + 20);
+    const extendIx = AddressLookupTableProgram.extendLookupTable({
+      payer: authority,
+      authority,
+      lookupTable: lookupTableAddress,
+      addresses: chunk,
+    });
+    await sendWithWallet(
+      connection,
+      sendTransaction,
+      [extendIx],
+      authority,
+      onAwaitingWallet,
+    );
+  }
+  return { lookupTableAddress, created, extended: missing.length };
+}
+
+/** Compile → wallet-sign → confirm a small management transaction. */
+async function sendWithWallet(
+  connection: Connection,
+  sendTransaction: WalletSendTransaction,
+  instructions: TransactionInstruction[],
+  payer: PublicKey,
+  onAwaitingWallet?: (awaiting: boolean) => void,
+): Promise<TransactionSignature> {
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("finalized");
+  const message = new TransactionMessage({
+    payerKey: payer,
+    recentBlockhash: blockhash,
+    instructions,
+  }).compileToV0Message([]);
+  const transaction = new VersionedTransaction(message);
+  onAwaitingWallet?.(true);
+  try {
+    const signature = await sendTransaction(transaction, connection);
+    const confirmation = await connection.confirmTransaction(
+      { blockhash, lastValidBlockHeight, signature },
+      "confirmed",
+    );
+    if (confirmation.value.err) {
+      throw new Error(
+        `lookup-table transaction confirmed with an error: ${JSON.stringify(confirmation.value.err)}`,
+      );
+    }
+    return signature;
+  } finally {
+    onAwaitingWallet?.(false);
+  }
+}
+
 // ===================== program error decoding =====================
 
 /**
@@ -611,28 +888,20 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
 
 /**
  * Explorer URL for a transaction signature, cluster-aware (localnet maps to
- * ?cluster=custom&customUrl=<endpoint>).
+ * ?cluster=custom&customUrl=<endpoint>). Path first, cluster query last.
  */
 export function explorerTxUrl(signature: string, endpoint: string): string {
-  return `${explorerBase(endpoint)}/tx/${signature}`;
+  return explorerUrl(`/tx/${signature}`, endpoint);
 }
 
 /** Explorer URL for an account, cluster-aware. */
 export function explorerAccountUrl(address: string, endpoint: string): string {
-  return `${explorerBase(endpoint)}/account/${address}`;
+  return explorerUrl(`/account/${address}`, endpoint);
 }
 
-function explorerBase(endpoint: string): string {
-  let cluster: string;
-  try {
-    const host = new URL(endpoint).host;
-    if (host === "api.devnet.solana.com") cluster = "?cluster=devnet";
-    else if (host === "api.testnet.solana.com") cluster = "?cluster=testnet";
-    else if (/^(localhost|127\.0\.0\.1)/.test(host))
-      cluster = `?cluster=custom&customUrl=${encodeURIComponent(endpoint)}`;
-    else cluster = "";
-  } catch {
-    cluster = "";
-  }
-  return `https://explorer.solana.com${cluster}`;
+function explorerUrl(path: string, endpoint: string): string {
+  // Cluster comes from NEXT_PUBLIC_CLUSTER (default devnet) via lib/wallet —
+  // not from endpoint-host sniffing — so links stay correct even when the RPC
+  // endpoint is a local proxy in front of a public cluster.
+  return `https://explorer.solana.com${path}${explorerClusterQuery(CLUSTER, endpoint)}`;
 }

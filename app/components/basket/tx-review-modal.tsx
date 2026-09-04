@@ -5,6 +5,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { truncateAddress } from "@/lib/format";
 import type { ExpectedAccount } from "@/lib/transactions";
+import { explorerTxUrl } from "@/lib/transactions";
 import type { TransactionFlowState } from "@/components/basket/use-transaction-flow";
 
 /**
@@ -81,7 +82,7 @@ export function TxReviewModal({
   const inFlight = !isIdle(flowState.status) && !isTerminal(flowState.status);
   const terminal = isTerminal(flowState.status);
   const explorerHref = flowState.signature
-    ? `${explorerRoot(endpoint)}/tx/${flowState.signature}`
+    ? explorerTxUrl(flowState.signature, endpoint)
     : null;
 
   return (
@@ -252,17 +253,3 @@ function StatusLine({
   }
 }
 
-function explorerRoot(endpoint: string): string {
-  let cluster: string;
-  try {
-    const host = new URL(endpoint).host;
-    if (host === "api.devnet.solana.com") cluster = "?cluster=devnet";
-    else if (host === "api.testnet.solana.com") cluster = "?cluster=testnet";
-    else if (/^(localhost|127\.0\.0\.1)/.test(host))
-      cluster = `?cluster=custom&customUrl=${encodeURIComponent(endpoint)}`;
-    else cluster = "";
-  } catch {
-    cluster = "";
-  }
-  return `https://explorer.solana.com${cluster}`;
-}

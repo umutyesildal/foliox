@@ -16,7 +16,14 @@
  * signature for existing tests.
  */
 
-export type PriceSource = "jupiter" | "mock";
+/**
+ * Quote provenance labels:
+ *   "jupiter" — live Jupiter Price API v6 (mainnet mints)
+ *   "mock"    — deterministic dev catalog (workers/mockPriceFill.ts fallback)
+ *   "yahoo"   — real equity market spot quote via the guarded Yahoo chart API
+ *               (workers/realisticMockPrices.ts, REALISTIC_MOCK_PRICES)
+ */
+export type PriceSource = "jupiter" | "mock" | "yahoo";
 
 export interface PricePoint {
   mint: string;

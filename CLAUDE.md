@@ -4,7 +4,7 @@
 > **Read this first before writing code.** This is the single source of truth for FolioX V0.
 > Spec: `docs/foliox-v0-spec.md` (774 lines, 13 sections) | Prompt: `foliox_build_prompt.md`
 > Brand: **Monochrome + Roman identity layer** (owner decisions 2026-09-02/03: classic shadcn dark/light chrome, ethereal chart data palette, Cinzel display font, laurel monogram logo, Roman numerals, --imperial purple / --pompeian red accents used sparingly; on the `roman-empire` branch — merge pending owner review). Telemetry off. Legal-review chips removed from UI (backlog).
-> Status: **V0 implementation complete — protocol (real Token-2022 CPI, localnet E2E 8/8 PASS), backend (real indexer/NAV/API, 392 TS tests), frontend (new IA + two owner feedback rounds + Roman theme, browser-verified). DEVNET PAUSED ON FAUCET FUNDING** (all airdrop routes exhausted incl. browser + raw API + GitHub OAuth attempt; owner to fund `y72KA263br7MtZw7BqC2dx5QYCBUciJGzShE8BRSwRE` ~12 devnet SOL — staged rerun in plan.md §8b).
+> Status: **PROTOCOL LIVE ON DEVNET — 2 live baskets (3-stock + 6-stock MAG SIX via v0 txs + ALTs), 12 mock xStocks whitelisted, 48+ confirmed txs: mint/redeem/fee verified on-chain, redeem_in_kind proven permissionless under a paused constituent. NAV priced from real market data (Yahoo-first, catalog fallback). Backend indexer/NAV/fee-crank live (fee crank builds UNSIGNED txs only). 620 tests green (178 Rust + 442 backend TS). NEXT: owner commit-gate decision + UI Phantom buy/redeem click-through; owner review / merge of `roman-empire`.** Evidence: `docs/devnet-live-2026-09-04.md`.
 
 ---
 
@@ -47,7 +47,7 @@ If you are tempted to add `admin_withdraw`, `pause_redeem`, `oracle check`, or `
 | **Tokens** | SPL Token-2022 | Raw for transfers, scaled for display |
 | **Oracles/prices** | Jupiter Price API v6 (NAV only) | Never gates redeem |
 | **Zap** | Jupiter Swap API (quote → swap) | Sequential swaps + `mint_in_kind` in V0 |
-| **Tests** | Rust `cargo test` 178 tests, TS `vitest` 373 backend tests (+1 root legacy) | Total 552 tests passing |
+| **Tests** | Rust `cargo test` 178 tests, TS `vitest` 421 backend tests | Total 620 tests passing (178 Rust + 442 backend) |
 
 **Program IDs (localnet/devnet):**
 
@@ -289,7 +289,7 @@ Placeholder copy must be replaced by counsel before mainnet.
 
 ---
 
-## 13. Testing — Super Many (552 tests, All Passing)
+## 13. Testing — Super Many (620 tests, All Passing)
 
 **Rust `cargo test` 178 tests** (`cargo test -p basket` 119 + `basket_factory` 38 + `whitelist` 21):
 
@@ -307,7 +307,7 @@ Placeholder copy must be replaced by counsel before mainnet.
 * `waveb-nav-api.test.ts` 45 tests (exact BigInt fixed-point NAV, drift/rounding, performance windows, zap quote legs with mocked fetch, unsigned fee-crank tx, API routes via fake PgLike)
 * `tests/foliox_math.test.ts:1` 1 legacy
 
-Total **552 tests passing** (`cargo test: 178 + backend vitest: 373 + root legacy: 1`). See `backend/tests/` + `programs/*/src/lib.rs` `#[cfg(test)]`.
+Total **620 tests passing** (`cargo test: 178 + backend vitest: 442`). See `backend/tests/` + `programs/*/src/lib.rs` `#[cfg(test)]`.
 
 **Run:**
 
@@ -387,7 +387,7 @@ PORT=3001
 * Don't change program IDs without updating `Anchor.toml:5` + `declare_id!` in all 3 `lib.rs:3`.
 * Don't use floating point for on-chain math — use `u128` intermediate then cast to `u64` floor.
 * Don't describe baskets as ETFs in UI copy — `LEGAL_REVIEW_REQUIRED` if you touch `app/app/legal/page.tsx:1` or `app/create/page.tsx:1`.
-* Don't break tests — 552 tests are your safety net; if you add super many more, run `cargo test` + `npx --prefix backend vitest run`.
+* Don't break tests — 620 tests are your safety net; if you add super many more, run `cargo test` + `npx --prefix backend vitest run`.
 * **DON'T use plain HTML / düz `recharts` / `shadcn` chart** — her chart `bklit` (`https://bklit.com/docs/installation`) olmalı. `plain HTML` görünümü yasaktır, her sayfa bklit `Card/Table/Badge` + `AreaChart/BarChart` + `shadcn/tailwind.css` ile yapılmalı.
 
 **When in doubt:** `cargo test -p basket --lib -- tests::test_gross_shares_perfect` and `grep -rn "redeem" docs/foliox-v0-spec.md`.

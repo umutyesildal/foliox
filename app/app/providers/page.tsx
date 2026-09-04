@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { truncateAddress } from "@/lib/format";
+import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -19,8 +20,6 @@ export const metadata: Metadata = {
   description:
     "Source registry: Backed Finance (xStocks issuer), Jupiter, Yahoo Finance, and the Nasdaq benchmark, with status and freshness.",
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 
 interface ProviderMint {
   ticker: string;
@@ -89,7 +88,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 async function getJson<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await apiFetch(path, {
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
       headers: { accept: "application/json" },

@@ -19,9 +19,9 @@ import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { RPC_ENDPOINT, describeWalletError } from "@/lib/wallet";
 
 /**
- * RPC endpoint: override with NEXT_PUBLIC_RPC_URL (e.g.
- * https://api.devnet.solana.com for devnet). Default is the localnet test
- * validator at http://127.0.0.1:8899 — see lib/wallet.ts.
+ * RPC endpoint + cluster: NEXT_PUBLIC_RPC_URL overrides the endpoint;
+ * NEXT_PUBLIC_CLUSTER (default "devnet") names the cluster used by the network
+ * indicator and every explorer link — see lib/wallet.ts.
  *
  * Wallets: Phantom + Solflare, auto-connect explicitly OFF. Connecting is
  * always an explicit user action from the header WalletButton. Wallet errors

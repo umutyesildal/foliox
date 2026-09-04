@@ -137,7 +137,7 @@ export function SummaryRail({
             "text-right font-mono tabular-nums",
             txSize > 1232 && "text-muted-foreground",
           )}
-          title="v0 transaction, no address lookup tables; the 1232-byte packet limit applies"
+          title="Legacy-shaped size estimate; above the 1232-byte packet limit the deploy step compiles through an address lookup table automatically"
         >
           ~{txSize.toLocaleString()} B
         </dd>

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Connection,
   PublicKey,
-  TransactionMessage,
   VersionedTransaction,
   type TransactionSignature,
 } from "@solana/web3.js";
@@ -16,7 +15,6 @@ import { useWalletFeedback } from "@/app/providers";
 import { formatBps, truncateAddress } from "@/lib/format";
 import {
   GENESIS_SHARES,
-  buildCreateBasketInstruction,
   deriveCreateBasketPdas,
   estimateCreateBasketTxSize,
   fetchCreatorSeedBalances,
@@ -26,7 +24,12 @@ import {
 } from "@/lib/create-basket";
 import { RPC_ENDPOINT, describeWalletError } from "@/lib/wallet";
 // Sibling contract: shared helpers from the basket-group worker's lib.
-import { explorerTxUrl } from "@/lib/transactions";
+import {
+  buildCreateBasketTransaction,
+  createBasketNeedsAlt,
+  ensureCreateBasketAlt,
+  explorerTxUrl,
+} from "@/lib/transactions";
 import { formatRawAsTokenUnits, type ConstituentDraft } from "./types";
 
 /** Uint8Array to lowercase hex (metadata hash display). */
@@ -38,6 +41,7 @@ function toHex(bytes: Uint8Array): string {
 
 type DeployPhase =
   | "idle"
+  | "preparing-alt"
   | "simulating"
   | "simulation-failed"
   | "awaiting-wallet"
@@ -179,18 +183,46 @@ export function DeployPanel({
           return balance === null || balance === undefined || balance < c.seedRaw;
         });
 
-  const buildVersionedTransaction = useCallback(async () => {
-    if (!args || !creator) return null;
-    const instruction = buildCreateBasketInstruction(creator, args);
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    const message = new TransactionMessage({
-      payerKey: new PublicKey(creator),
-      recentBlockhash: blockhash,
-      instructions: [instruction],
-    }).compileToV0Message([]);
-    const tx = new VersionedTransaction(message);
-    return { tx, blockhash, lastValidBlockHeight };
-  }, [args, creator, connection]);
+  // n >= 4 constituents exceed the 1232B packet limit, so the transaction is
+  // compiled through an Address Lookup Table. Creating/extending that table
+  // needs wallet signatures — `ensureAlt` asks once, then the table address is
+  // reused for the rest of the session.
+  const altRef = useRef<PublicKey | null>(null);
+  const [altAddress, setAltAddress] = useState<string | null>(null);
+  const needsAlt = args ? createBasketNeedsAlt(args.constituents.length) : false;
+
+  const ensureAlt = useCallback(
+    async (resumePhase: DeployPhase): Promise<PublicKey | null> => {
+      if (!args || !creator || !createBasketNeedsAlt(args.constituents.length)) return null;
+      if (altRef.current) return altRef.current;
+      const handle = await ensureCreateBasketAlt({
+        connection,
+        creator,
+        args,
+        sendTransaction,
+        onAwaitingWallet: (awaiting) => setPhase(awaiting ? "preparing-alt" : resumePhase),
+      });
+      altRef.current = handle.lookupTableAddress;
+      setAltAddress(handle.lookupTableAddress.toBase58());
+      return handle.lookupTableAddress;
+    },
+    [args, creator, connection, sendTransaction],
+  );
+
+  const buildVersionedTransaction = useCallback(
+    async (resumePhase: DeployPhase = "awaiting-wallet") => {
+      if (!args || !creator) return null;
+      const alt = await ensureAlt(resumePhase);
+      const built = await buildCreateBasketTransaction({
+        connection,
+        creator,
+        args,
+        lookupTableAddresses: alt ? [alt] : [],
+      });
+      return built;
+    },
+    [args, creator, connection, ensureAlt],
+  );
 
   const runSimulation = useCallback(async () => {
     if (!args || !creator) return;
@@ -198,9 +230,9 @@ export function DeployPanel({
     setSimulationLogs([]);
     setErrorMessage(null);
     try {
-      const built = await buildVersionedTransaction();
+      const built = await buildVersionedTransaction("simulating");
       if (!built) return;
-      const result = await connection.simulateTransaction(built.tx, {
+      const result = await connection.simulateTransaction(built.transaction, {
         sigVerify: false,
         replaceRecentBlockhash: true,
       });
@@ -229,7 +261,7 @@ export function DeployPanel({
     try {
       const built = await buildVersionedTransaction();
       if (!built) return;
-      const txSignature = await sendTransaction(built.tx, connection);
+      const txSignature = await sendTransaction(built.transaction, connection);
       setSignature(txSignature);
       setPhase("pending");
       const confirmation = await connection.confirmTransaction(
@@ -315,7 +347,11 @@ export function DeployPanel({
     );
   }
 
-  const busy = phase === "simulating" || phase === "awaiting-wallet" || phase === "pending";
+  const busy =
+    phase === "simulating" ||
+    phase === "preparing-alt" ||
+    phase === "awaiting-wallet" ||
+    phase === "pending";
   const blocked = validationErrors.length > 0;
 
   return (
@@ -352,8 +388,16 @@ export function DeployPanel({
         </dd>
         <dt className="text-muted-foreground">Est. tx size</dt>
         <dd className={`font-mono tabular-nums ${overLimit ? "text-muted-foreground" : ""}`}>
-          ~{estSize.toLocaleString()} B {overLimit ? `— exceeds the ${PACKET_LIMIT} B packet limit without lookup tables` : ""}
+          ~{estSize.toLocaleString()} B {overLimit ? `— exceeds the ${PACKET_LIMIT} B packet limit; sent through a lookup table` : ""}
         </dd>
+        {altAddress && (
+          <>
+            <dt className="text-muted-foreground">Lookup table</dt>
+            <dd className="break-all font-mono tabular-nums" title={altAddress}>
+              {altAddress}
+            </dd>
+          </>
+        )}
       </dl>
 
       <div className="rounded-lg border border-border bg-card p-5">
@@ -390,10 +434,11 @@ export function DeployPanel({
       {overLimit && !blocked && (
         <p className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
           This basket touches {9 + constituents.length * 4} accounts, so the
-          serialized transaction is ~{estSize.toLocaleString()} bytes — over the
-          {` ${PACKET_LIMIT} `}byte Solana packet limit without address lookup
-          tables. Simulation and sending may fail until V1 adds lookup-table
-          support. Fewer constituents fit in a single transaction.
+          legacy serialized transaction is ~{estSize.toLocaleString()} bytes — over the
+          {` ${PACKET_LIMIT} `}byte Solana packet limit. The first simulate or
+          deploy click therefore asks your wallet to create and fill an address
+          lookup table (two extra signatures), after which the transaction
+          compiles through it and fits comfortably.
         </p>
       )}
 

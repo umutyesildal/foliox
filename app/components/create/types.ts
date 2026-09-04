@@ -3,6 +3,8 @@
  * step components receive slices of this state as props.
  */
 
+import { prettyTicker } from "@/lib/format";
+
 /** Row from GET /api/v1/whitelist (backend whitelisted_mints table). */
 export interface WhitelistRow {
   mint: string;
@@ -55,12 +57,13 @@ export interface WizardDraft {
 
 export const WEIGHTS_DENOMINATOR = 10_000;
 
-/** Ticker from the price source label ("jupiter:TSLAx"), else short mint. */
+/** Ticker from the price source label ("jupiter:TSLAx", "mock:tsla" → "TSLA"),
+ *  else short mint. Display-only casing via prettyTicker. */
 export function tickerFromRow(row: WhitelistRow): string {
   const source = row.price_source ?? "";
   const colon = source.indexOf(":");
   const candidate = colon >= 0 ? source.slice(colon + 1).trim() : source.trim();
-  if (candidate.length >= 2 && candidate.length <= 12) return candidate;
+  if (candidate.length >= 2 && candidate.length <= 12) return prettyTicker(candidate);
   return `${row.mint.slice(0, 6)}…`;
 }
 

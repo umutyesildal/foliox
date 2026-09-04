@@ -22,6 +22,17 @@ const ABBREVIATIONS = [
 export const NOT_A_NUMBER_LABEL = "—";
 
 /**
+ * Display casing for a ticker derived from a whitelist price_source slug
+ * ("mock:nvda" → "NVDA"). All-lowercase slugs are uppercased; anything that
+ * already has shape (mixed case like "TSLAx", or a mint fragment) passes
+ * through unchanged. Display-only — never sent on-chain.
+ */
+export function prettyTicker(ticker: string): string {
+  const t = ticker.trim();
+  return /^[a-z0-9_-]+$/.test(t) ? t.toUpperCase() : t;
+}
+
+/**
  * Format a token amount for display. Locale-aware grouping below 1M,
  * single-decimal abbreviation at 1M/1B/1T (e.g. 12,345.5 -> "12,345.5",
  * 1_234_567 -> "1.2M").

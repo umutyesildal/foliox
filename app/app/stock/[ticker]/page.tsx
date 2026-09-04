@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RangeLinks } from "@/components/ui/range-links";
 import { formatUsd } from "@/lib/format";
-
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
+import { fetchMockXStockCatalog, type MockCatalogEntry } from "@/lib/xstock-catalog";
+import { apiQuery } from "@/lib/api-client";
 
 const RANGES = ["1mo", "3mo", "6mo", "1y"] as const;
 
@@ -45,8 +45,9 @@ interface ComparePayload {
 
 async function getChart(ticker: string, range: string): Promise<ChartPayload["data"]> {
   try {
-    const res = await fetch(
-      `${API_BASE}/api/v1/prices/chart?ticker=${encodeURIComponent(ticker)}&range=${encodeURIComponent(range)}`,
+    const res = await apiQuery(
+      "/api/v1/prices/chart",
+      { ticker, range },
       { cache: "no-store", signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } },
     );
     if (!res.ok) return null;
@@ -59,8 +60,9 @@ async function getChart(ticker: string, range: string): Promise<ChartPayload["da
 
 async function getCompare(ticker: string) {
   try {
-    const res = await fetch(
-      `${API_BASE}/api/v1/prices/compare?tickers=${encodeURIComponent(ticker)}`,
+    const res = await apiQuery(
+      "/api/v1/prices/compare",
+      { tickers: ticker },
       { cache: "no-store", signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } },
     );
     if (!res.ok) return null;
@@ -69,6 +71,12 @@ async function getCompare(ticker: string) {
   } catch {
     return null;
   }
+}
+
+/** Dev-catalog entry for a mock ticker (null when absent or API unreachable). */
+async function getMockEntry(ticker: string): Promise<MockCatalogEntry | null> {
+  const catalog = await fetchMockXStockCatalog();
+  return catalog?.find((entry) => entry.ticker === ticker) ?? null;
 }
 
 export async function generateMetadata({
@@ -98,7 +106,11 @@ export default async function StockPage({
     ? (sp.range as (typeof RANGES)[number])
     : "1mo";
 
-  const [chart, compare] = await Promise.all([getChart(ticker, range), getCompare(ticker)]);
+  const [chart, compare, mockEntry] = await Promise.all([
+    getChart(ticker, range),
+    getCompare(ticker),
+    getMockEntry(ticker),
+  ]);
 
   const yahooSymbol = chart?.yahoo?.symbol ?? ticker.replace(/^x/i, "");
   const yahooCandles = chart?.yahoo?.candles ?? [];
@@ -191,6 +203,22 @@ export default async function StockPage({
                     Aligned
                   </Badge>
                 )}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      ) : mockEntry ? (
+        // Mock tickers are not on Jupiter — the dev catalog price is the only
+        // honest figure, rendered alone and labeled mock.
+        <div className="grid gap-3 md:grid-cols-2">
+          <Card className="h-full">
+            <CardHeader className="pb-2">
+              <CardDescription>Dev catalog (mock — not live)</CardDescription>
+              <CardTitle className="font-mono text-2xl tabular-nums">
+                {mockEntry.priceUsd !== null ? formatUsd(mockEntry.priceUsd) : "—"}
+              </CardTitle>
+              <CardDescription className="font-mono text-[11px]">
+                {mockEntry.priceSource || "mock"} · deterministic dev-catalog price
               </CardDescription>
             </CardHeader>
           </Card>

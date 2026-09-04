@@ -25,6 +25,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { isPgLike, type PgLike } from "../db/client.js";
 import { fetchPriceQuotes, type PriceQuoteMap } from "./priceFetch.js";
+import { createMockAwareQuoteFetcher } from "./mockPriceFill.js";
 
 // ---------------------------------------------------------------------------
 // Legacy numeric API — kept byte-for-byte compatible (existing vitest suite
@@ -727,9 +728,16 @@ export function createNavEngineFromEnv(opts: {
   const intervalMs = Number(env.NAV_INTERVAL_MS || DEFAULT_INTERVAL_MS);
   const rankingsRefreshMs = Number(env.NAV_RANKINGS_REFRESH_MS || DEFAULT_RANKINGS_REFRESH_MS);
   console.log(`[navEngine] enabled (interval ${intervalMs}ms, rankings refresh ${rankingsRefreshMs}ms)`);
+  // Mock-aware prices: Jupiter first; mints whose whitelisted_mints row is
+  // labeled "mock:<slug>" (devnet mock xStocks) are filled — with
+  // REALISTIC_MOCK_PRICES on — from the real equity market (source "yahoo",
+  // workers/realisticMockPrices.ts), falling back per-symbol to the
+  // deterministic dev catalog (source "mock", workers/mockPriceFill.ts).
+  const fetchQuotes = createMockAwareQuoteFetcher(db, { env });
   return new NavEngine({
     db,
     cache: opts.cache ?? null,
+    fetchQuotes,
     fetchSupply,
     intervalMs,
     rankingsRefreshMs,

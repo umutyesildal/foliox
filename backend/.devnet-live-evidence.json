@@ -1,0 +1,441 @@
+{
+  "capturedAt": "2026-09-04T17:43:23.763Z",
+  "network": "solana-devnet",
+  "rpcUrl": "https://api.devnet.solana.com",
+  "database": "postgres://umutyesildal@localhost:5432/foliox_devnet",
+  "backend": {
+    "pidFile": "/tmp/foliox-backend-devnet.pid",
+    "log": "/tmp/foliox-backend-devnet.log",
+    "startCommand": "cd backend && set -a && . ./.env.devnet && set +a && nohup npx tsx src/index.ts > /tmp/foliox-backend-devnet.log 2>&1 &",
+    "stopCommand": "kill $(cat /tmp/foliox-backend-devnet-child.pid)   # graceful SIGTERM to the node process; optionally also: kill $(cat /tmp/foliox-backend-devnet.pid)",
+    "pid": 62344,
+    "childPid": 62373
+  },
+  "programs": {
+    "whitelist": "FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS",
+    "factory": "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF",
+    "basket": "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k"
+  },
+  "health": {
+    "ok": true,
+    "version": "0.1.0",
+    "ts": "2026-09-04T17:42:53.528Z",
+    "subsystems": {
+      "db": {
+        "connected": true,
+        "schemaApplied": true
+      },
+      "indexer": {
+        "enabled": true,
+        "running": true
+      },
+      "navEngine": {
+        "enabled": true,
+        "running": true
+      },
+      "feeCrank": {
+        "enabled": true,
+        "running": true
+      }
+    },
+    "db": {
+      "connected": true,
+      "basketCount": 1,
+      "lastSlot": "493115129",
+      "lastEventTs": "2026-09-04T16:53:22.000Z",
+      "indexerLagSeconds": 2971,
+      "holdings": {
+        "rows": 3,
+        "lastUpdatedAt": "2026-09-04T17:42:31.107Z",
+        "staleSeconds": 22
+      }
+    }
+  },
+  "basketsApi": {
+    "count": 1,
+    "source": "onchain-indexed",
+    "first": {
+      "pubkey": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+      "creator": "y72KA263br7MtZw7BqC2dx5QYCBUciJGzShE8BRSwRE",
+      "share_mint": "7xo7uw13B4DnfwAMGQ9MC5qkX2zD2rUp94j4UBQ61eSE",
+      "constituents": [
+        "Duagr7hYLnUcG42gu3xqhbSj1E6xwEvRMEN14CG5BKwn",
+        "7T5QwHsqHd5YmMSoJqg69kGsUVF7MMVzmy2bAumgPD23",
+        "4gZh5JxhrfKMg7x14evWcrhM3hWHfrtcq6cNgFPH5kQa"
+      ],
+      "weights_bps": [
+        4000,
+        3200,
+        2800
+      ],
+      "metadata_json": null,
+      "nav": "145036556.6104",
+      "supply": "551050751",
+      "share_price": "0.26319999808946816951",
+      "return_30d": "0.0000000000000000000000000000",
+      "mint_count": "2",
+      "refreshed_at": "2026-09-04T17:37:08.318Z",
+      "nav_as_of": "2026-09-04T17:42:07.786Z",
+      "return_24h": null,
+      "holders": 3,
+      "source": "onchain-indexed",
+      "asOf": "2026-09-04T17:42:07.786Z"
+    }
+  },
+  "basketDetail": {
+    "pubkey": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+    "treasury": "AAb2TXLQCPFvnUoJFSBe9PFs28w5kvAukH4Gaiia3eiJ",
+    "share_mint": "7xo7uw13B4DnfwAMGQ9MC5qkX2zD2rUp94j4UBQ61eSE",
+    "weights_bps": [
+      4000,
+      3200,
+      2800
+    ],
+    "entry_fee_bps": 100,
+    "exit_fee_bps": 50,
+    "management_fee_bps": 200,
+    "nav": {
+      "value": "145036556.6104",
+      "supply": "551050751",
+      "sharePrice": "0.263199998089",
+      "priceSource": {
+        "4gZh5JxhrfKMg7x14evWcrhM3hWHfrtcq6cNgFPH5kQa": {
+          "asOf": "2026-09-04T17:42:07.792Z",
+          "price": 420,
+          "source": "mock"
+        },
+        "7T5QwHsqHd5YmMSoJqg69kGsUVF7MMVzmy2bAumgPD23": {
+          "asOf": "2026-09-04T17:42:07.792Z",
+          "price": 230,
+          "source": "mock"
+        },
+        "Duagr7hYLnUcG42gu3xqhbSj1E6xwEvRMEN14CG5BKwn": {
+          "asOf": "2026-09-04T17:42:07.792Z",
+          "price": 180,
+          "source": "mock"
+        }
+      },
+      "asOf": "2026-09-04T17:42:07.786Z",
+      "source": "onchain-indexed"
+    },
+    "drift": {
+      "actualWeightsBps": [
+        4000,
+        3200,
+        2800
+      ],
+      "driftBps": [
+        0,
+        0,
+        0
+      ],
+      "basis": "vault_holdings.scaled_amount vs baskets.weights_bps (AGENTS \u00a717)"
+    },
+    "holdings": [
+      {
+        "mint": "Duagr7hYLnUcG42gu3xqhbSj1E6xwEvRMEN14CG5BKwn",
+        "raw_amount": "220420298800",
+        "multiplier": "1",
+        "scaled_amount": "220420.2988",
+        "decimals": 6,
+        "updated_at": "2026-09-04T17:42:31.105Z",
+        "source": "onchain-indexed"
+      },
+      {
+        "mint": "7T5QwHsqHd5YmMSoJqg69kGsUVF7MMVzmy2bAumgPD23",
+        "raw_amount": "176336239040",
+        "multiplier": "1",
+        "scaled_amount": "176336.23904",
+        "decimals": 6,
+        "updated_at": "2026-09-04T17:42:31.106Z",
+        "source": "onchain-indexed"
+      },
+      {
+        "mint": "4gZh5JxhrfKMg7x14evWcrhM3hWHfrtcq6cNgFPH5kQa",
+        "raw_amount": "154294209160",
+        "multiplier": "1",
+        "scaled_amount": "154294.20916",
+        "decimals": 6,
+        "updated_at": "2026-09-04T17:42:31.107Z",
+        "source": "onchain-indexed"
+      }
+    ]
+  },
+  "db": {
+    "whitelistedMints": {
+      "count": 12,
+      "allMockLabeled": true,
+      "rows": [
+        {
+          "mint": "3NwEDKm1bRspo7FPAQd4LxZTmpfbjUx4mWvkrjPP7KFW",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:tsla"
+        },
+        {
+          "mint": "4gZh5JxhrfKMg7x14evWcrhM3hWHfrtcq6cNgFPH5kQa",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:msft"
+        },
+        {
+          "mint": "6JjHTTUediahYntYLyrrBtbThqcrNRkFMa3MvkBQAM1h",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:amzn"
+        },
+        {
+          "mint": "7T5QwHsqHd5YmMSoJqg69kGsUVF7MMVzmy2bAumgPD23",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:aapl"
+        },
+        {
+          "mint": "9o6it8d2QXmKpZbkSXGHPpaQ7P1zFMDd3geTrecVuYon",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:spy"
+        },
+        {
+          "mint": "D5B7VowfXWzGoy1fYAbQ4ci9rno1LbHv1YFJsMHqu4yA",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:amd"
+        },
+        {
+          "mint": "Duagr7hYLnUcG42gu3xqhbSj1E6xwEvRMEN14CG5BKwn",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:nvda"
+        },
+        {
+          "mint": "E4SnZpaaQorTGtZNznYEFNTp3U1a3au9B4cwJBdjvZjG",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:meta"
+        },
+        {
+          "mint": "FHUwgMzYymmgArrXdNksWMTDFcnRxXBCZ75tBMuxPQMG",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:mstr"
+        },
+        {
+          "mint": "Gf9KAJ6XvuYZDvQ8g5uHzZjBYk8fDDsxdyx4uQF4sXWc",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:coin"
+        },
+        {
+          "mint": "GkozZZUoQLqBaqCq4QSPSErQSnf3rxvtwLppwkMoUD77",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:hood"
+        },
+        {
+          "mint": "cwKxRhYYZyeZSkgLX3JT1KERSTFkzua2RcgaDucSsvj",
+          "decimals": 6,
+          "status": "Active",
+          "price_source": "mock:googl"
+        }
+      ]
+    },
+    "events": [
+      {
+        "type": "BasketCreated",
+        "ts": "2026-09-04T18:52:22+02:00",
+        "data": {
+          "ts": 1788540742,
+          "type": "BasketCreated",
+          "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+          "creator": "y72KA263br7MtZw7BqC2dx5QYCBUciJGzShE8BRSwRE",
+          "programId": "3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF",
+          "shareMint": "7xo7uw13B4DnfwAMGQ9MC5qkX2zD2rUp94j4UBQ61eSE",
+          "createBasket": {
+            "nonce": "0",
+            "exitFeeBps": 50,
+            "weightsBps": [
+              4000,
+              3200,
+              2800
+            ],
+            "entryFeeBps": 100,
+            "seedAmounts": [
+              "400000000",
+              "320000000",
+              "280000000"
+            ],
+            "constituents": [
+              "Duagr7hYLnUcG42gu3xqhbSj1E6xwEvRMEN14CG5BKwn",
+              "7T5QwHsqHd5YmMSoJqg69kGsUVF7MMVzmy2bAumgPD23",
+              "4gZh5JxhrfKMg7x14evWcrhM3hWHfrtcq6cNgFPH5kQa"
+            ],
+            "metadataHashHex": "2f622a786a186d8df4ad73d3a42eb5d709af327fe04e5c350c02754c7010ebc2",
+            "managementFeeBps": 200
+          },
+          "numConstituents": 3
+        }
+      },
+      {
+        "type": "Minted",
+        "ts": "2026-09-04T18:52:50+02:00",
+        "data": {
+          "type": "Minted",
+          "user": "48CUGMWkw49EDkVQBq5TEb3M43oej9bJf7z8aF3zA3bg",
+          "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+          "netShares": "99000",
+          "programId": "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k",
+          "grossShares": "100000",
+          "entryFeeShares": "1000"
+        }
+      },
+      {
+        "type": "Redeemed",
+        "ts": "2026-09-04T18:52:57+02:00",
+        "data": {
+          "type": "Redeemed",
+          "user": "48CUGMWkw49EDkVQBq5TEb3M43oej9bJf7z8aF3zA3bg",
+          "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+          "programId": "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k",
+          "sharesBurned": "49500",
+          "exitFeeShares": "247"
+        }
+      },
+      {
+        "type": "Minted",
+        "ts": "2026-09-04T18:53:08+02:00",
+        "data": {
+          "type": "Minted",
+          "user": "48CUGMWkw49EDkVQBq5TEb3M43oej9bJf7z8aF3zA3bg",
+          "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+          "netShares": "544500000",
+          "programId": "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k",
+          "grossShares": "550000000",
+          "entryFeeShares": "5500000"
+        }
+      },
+      {
+        "type": "FeeAccrued",
+        "ts": "2026-09-04T18:53:22+02:00",
+        "data": {
+          "type": "FeeAccrued",
+          "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+          "programId": "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k",
+          "elapsedSec": "14",
+          "sharesMinted": "4"
+        }
+      }
+    ],
+    "userPositions": [
+      {
+        "user": "48CUGMWkw49EDkVQBq5TEb3M43oej9bJf7z8aF3zA3bg",
+        "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+        "share_balance": 544549253
+      },
+      {
+        "user": "AAb2TXLQCPFvnUoJFSBe9PFs28w5kvAukH4Gaiia3eiJ",
+        "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+        "share_balance": 550126
+      },
+      {
+        "user": "y72KA263br7MtZw7BqC2dx5QYCBUciJGzShE8BRSwRE",
+        "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+        "share_balance": 4951125
+      }
+    ],
+    "positionEventsByKind": [
+      {
+        "kind": "FeeAccrued",
+        "count": 1
+      },
+      {
+        "kind": "Minted",
+        "count": 2
+      },
+      {
+        "kind": "Redeemed",
+        "count": 1
+      }
+    ],
+    "vaultHoldings": [
+      {
+        "mint": "4gZh5JxhrfKMg7x14evWcrhM3hWHfrtcq6cNgFPH5kQa",
+        "raw_amount": "154294209160",
+        "scaled_amount": "154294.20916",
+        "decimals": 6
+      },
+      {
+        "mint": "7T5QwHsqHd5YmMSoJqg69kGsUVF7MMVzmy2bAumgPD23",
+        "raw_amount": "176336239040",
+        "scaled_amount": "176336.23904",
+        "decimals": 6
+      },
+      {
+        "mint": "Duagr7hYLnUcG42gu3xqhbSj1E6xwEvRMEN14CG5BKwn",
+        "raw_amount": "220420298800",
+        "scaled_amount": "220420.2988",
+        "decimals": 6
+      }
+    ],
+    "navSnapshotLatest": [
+      {
+        "basket": "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg",
+        "ts": "2026-09-04T19:42:07.786+02:00",
+        "nav": "145036556.6104",
+        "supply": "551050751",
+        "share_price": "0.263199998089",
+        "price_source": {
+          "4gZh5JxhrfKMg7x14evWcrhM3hWHfrtcq6cNgFPH5kQa": {
+            "asOf": "2026-09-04T17:42:07.792Z",
+            "price": 420,
+            "source": "mock"
+          },
+          "7T5QwHsqHd5YmMSoJqg69kGsUVF7MMVzmy2bAumgPD23": {
+            "asOf": "2026-09-04T17:42:07.792Z",
+            "price": 230,
+            "source": "mock"
+          },
+          "Duagr7hYLnUcG42gu3xqhbSj1E6xwEvRMEN14CG5BKwn": {
+            "asOf": "2026-09-04T17:42:07.792Z",
+            "price": 180,
+            "source": "mock"
+          }
+        }
+      }
+    ],
+    "counts": {
+      "baskets": 1,
+      "whitelisted_mints": 12,
+      "events": 5,
+      "user_positions": 3,
+      "position_events": 4,
+      "vault_holdings": 3,
+      "nav_snapshots_latest": 1
+    }
+  },
+  "navSanity": {
+    "note": "share_price 0.2632 per raw base unit == 263.2 weighted USD per basket unit (NVDAx 180*0.40 + AAPLx 230*0.32 + MSFTx 420*0.28); drift 0 bps on all three legs"
+  },
+  "feeCrank": {
+    "running": true,
+    "interval": "3600000ms (hourly); builds UNSIGNED accrue_management_fee txs only",
+    "invariantProof": {
+      "method": "FeeCrank.buildFeeTx (exported keeper tooling path, same code the hourly tick calls) against the real indexed basket row + live devnet blockhash",
+      "artifactSignaturesField": 0,
+      "decodedVersionedTxSignatures": "1 slot, all-zero bytes (unsigned placeholder)",
+      "feePayer": "11111111111111111111111111111111 (placeholder \u2014 FEE_CRANK_PAYER_PUBKEY unset)",
+      "instruction": "accrue_management_fee @ 6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k",
+      "blockhash": "F3KzVfeSucMuZ12GowsXcqnsSe1WkmobsDcwQCHCastu",
+      "estimatedFeeShares": "1048",
+      "scheduledTick": "first hourly tick builds+logs once basket.last_fee_accrual_ts is >1h old"
+    }
+  },
+  "codeEdits": [
+    "backend/src/indexer/listener.ts \u2014 baskets row now upserted BEFORE events insert (events_basket_fkey); signatures processed oldest-first; failed sigs retried (cap 5) instead of markSeen-dropped; added throttled whitelisted_mints + vault_holdings sync passes; config gains whitelistProgramId/basketProgramId",
+    "backend/src/indexer/whitelistSync.ts (new) \u2014 decodes on-chain WhitelistedMint accounts (disc+mint+decimals+watermark+status+price_source+bump) into whitelisted_mints",
+    "backend/src/indexer/holdingsSync.ts \u2014 deriveBasketPda corrected to derive under the FACTORY program id; added deriveVaultAuthority (['basket', basket] under BASKET program); getVaultAtas now owned by vault authority; added syncIndexedBaskets",
+    "backend/tests/livewire.test.ts (new) \u2014 regression tests for ordering, retry, whitelist decode, devnet PDA pins",
+    "backend/tests/backend-truth.test.ts \u2014 one assertion updated to the corrected (idempotent, pre-event) baskets upsert"
+  ],
+  "tests": "npm test \u2192 8 files, 421 tests, all passing"
+}

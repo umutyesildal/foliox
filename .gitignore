@@ -19,3 +19,6 @@ keys/
 # brand-design artifacts
 .brand-preview/
 app/app/globals.css.bak
+
+# Devnet/localnet run state (keypairs + logs; evidence lives in docs/)
+scripts/.e2e-devnet/

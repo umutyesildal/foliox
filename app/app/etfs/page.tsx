@@ -4,13 +4,16 @@ import { Suspense } from "react";
 
 import { EtfGrid, EtfGridSkeleton, type EtfRow } from "@/components/etfs/etf-grid";
 import { EmptyState, FreshnessBadge } from "@/components/states";
+import {
+  fetchMockXStockCatalog,
+  type MockCatalogEntry,
+} from "@/lib/xstock-catalog";
+import { apiFetch, apiQuery } from "@/lib/api-client";
 
 export const metadata: Metadata = {
   title: "Tokenized ETFs — FolioX",
   description: "The tokenized ETF tickers listed on FolioX today.",
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 
 /**
  * Display metadata for xStock registry tickers that are tokenized ETFs (fund
@@ -48,7 +51,25 @@ interface ChartPayload {
 
 async function getJson<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await apiFetch(path, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** `getJson` for routes that take query parameters (literal path + params). */
+async function getJsonQuery<T>(
+  path: string,
+  params: Record<string, string>,
+): Promise<T | null> {
+  try {
+    const res = await apiQuery(path, params, {
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
       headers: { accept: "application/json" },
@@ -61,12 +82,53 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
- * Listing body: fetch the instrument registry, keep only ETF-type tickers,
- * attach the live token price (Jupiter) and the 24h change (Yahoo daily
+ * Dev-catalog path: build rows from GET /api/v1/xstocks/mock (deterministic
+ * dev-catalog prices, labeled mock). Returns null when the catalog route is
+ * unreachable — the caller then uses the live Jupiter/Yahoo flow.
+ */
+async function etfRowsFromCatalog(): Promise<EtfRow[] | null> {
+  const catalog = await fetchMockXStockCatalog();
+  if (!catalog) return null;
+  const rows = catalog
+    .filter((entry) => ETF_META[entry.ticker] !== undefined)
+    .map((entry: MockCatalogEntry) => ({
+      ticker: entry.ticker,
+      name: ETF_META[entry.ticker]?.name,
+      provider: "mock (dev catalog)",
+      price: entry.priceUsd,
+      change24h: null,
+    }));
+  return rows.length > 0 ? rows : null;
+}
+
+/**
+ * Listing body: prefer the devnet dev catalog for prices (mock, labeled);
+ * otherwise fall back to the live registry flow — instrument registry, ETF-type
+ * tickers only, live token price (Jupiter) and the 24h change (Yahoo daily
  * close-to-close — never the simulated xStock series). Renders its own header
  * so the FreshnessBadge only appears once real metadata exists.
  */
 async function EtfListing() {
+  const catalogRows = await etfRowsFromCatalog();
+
+  if (catalogRows) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <h2 id="tokenized-etfs" className="text-sm font-medium tracking-tight">
+            Tokenized ETFs on FolioX
+          </h2>
+          <FreshnessBadge source="dev catalog · mock prices (not live)" />
+        </div>
+        <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+          Devnet showcase: prices are deterministic dev-catalog values (mock — not live
+          market data).
+        </p>
+        <EtfGrid rows={catalogRows} />
+      </div>
+    );
+  }
+
   const xstocksRes = await getJson<{ data?: XStockRow[] }>("/api/v1/xstocks");
 
   if (xstocksRes?.data == null) {
@@ -109,11 +171,12 @@ async function EtfListing() {
 
   const tickers = listed.map((row) => row.ticker).join(",");
   const [compareRes, ...chartRes] = await Promise.all([
-    getJson<ComparePayload>(`/api/v1/prices/compare?tickers=${encodeURIComponent(tickers)}`),
+    getJsonQuery<ComparePayload>("/api/v1/prices/compare", { tickers }),
     ...listed.map((row) =>
-      getJson<ChartPayload>(
-        `/api/v1/prices/chart?ticker=${encodeURIComponent(row.ticker)}&range=1mo`,
-      ),
+      getJsonQuery<ChartPayload>("/api/v1/prices/chart", {
+        ticker: row.ticker,
+        range: "1mo",
+      }),
     ),
   ]);
 

@@ -30,8 +30,8 @@ import {
   type WhitelistRow,
 } from "@/components/create/types";
 import { sha256Hex } from "@/lib/create-basket";
+import { apiFetch, apiQuery } from "@/lib/api-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 const STEPS = ["Select", "Weights", "Fees", "Seed", "Legal", "Deploy"] as const;
 
 type WhitelistStatus = "loading" | "ready" | "error" | "empty";
@@ -86,7 +86,7 @@ export default function CreatePage() {
     setWhitelistStatus("loading");
     setWhitelistError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/whitelist`, { cache: "no-store" });
+      const res = await apiFetch("/api/v1/whitelist", { cache: "no-store" });
       if (!res.ok) {
         setWhitelistRows([]);
         setWhitelistStatus("error");
@@ -136,8 +136,9 @@ export default function CreatePage() {
     setPriceStatus("loading");
     void (async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/api/v1/prices/compare?tickers=${encodeURIComponent(tickers.join(","))}`,
+        const res = await apiQuery(
+          "/api/v1/prices/compare",
+          { tickers: tickers.join(",") },
           { cache: "no-store" },
         );
         if (!res.ok) throw new Error(`prices/compare responded ${res.status}`);

@@ -7,14 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RangeLinks } from "@/components/ui/range-links";
 import { SectionHeader } from "@/components/ui/section-header";
+import { apiQuery } from "@/lib/api-client";
 
 export const metadata: Metadata = {
   title: "Market overview — FolioX",
   description:
     "QQQ, SPY, DIA and the Nasdaq Composite normalized to 100, with a 30-candle benchmark volume view.",
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 
 const RANGES = ["1mo", "3mo", "6mo", "1y"] as const;
 
@@ -56,11 +55,15 @@ const SERIES_LABELS: Record<string, string> = {
 
 async function getOverview(range: string): Promise<OverviewPayload | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/market/overview?range=${encodeURIComponent(range)}`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-      headers: { accept: "application/json" },
-    });
+    const res = await apiQuery(
+      "/api/v1/market/overview",
+      { range },
+      {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+        headers: { accept: "application/json" },
+      },
+    );
     if (!res.ok) return null;
     return (await res.json()) as OverviewPayload;
   } catch {

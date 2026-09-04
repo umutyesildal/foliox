@@ -549,7 +549,13 @@ describe("indexer/listener — pollOnce + DB upserts", () => {
       maxSeenCache: 100,
     }, db as never);
     await indexer.pollOnce();
-    expect(db.calls.find((c) => c.sql.includes("INSERT INTO baskets"))).toBeUndefined();
+    // The baskets upsert now runs BEFORE the events insert (events.basket has
+    // a FK to baskets(pubkey)) but is itself idempotent — ON CONFLICT DO
+    // NOTHING — so a replay can never double-count. creator_stats must stay
+    // gated on the event insert being fresh: absent here.
+    const basketCall = db.calls.find((c) => c.sql.includes("INSERT INTO baskets"));
+    expect(basketCall).toBeDefined();
+    expect(basketCall?.sql).toContain("ON CONFLICT (pubkey) DO NOTHING");
     expect(db.calls.find((c) => c.sql.includes("creator_stats"))).toBeUndefined();
   });
 

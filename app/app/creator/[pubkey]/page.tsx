@@ -8,9 +8,8 @@ import { PublicKey } from "@solana/web3.js";
 import { EmptyState, ErrorState, FreshnessBadge, Skeleton } from "@/components/states";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatAsOf, formatUsd, truncateAddress } from "@/lib/format";
+import { apiFetch } from "@/lib/api-client";
 import { LegalReviewTag } from "@/components/create";
-
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 
 interface CreatorStats {
   basket_count?: string | number | null;
@@ -79,9 +78,10 @@ export default function CreatorPage() {
     setStatus("loading");
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/creators/${encodeURIComponent(pubkeyParam)}`, {
-        cache: "no-store",
-      });
+      const res = await apiFetch(
+        `/api/v1/creators/${encodeURIComponent(pubkeyParam)}`,
+        { cache: "no-store" },
+      );
       const body = (await res.json().catch(() => null)) as CreatorPayload | null;
       if (res.status === 404 || body?.error?.code === "NOT_INDEXED") {
         setPayload(null);

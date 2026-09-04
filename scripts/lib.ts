@@ -23,6 +23,8 @@
  */
 
 import {
+  AddressLookupTableAccount,
+  AddressLookupTableProgram,
   ComputeBudgetProgram,
   Connection,
   Keypair,
@@ -30,6 +32,8 @@ import {
   SystemProgram,
   Transaction,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import { createHash } from "crypto";
@@ -620,9 +624,103 @@ export function loadState(): Record<string, any> {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+/**
+ * Keyfile names are state-dir-relative ONLY: `[A-Za-z0-9._-]+`, no path
+ * separators, no `..` segments. Resolves against stateDir() and refuses to
+ * return any path that escapes it — every state keypair read/write goes
+ * through this containment check.
+ */
+const KEYPAIR_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+export function keypairFilename(name: string): string {
+  if (typeof name !== "string" || name.includes("..") || !KEYPAIR_NAME_RE.test(name)) {
+    throw new Error(
+      `invalid keypair name ${JSON.stringify(String(name).slice(0, 64))}: expected [A-Za-z0-9._-]+ without path separators`,
+    );
+  }
+  const dir = path.resolve(stateDir());
+  const file = path.resolve(dir, name);
+  if (!file.startsWith(dir + path.sep)) {
+    throw new Error(`keypair name ${JSON.stringify(name)} resolves outside the state dir`);
+  }
+  return file;
+}
+
+/**
+ * Operator-provided keypair path (env overrides: FOLIOX_E2E_PAYER,
+ * FOLIOX_E2E_TREASURY). Only plain path characters are allowed — no `..`
+ * segments, whitespace, shell metacharacters or option-like strings.
+ */
+const KEYPAIR_PATH_RE = /^\/?[A-Za-z0-9][A-Za-z0-9._\-/]{0,4095}$/;
+
+/**
+ * Loads a keypair from a JSON secret-key file. Hard containment: whatever the
+ * caller passes, the OS-resolved real path of the file must live INSIDE the
+ * state dir — bare names resolve against stateDir(), absolute paths are
+ * accepted only when already under it (set FOLIOX_E2E_STATE_DIR to that
+ * directory). `..` segments and non-path characters are rejected before
+ * anything touches the filesystem.
+ */
+export function keypairFromFile(file: string): Keypair {
+  if (typeof file !== "string" || file.includes("..") || !KEYPAIR_PATH_RE.test(file)) {
+    throw new Error(
+      `invalid keypair path ${JSON.stringify(String(file).slice(0, 64))}: expected a plain filesystem path without '..'`,
+    );
+  }
+  const dir = path.resolve(stateDir());
+  const resolved = path.isAbsolute(file) ? path.resolve(file) : path.resolve(dir, file);
+  // realpathSync resolves symlinks and gives the OS-canonical location, so the
+  // containment check below cannot be bypassed by a link planted in the dir.
+  let real: string;
+  try {
+    real = fs.realpathSync(resolved);
+  } catch {
+    throw new Error(`keypair file not found: ${resolved}`);
+  }
+  if (!real.startsWith(dir + path.sep)) {
+    throw new Error(
+      `keypair file ${JSON.stringify(file)} resolves outside the state dir (${dir}) — pass a state-dir-relative name or set FOLIOX_E2E_STATE_DIR`,
+    );
+  }
+  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(real, "utf8"))));
+}
+
+/**
+ * E2E keypair overrides come from env vars (FOLIOX_E2E_PAYER,
+ * FOLIOX_E2E_TREASURY). The env var NAME is passed as a literal; the value is
+ * read, normalized, charset-checked and contained to the state dir here — the
+ * same self-contained pattern as stateDir() — so no environment-derived path
+ * ever crosses a call boundary.
+ *
+ * Returns null when the variable is unset; throws loudly when it is set but
+ * not a safe path, missing, or outside the state dir.
+ */
+export function envKeypair(name: "FOLIOX_E2E_PAYER" | "FOLIOX_E2E_TREASURY"): Keypair | null {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return null;
+  const file = path.normalize(raw);
+  if (file.includes("..") || !KEYPAIR_PATH_RE.test(file)) {
+    throw new Error(`${name} is not a safe keypair path: ${JSON.stringify(raw.slice(0, 64))}`);
+  }
+  const dir = path.resolve(stateDir());
+  const resolved = path.isAbsolute(file) ? path.resolve(file) : path.resolve(dir, file);
+  let real: string;
+  try {
+    real = fs.realpathSync(resolved);
+  } catch {
+    throw new Error(`${name} keypair file not found: ${resolved}`);
+  }
+  if (!real.startsWith(dir + path.sep)) {
+    throw new Error(
+      `${name} resolves outside the state dir (${dir}) — pass a state-dir-relative name or set FOLIOX_E2E_STATE_DIR`,
+    );
+  }
+  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(real, "utf8"))));
+}
+
 /** Loads or creates a keypair file inside the state dir. */
 export function stateKeypair(name: string): Keypair {
-  const file = path.join(stateDir(), name);
+  const file = keypairFilename(name);
   if (fs.existsSync(file)) {
     return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(file, "utf8"))));
   }
@@ -631,16 +729,9 @@ export function stateKeypair(name: string): Keypair {
   return kp;
 }
 
-/** Loads a keypair from a JSON secret-key file. */
-export function keypairFromFile(file: string): Keypair {
-  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(file, "utf8"))));
-}
-
 /** The e2e payer (authority / creator). Uses $FOLIOX_E2E_PAYER or a generated state keypair. */
 export function payerKeypair(): Keypair {
-  const p = process.env.FOLIOX_E2E_PAYER;
-  if (p && fs.existsSync(p)) return keypairFromFile(p);
-  return stateKeypair("payer.json");
+  return envKeypair("FOLIOX_E2E_PAYER") ?? stateKeypair("payer.json");
 }
 
 export function rpcUrl(): string {
@@ -651,6 +742,13 @@ export function newConnection(): Connection {
   return new Connection(rpcUrl(), { commitment: "confirmed" });
 }
 
+/** Below this balance a non-localnet RPC refuses to continue (no airdrop there). */
+const DEVNET_MIN_SOL = 0.3;
+
+function isLocalnet(endpoint: string): boolean {
+  return endpoint.includes("127.0.0.1") || endpoint.includes("localhost");
+}
+
 export async function ensureSol(
   conn: Connection,
   kp: Keypair,
@@ -659,6 +757,20 @@ export async function ensureSol(
 ): Promise<void> {
   let bal = await conn.getBalance(kp.publicKey, "confirmed");
   if (bal >= minSol * Number(LAMPORTS_PER_SOL)) return;
+  if (!isLocalnet(conn.rpcEndpoint)) {
+    // NEVER airdrop on a public cluster (devnet/mainnet): the request either
+    // fails or drains a shared faucet. Continue as long as the wallet can pay
+    // the fees for this step; otherwise stop loudly.
+    if (bal < DEVNET_MIN_SOL * Number(LAMPORTS_PER_SOL)) {
+      throw new Error(
+        `no airdrop on ${conn.rpcEndpoint}: balance ${bal / 1e9} SOL < ${DEVNET_MIN_SOL} SOL minimum — fund ${kp.publicKey.toBase58()} manually`,
+      );
+    }
+    console.log(
+      `  NOTE: balance ${bal / 1e9} SOL < ${minSol} SOL requested on ${conn.rpcEndpoint} — continuing (no airdrop on a public cluster)`,
+    );
+    return;
+  }
   const amt = airdropSol * Number(LAMPORTS_PER_SOL);
   process.stdout.write(
     `  airdropping ${airdropSol} SOL to ${kp.publicKey.toBase58()} (balance ${bal / 1e9} SOL)\n`,
@@ -696,6 +808,45 @@ function withCuLimit(ixs: TransactionInstruction[]): TransactionInstruction[] {
   return [ComputeBudgetProgram.setComputeUnitLimit({ units: E2E_COMPUTE_UNITS }), ...ixs];
 }
 
+/** Errors that mean "the cluster throttled us / blockhash went stale" — retry, not a program failure. */
+const TRANSIENT_RE =
+  /(429|Too Many Requests|rate.?limit|ws error|ECONNRESET|ETIMEDOUT|socket hang up|blockhash|block hash|BlockhashNotFound|not found in cache|was not submitted)/i;
+
+function isTransient(err: unknown): boolean {
+  const anyErr = err as { transactionMessage?: string; getLogs?: unknown };
+  const texts = [anyErr?.transactionMessage, err instanceof Error ? err.message : String(err)];
+  return texts.some((t) => typeof t === "string" && TRANSIENT_RE.test(t));
+}
+
+/** Inter-transaction throttle: public clusters rate-limit; localhost does not. */
+async function txPace(): Promise<void> {
+  if (!isLocalnet(rpcUrl())) await sleep(2500);
+}
+
+/** sendAndConfirmTransaction with backoff on transient (429 / blockhash) errors. */
+async function sendRetry(
+  conn: Connection,
+  tx: Transaction,
+  signers: Keypair[],
+  opts: { skipPreflight: boolean },
+  tries = 5,
+): Promise<string> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      // Re-fetch a fresh blockhash per attempt; Transaction keeps no pool.
+      (tx as unknown as { recentBlockhash?: string }).recentBlockhash = undefined;
+      tx.feePayer = signers[0].publicKey;
+      return await sendAndConfirmTransaction(conn, tx, signers, opts);
+    } catch (e) {
+      lastErr = e;
+      if (i === tries - 1 || !isTransient(e)) throw e;
+      await sleep(1500 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
 /** Send + confirm, printing the signature. */
 export async function send(
   conn: Connection,
@@ -703,10 +854,9 @@ export async function send(
   ixs: TransactionInstruction[],
   signers: Keypair[],
 ): Promise<string> {
+  await txPace();
   const tx = new Transaction().add(...withCuLimit(ixs));
-  const sig = await sendAndConfirmTransaction(conn, tx, signers, {
-    skipPreflight: false,
-  });
+  const sig = await sendRetry(conn, tx, signers, { skipPreflight: false });
   console.log(`  tx ${name}: ${sig}`);
   return sig;
 }
@@ -715,19 +865,394 @@ export async function send(
  * Send + confirm, returning false instead of throwing when the tx fails.
  * Safe for probes: a failed Solana transaction is atomic, so a failed
  * create-mint attempt (e.g. wrong extension space) leaves no state behind.
+ * Transient transport errors (devnet 429 / stale blockhash) are retried with
+ * backoff and do NOT count as layout rejections.
  */
 export async function trySend(
   conn: Connection,
   ixs: TransactionInstruction[],
   signers: Keypair[],
 ): Promise<boolean> {
+  await txPace();
+  const tx = new Transaction().add(...withCuLimit(ixs));
   try {
-    const tx = new Transaction().add(...withCuLimit(ixs));
-    await sendAndConfirmTransaction(conn, tx, signers, { skipPreflight: true });
+    await sendRetry(conn, tx, signers, { skipPreflight: true });
     return true;
-  } catch {
+  } catch (e) {
+    if (isTransient(e)) return false; // give up after retries — caller may re-probe
     return false;
   }
+}
+
+// ===================== versioned (v0) transactions + address lookup tables =====================
+//
+// The 3-constituent basket ceiling is a WIRE limit, not a program limit: a
+// legacy (v1) transaction may not exceed the 1232-byte Solana packet size, and
+// create_basket with n=6 serializes to ~1618B. v0 messages with Address Lookup
+// Tables (ALTs) compress every non-signer account key to a 1-byte table index,
+// so the same instruction fits. The programs are untouched — this is purely
+// client-side transaction construction.
+
+/** Solana packet size limit — the reason v0+ALT exists. */
+export const PACKET_LIMIT = 1232;
+
+export interface V0Options {
+  computeUnitLimit?: number;
+  computeUnitPrice?: number;
+}
+
+/** A plausible 32-byte blockhash placeholder used purely for SIZE measurement. */
+const MEASURE_BLOCKHASH = "11111111111111111111111111111111";
+
+/** Prepends the compute-budget instructions (limit + optional priority price). */
+function withV0Budget(
+  instructions: TransactionInstruction[],
+  opts: V0Options,
+): TransactionInstruction[] {
+  const budget: TransactionInstruction[] = [
+    ComputeBudgetProgram.setComputeUnitLimit({ units: opts.computeUnitLimit ?? E2E_COMPUTE_UNITS }),
+  ];
+  if (opts.computeUnitPrice !== undefined && opts.computeUnitPrice > 0) {
+    budget.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: opts.computeUnitPrice }));
+  }
+  return [...budget, ...instructions];
+}
+
+/**
+ * Fetch the on-chain ALT accounts for `compileToV0Message` (it needs the full
+ * AddressLookupTableAccount, not just the address).
+ */
+export async function loadLookupTables(
+  conn: Connection,
+  addresses: PublicKey[],
+): Promise<AddressLookupTableAccount[]> {
+  const out: AddressLookupTableAccount[] = [];
+  for (const a of addresses) {
+    const table = await conn.getAddressLookupTable(a);
+    if (!table.value) throw new Error(`address lookup table ${a.toBase58()} not found on-chain`);
+    out.push(table.value);
+  }
+  return out;
+}
+
+/**
+ * Compile instructions into a v0 message (referencing the given ALT accounts)
+ * and wrap it in a VersionedTransaction. The blockhash is only meaningful when
+ * the tx will be signed+sent; for size measurement any 32-byte value works.
+ */
+export function toVersionedTx(
+  instructions: TransactionInstruction[],
+  lookupTables: AddressLookupTableAccount[],
+  payer: PublicKey,
+  blockhash: string,
+  opts: V0Options = {},
+): VersionedTransaction {
+  const message = new TransactionMessage({
+    payerKey: payer,
+    recentBlockhash: blockhash,
+    instructions: withV0Budget(instructions, opts),
+  }).compileToV0Message(lookupTables);
+  return new VersionedTransaction(message);
+}
+
+/** Serialized wire size of a legacy or versioned transaction (zeroed signatures). */
+export function serializedTxSize(
+  tx: Transaction | VersionedTransaction,
+): number {
+  return tx.serialize({ requireAllSignatures: false, verifySignatures: false }).length;
+}
+
+/**
+ * What these instructions would cost on the legacy wire (with the standard CU
+ * budget prepended) — the gate that decides whether v0+ALT is needed at all.
+ * Uses serializeMessage() + signature bytes: Transaction.serialize() hard-throws
+ * above 1232 and we need the actual number to report.
+ */
+export function legacyWireSize(
+  instructions: TransactionInstruction[],
+  payer: PublicKey,
+  opts: V0Options = {},
+): number {
+  const tx = new Transaction().add(...withV0Budget(instructions, opts));
+  tx.feePayer = payer;
+  tx.recentBlockhash = MEASURE_BLOCKHASH;
+  return 64 + tx.serializeMessage().length; // 1 ed25519 signature (64B) + message
+}
+
+/** u64 LE buffer — the ALT PDA derives from (authority, recent_slot u64 LE). */
+function u64LeBytes(v: bigint): Buffer {
+  const b = Buffer.alloc(8);
+  b.writeBigUInt64LE(v, 0);
+  return b;
+}
+
+/** ALT PDA for (authority, recentSlot) — mirrors AddressLookupTableProgram. */
+export function deriveAltAddress(authority: PublicKey, recentSlot: number): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [authority.toBuffer(), u64LeBytes(BigInt(recentSlot))],
+    AddressLookupTableProgram.programId,
+  )[0];
+}
+
+async function readAltAddresses(
+  conn: Connection,
+  address: PublicKey,
+): Promise<PublicKey[]> {
+  const table = await conn.getAddressLookupTable(address);
+  return table.value ? [...table.value.state.addresses] : [];
+}
+
+/**
+ * Create + extend an ALT idempotently, keyed by `name` in state.json:
+ *   alts: { [name]: { address, authority, slot, addresses } }
+ *
+ * - Cached + on-chain: extends with any MISSING addresses only (the ALT program
+ *   rejects duplicates), then returns.
+ * - Cached but account gone: falls through to create.
+ * - Not cached: picks recentSlot = last finalized slot, derives the table
+ *   address (PDA of [authority, slot] under the ALT program), sends
+ *   createLookupTable (found "by signature" of that transaction), verifies the
+ *   account landed, then extends in chunks that fit the packet limit.
+ *
+ * Only the authority signs the management transactions — the consumer tx
+ * (create_basket / mint_in_kind …) never needs the authority.
+ */
+export async function getOrCreateAlt(
+  conn: Connection,
+  authority: Keypair,
+  name: string,
+  addresses: (PublicKey | null | undefined)[],
+): Promise<{ address: PublicKey; created: boolean; extended: number }> {
+  const wanted: PublicKey[] = [];
+  for (const a of addresses) {
+    if (a && !wanted.some((w) => w.equals(a))) wanted.push(a);
+  }
+  if (wanted.length > 256) {
+    throw new Error(`ALT ${name}: ${wanted.length} addresses > 256 table capacity`);
+  }
+
+  const state = loadState();
+  const alts: Record<string, {
+    address: string;
+    authority: string;
+    slot: number;
+    addresses?: string[];
+  }> = state.alts ?? {};
+  const cached = alts[name];
+  if (cached) {
+    const address = new PublicKey(cached.address);
+    if (await conn.getAccountInfo(address)) {
+      const have = await readAltAddresses(conn, address);
+      const missing = wanted.filter((w) => !have.some((h) => h.equals(w)));
+      if (missing.length > 0) {
+        await extendAlt(conn, authority, address, missing);
+        const now = await readAltAddresses(conn, address);
+        saveState({
+          alts: { ...alts, [name]: { ...cached, addresses: now.map((p) => p.toBase58()) } },
+        });
+      }
+      console.log(
+        `  ALT ${name}: ${address.toBase58()} (${wanted.length} wanted, ${missing.length} newly extended)`,
+      );
+      return { address, created: false, extended: missing.length };
+    }
+    console.log(`  ALT ${name}: cached ${cached.address} missing on-chain — recreating`);
+  }
+
+  const recentSlot = await conn.getSlot("finalized");
+  const address = deriveAltAddress(authority.publicKey, recentSlot);
+  if (!(await conn.getAccountInfo(address))) {
+    const [createIx, derivedAddress] = AddressLookupTableProgram.createLookupTable({
+      authority: authority.publicKey,
+      payer: authority.publicKey,
+      recentSlot,
+    });
+    if (!derivedAddress.equals(address)) {
+      throw new Error(
+        `ALT ${name}: derivation mismatch ${derivedAddress.toBase58()} != ${address.toBase58()}`,
+      );
+    }
+    await send(conn, `alt_create_${name}`, [createIx], [authority]);
+    // The table account must be visible before we can extend it.
+    for (let i = 0; i < 20; i++) {
+      if (await conn.getAccountInfo(address)) break;
+      await sleep(500);
+    }
+    if (!(await conn.getAccountInfo(address))) {
+      throw new Error(`ALT ${name}: create tx confirmed but ${address.toBase58()} not found`);
+    }
+  }
+  await extendAlt(conn, authority, address, wanted);
+  const now = await readAltAddresses(conn, address);
+  saveState({
+    alts: {
+      ...alts,
+      [name]: {
+        address: address.toBase58(),
+        authority: authority.publicKey.toBase58(),
+        slot: recentSlot,
+        addresses: now.map((p) => p.toBase58()),
+      },
+    },
+  });
+  console.log(`  ALT ${name}: ${address.toBase58()} created @slot ${recentSlot} (${now.length} addresses)`);
+  return { address, created: true, extended: wanted.length };
+}
+
+/** extendLookupTable in packet-sized chunks (32B/address → ≤ 20 per ix). */
+async function extendAlt(
+  conn: Connection,
+  authority: Keypair,
+  address: PublicKey,
+  missing: PublicKey[],
+): Promise<void> {
+  for (let i = 0; i < missing.length; i += 20) {
+    const chunk = missing.slice(i, i + 20);
+    await send(
+      conn,
+      `alt_extend_${address.toBase58().slice(0, 6)}_${i}`,
+      [
+        AddressLookupTableProgram.extendLookupTable({
+          payer: authority.publicKey,
+          authority: authority.publicKey,
+          lookupTable: address,
+          addresses: chunk,
+        }),
+      ],
+      [authority],
+    );
+  }
+}
+
+export interface SendFitted {
+  signature: string;
+  wire: "legacy" | "v0";
+  altAddress: string | null;
+  legacySize: number;
+  v0Size: number | null;
+}
+
+/**
+ * Send with the smallest wire format that fits: legacy while the serialized
+ * transaction stays under the 1232-byte packet limit (existing proofs stay
+ * byte-reproducible), v0+ALT only when size demands it.
+ *
+ * `altAddresses` is the FULL candidate list — signer keys are filtered here
+ * (a v0 signer must sit in static keys, never in a lookup table).
+ */
+export async function sendFitting(
+  conn: Connection,
+  name: string,
+  instructions: TransactionInstruction[],
+  signers: Keypair[],
+  opts: {
+    altName?: string;
+    altAddresses?: (PublicKey | null | undefined)[];
+    altAuthority?: Keypair;
+    computeUnitLimit?: number;
+    computeUnitPrice?: number;
+  } = {},
+): Promise<SendFitted> {
+  const payer = signers[0].publicKey;
+  const v0opts: V0Options = {
+    computeUnitLimit: opts.computeUnitLimit,
+    computeUnitPrice: opts.computeUnitPrice,
+  };
+  const legacySize = legacyWireSize(instructions, payer, v0opts);
+  if (legacySize <= PACKET_LIMIT) {
+    const signature = await send(conn, name, instructions, signers);
+    return { signature, wire: "legacy", altAddress: null, legacySize, v0Size: null };
+  }
+  if (!opts.altName || !opts.altAddresses || opts.altAddresses.length === 0) {
+    throw new Error(
+      `${name}: legacy wire size ${legacySize}B > ${PACKET_LIMIT}B and no ALT configured`,
+    );
+  }
+  const signerKeys = signers.map((s) => s.publicKey);
+  const altAuthority = opts.altAuthority ?? signers[0];
+  const alt = await getOrCreateAlt(conn, altAuthority, opts.altName, opts.altAddresses);
+  const tables = await loadLookupTables(conn, [alt.address]);
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
+  const tx = toVersionedTx(instructions, tables, payer, blockhash, v0opts);
+  const v0Size = serializedTxSize(tx);
+  if (v0Size > PACKET_LIMIT) {
+    throw new Error(
+      `${name}: even with ALT ${alt.address.toBase58()} the v0 message is ${v0Size}B > ${PACKET_LIMIT}B`,
+    );
+  }
+  console.log(`  ${name}: legacy ${legacySize}B > ${PACKET_LIMIT}B — v0+ALT ${v0Size}B`);
+  const signature = await sendVersioned(
+    conn,
+    name,
+    tx,
+    signers,
+    { blockhash, lastValidBlockHeight },
+    (freshBlockhash) => toVersionedTx(instructions, tables, payer, freshBlockhash, v0opts),
+  );
+  return { signature, wire: "v0", altAddress: alt.address.toBase58(), legacySize, v0Size };
+}
+
+/**
+ * Sign + send an already-compiled VersionedTransaction with backoff on
+ * transient (429 / blockhash) errors. Rebuilds the tx per attempt with a fresh
+ * blockhash via `rebuild` when provided.
+ */
+export async function sendVersioned(
+  conn: Connection,
+  name: string,
+  tx: VersionedTransaction,
+  signers: Keypair[],
+  ctx: { blockhash: string; lastValidBlockHeight: number },
+  rebuild?: (blockhash: string) => VersionedTransaction,
+  tries = 5,
+): Promise<string> {
+  await txPace();
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      if (i > 0 && rebuild) {
+        const { blockhash } = await conn.getLatestBlockhash();
+        tx = rebuild(blockhash);
+      }
+      tx.sign(signers);
+      const signature = await conn.sendTransaction(tx, { skipPreflight: false });
+      const latest = await conn.getLatestBlockhash();
+      await conn.confirmTransaction(
+        { signature, ...latest },
+        "confirmed",
+      );
+      console.log(`  tx ${name}: ${signature}`);
+      return signature;
+    } catch (e) {
+      lastErr = e;
+      if (i === tries - 1 || !isTransient(e)) throw e;
+      await sleep(1500 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+/** Convenience: compile a v0 tx, measure it, sign+send with retries. */
+export async function sendV0(
+  conn: Connection,
+  name: string,
+  instructions: TransactionInstruction[],
+  signers: Keypair[],
+  lookupTables: PublicKey[],
+  opts: V0Options = {},
+): Promise<string> {
+  const payer = signers[0].publicKey;
+  const tables = await loadLookupTables(conn, lookupTables);
+  const build = (blockhash: string) =>
+    toVersionedTx(instructions, tables, payer, blockhash, opts);
+  await txPace();
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
+  const tx = build(blockhash);
+  const size = serializedTxSize(tx);
+  if (size > PACKET_LIMIT) {
+    throw new Error(`${name}: v0 wire size ${size}B > ${PACKET_LIMIT}B (tables: ${lookupTables.length})`);
+  }
+  return sendVersioned(conn, name, tx, signers, { blockhash, lastValidBlockHeight }, build);
 }
 
 // ===================== program error names (debug aid) =====================
@@ -758,6 +1283,58 @@ export function describeErr(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   const short = msg.split("\n").slice(-2).join(" ").slice(0, 300);
   return code !== null ? `${short} (${code} = ${ERR_NAMES[code] ?? "unknown"})` : short;
+}
+
+// ===================== per-basket state registry =====================
+
+/** Shape of one entry in state.json `baskets` (written by createBasket.ts). */
+export interface BasketEntry {
+  factory?: string;
+  basket: string;
+  shareMint: string;
+  vaultAuthority?: string;
+  creator: string;
+  creatorShareAta?: string;
+  treasury: string;
+  treasuryShareAta?: string;
+  nonce?: string;
+  numConstituents?: number;
+  constituents?: string[];
+  constituentSymbols?: string[];
+  weightsBps?: number[];
+  feesBps?: { entry: number; exit: number; mgmt: number };
+  seedAmounts?: string[];
+  metadataBlob?: string;
+  createTx?: string;
+}
+
+/**
+ * Basket selector for downstream scripts (mintAndRedeem / accrueFee /
+ * verifyClientBuilders): FOLIOX_E2E_BASKET=<nonce> picks an explicit
+ * state.baskets entry; unset = the NEWEST basket (highest nonce). Falls back
+ * to the flat pre-registry top-level state when `baskets` doesn't exist yet.
+ */
+export function selectBasket(state: Record<string, any> = loadState()): {
+  key: string;
+  entry: BasketEntry;
+} {
+  const baskets: Record<string, BasketEntry> = state.baskets ?? {};
+  const wanted = process.env.FOLIOX_E2E_BASKET;
+  if (wanted !== undefined && wanted !== "") {
+    const entry = baskets[wanted];
+    if (!entry) {
+      throw new Error(
+        `FOLIOX_E2E_BASKET=${wanted}: no such state.baskets entry (have ${Object.keys(baskets).join(", ") || "none"})`,
+      );
+    }
+    return { key: wanted, entry };
+  }
+  const keys = Object.keys(baskets).sort((a, b) => (BigInt(b) > BigInt(a) ? 1 : -1));
+  if (keys.length > 0) return { key: keys[0], entry: baskets[keys[0]] };
+  if (!state.basket) {
+    throw new Error("no basket in state — run scripts/createBasket.ts first");
+  }
+  return { key: String(state.nonce ?? "0"), entry: state as unknown as BasketEntry };
 }
 
 // ===================== step runner =====================

@@ -6,9 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorState, EmptyState, FreshnessBadge, Skeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { ChangeValue } from "@/components/stocks/change-value";
-import { formatUsd, truncateAddress } from "@/lib/format";
-
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
+import { formatUsd, prettyTicker, truncateAddress } from "@/lib/format";
+import { apiFetch } from "@/lib/api-client";
 
 /** Numeric field as served by the indexer: Postgres numeric serialized as text. */
 type Numeric = string | number | null | undefined;
@@ -311,7 +310,7 @@ export default function ExploreClient() {
 
     async function load() {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/baskets?limit=100`, {
+        const res = await apiFetch("/api/v1/baskets?limit=100", {
           signal: controller.signal,
           cache: "no-store",
           headers: { accept: "application/json" },
@@ -347,7 +346,7 @@ export default function ExploreClient() {
 
     async function loadTickers() {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/whitelist`, {
+        const res = await apiFetch("/api/v1/whitelist", {
           signal: controller.signal,
           cache: "no-store",
           headers: { accept: "application/json" },
@@ -361,7 +360,7 @@ export default function ExploreClient() {
           if (typeof row.mint !== "string" || !row.mint) continue;
           const fromField = typeof row.ticker === "string" ? row.ticker.trim() : "";
           const fromSource = typeof row.price_source === "string" ? row.price_source.split(":").pop() ?? "" : "";
-          const ticker = fromField || fromSource;
+          const ticker = prettyTicker(fromField || fromSource);
           if (ticker) map.set(row.mint, ticker);
         }
         setMintTickers(map);
@@ -381,7 +380,7 @@ export default function ExploreClient() {
 
     async function loadBench() {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/market/overview?range=1mo`, {
+        const res = await apiFetch("/api/v1/market/overview?range=1mo", {
           signal: controller.signal,
           cache: "no-store",
           headers: { accept: "application/json" },

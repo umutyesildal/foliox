@@ -19,6 +19,7 @@
  */
 import { Connection, PublicKey, type AccountInfo, type ParsedTransactionWithMeta } from "@solana/web3.js";
 import { connectFromEnv, isPgLike, type PgLike } from "../db/client.js";
+import { syncIndexedBaskets } from "./holdingsSync.js";
 import {
   decodeAnchorEvent,
   decodeCreateBasketIx,
@@ -30,6 +31,7 @@ import {
   type FolioxEventType,
 } from "./events.js";
 import { applyPositionEvent } from "./positions.js";
+import { syncWhitelistedMints, type WhitelistRpc } from "./whitelistSync.js";
 
 /** Minimal structural slice of @solana/web3.js Connection used here. */
 export interface SolanaRpc {
@@ -44,11 +46,31 @@ export interface SolanaRpc {
   getAccountInfo(address: PublicKey): Promise<AccountInfo<Buffer> | null>;
 }
 
+/**
+ * Structural slice for the periodic on-chain state syncs (whitelisted_mints +
+ * vault_holdings). A real web3 Connection satisfies it; hand-rolled test RPCs
+ * may omit these methods — the syncs no-op when they are missing.
+ */
+export interface ChainStateRpc extends SolanaRpc {
+  getProgramAccounts: WhitelistRpc["getProgramAccounts"];
+  getMultipleAccountsInfo(
+    keys: PublicKey[],
+    commitment?: unknown,
+  ): Promise<Array<AccountInfo<Buffer> | null>>;
+}
+
 export interface IndexerConfig {
   programIds: string[];
   pollIntervalMs: number;
   signaturesPerPoll: number;
   maxSeenCache: number;
+  /**
+   * PROGRAM_WHITELIST — enables the periodic on-chain WhitelistedMint →
+   * whitelisted_mints sync (price_source labels for the NAV engine).
+   */
+  whitelistProgramId?: string;
+  /** PROGRAM_BASKET — enables the periodic vault_holdings refresh pass. */
+  basketProgramId?: string;
 }
 
 export const DEFAULT_INDEXER_CONFIG: IndexerConfig = {
@@ -57,6 +79,13 @@ export const DEFAULT_INDEXER_CONFIG: IndexerConfig = {
   signaturesPerPoll: 50,
   maxSeenCache: 10_000,
 };
+
+/** WhitelistedMint account sync cadence (schema §7: whitelist is slow-moving). */
+const WHITELIST_SYNC_INTERVAL_MS = 60_000;
+/** vault_holdings refresh cadence (schema §7: "updated every 30s or on event"). */
+const HOLDINGS_SYNC_INTERVAL_MS = 30_000;
+/** Failed signatures are retried this many polls before being dropped. */
+const MAX_PROCESS_ATTEMPTS = 5;
 
 export interface EventRow {
   sig: string;
@@ -199,6 +228,10 @@ function buildBasketUpsert(
 
 export class EventIndexer {
   private readonly seen = new Set<string>();
+  /** Per-signature processing attempts (failed sigs are retried, not dropped). */
+  private readonly attempts = new Map<string, number>();
+  private lastWhitelistSyncMs = 0;
+  private lastHoldingsSyncMs = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
   private stopped = false;
@@ -224,14 +257,50 @@ export class EventIndexer {
 
   /**
    * One poll pass across all configured programs. Decoded events are returned
-   * so callers can inspect them even in DB-less mode (db === null).
+   * so callers can inspect them even in DB-less mode (db === null). After the
+   * signature sweep, the periodic on-chain state syncs run (whitelisted_mints
+   * from WhitelistedMint accounts, vault_holdings for indexed baskets).
    */
   async pollOnce(): Promise<PollResult[]> {
     const results: PollResult[] = [];
     for (const programId of this.cfg.programIds) {
       results.push(await this.pollProgram(programId));
     }
+    await this.syncChainState();
     return results;
+  }
+
+  /**
+   * Periodic (throttled) sync of account state that events alone cannot carry:
+   *   1. whitelisted_mints ← on-chain WhitelistedMint accounts (price_source).
+   *   2. vault_holdings ← basket PDA vault ATAs for every indexed basket.
+   * Whitelist rows land BEFORE holdings rows because vault_holdings.mint carries
+   * a FK to whitelisted_mints. Every failure is contained — a broken sync never
+   * breaks the event poll loop.
+   */
+  private async syncChainState(): Promise<void> {
+    if (!isPgLike(this.db)) return;
+    const full = this.rpc as ChainStateRpc;
+    if (typeof full.getProgramAccounts !== "function") return; // hand-rolled test rpc
+    const now = Date.now();
+    if (this.cfg.whitelistProgramId && now - this.lastWhitelistSyncMs >= WHITELIST_SYNC_INTERVAL_MS) {
+      this.lastWhitelistSyncMs = now;
+      try {
+        const n = await syncWhitelistedMints(full, this.cfg.whitelistProgramId, this.db);
+        if (n > 0) console.log(`[indexer] whitelist sync: ${n} mints upserted`);
+      } catch (err) {
+        console.warn("[indexer] whitelist sync failed:", err instanceof Error ? err.message : err);
+      }
+    }
+    if (now - this.lastHoldingsSyncMs >= HOLDINGS_SYNC_INTERVAL_MS) {
+      this.lastHoldingsSyncMs = now;
+      try {
+        const n = await syncIndexedBaskets(full, this.db);
+        if (n > 0) console.log(`[indexer] holdings sync: ${n} baskets refreshed`);
+      } catch (err) {
+        console.warn("[indexer] holdings sync failed:", err instanceof Error ? err.message : err);
+      }
+    }
   }
 
   private async pollProgram(programId: string): Promise<PollResult> {
@@ -247,7 +316,10 @@ export class EventIndexer {
       return { programId, signaturesSeen, events };
     }
 
-    for (const sigInfo of sigInfos) {
+    // getSignaturesForAddress returns NEWEST-first; process OLDEST-first so a
+    // fresh sync lands the BasketCreated tx (which upserts the baskets row)
+    // before the Minted/Redeemed/FeeAccrued txs whose rows FK-reference it.
+    for (const sigInfo of [...sigInfos].reverse()) {
       if (sigInfo.err) continue; // failed txs emit nothing we care about
       if (this.seen.has(sigInfo.signature)) continue;
       signaturesSeen++;
@@ -292,12 +364,14 @@ export class EventIndexer {
         }
 
         if (rows.length > 0) {
-          // Only persist downstream rows when the event insert is fresh, so
-          // re-processing a signature can never double-count creator_stats.
-          let fresh = false;
-          for (const row of rows) fresh = (await insertEvent(this.db, row)) || fresh;
+          // BasketCreated must upsert the baskets row BEFORE the event rows:
+          // events.basket carries a FK to baskets(pubkey), so on a fresh sync
+          // the create tx would otherwise fail its own event insert. The
+          // upsert is idempotent (ON CONFLICT DO NOTHING); creator_stats below
+          // stays gated on the event insert being fresh AND the basket row
+          // being newly created, so replays never double-count.
+          let basketUpserted = false;
           if (
-            fresh &&
             basketCreated &&
             createArgs &&
             createArgs.constituents.length === basketCreated.numConstituents
@@ -307,13 +381,18 @@ export class EventIndexer {
               const treasury = await this.fetchTreasury(factory);
               if (treasury) {
                 const upsert = buildBasketUpsert(basketCreated, factory, createArgs, treasury);
-                if (await upsertBasketFromCreation(this.db, upsert)) {
-                  await incrementCreatorStats(this.db, basketCreated.creator);
-                }
+                basketUpserted = await upsertBasketFromCreation(this.db, upsert);
               } else {
                 console.warn(`[indexer] could not decode FactoryConfig treasury for basket ${basketCreated.basket}`);
               }
             }
+          }
+          // Only persist downstream rows when the event insert is fresh, so
+          // re-processing a signature can never double-count creator_stats.
+          let fresh = false;
+          for (const row of rows) fresh = (await insertEvent(this.db, row)) || fresh;
+          if (fresh && basketCreated && basketUpserted) {
+            await incrementCreatorStats(this.db, basketCreated.creator);
           }
         }
 
@@ -333,10 +412,28 @@ export class EventIndexer {
           }
         }
       } catch (err) {
-        console.warn(`[indexer] failed to process ${sigInfo.signature}:`, err instanceof Error ? err.message : err);
-      } finally {
-        this.markSeen(sigInfo.signature);
+        // Do NOT drop the signature on failure: devnet RPC 429s and FK waits
+        // on a basket row an older signature will establish both heal on
+        // retry. Track attempts and give up only after MAX_PROCESS_ATTEMPTS.
+        const attempt = (this.attempts.get(sigInfo.signature) ?? 0) + 1;
+        this.attempts.set(sigInfo.signature, attempt);
+        if (attempt >= MAX_PROCESS_ATTEMPTS) {
+          console.warn(
+            `[indexer] giving up on ${sigInfo.signature} after ${attempt} attempts:`,
+            err instanceof Error ? err.message : err,
+          );
+          this.markSeen(sigInfo.signature);
+          this.attempts.delete(sigInfo.signature);
+        } else {
+          console.warn(
+            `[indexer] failed to process ${sigInfo.signature} (attempt ${attempt}/${MAX_PROCESS_ATTEMPTS}, will retry):`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+        continue; // leave unseen so the next poll retries it
       }
+      this.markSeen(sigInfo.signature);
+      this.attempts.delete(sigInfo.signature);
     }
     return { programId, signaturesSeen, events };
   }
@@ -437,6 +534,8 @@ export function indexerConfigFromEnv(env: NodeJS.ProcessEnv = process.env): (Ind
   return {
     rpcUrl,
     programIds,
+    whitelistProgramId: env.PROGRAM_WHITELIST,
+    basketProgramId: env.PROGRAM_BASKET,
     pollIntervalMs: Number(env.INDEXER_POLL_MS || DEFAULT_INDEXER_CONFIG.pollIntervalMs),
     signaturesPerPoll: Number(env.INDEXER_POLL_LIMIT || DEFAULT_INDEXER_CONFIG.signaturesPerPoll),
     maxSeenCache: DEFAULT_INDEXER_CONFIG.maxSeenCache,

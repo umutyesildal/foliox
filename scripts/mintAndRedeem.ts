@@ -1,24 +1,40 @@
 /**
- * FolioX localnet E2E — step 3/4: mint in-kind + redeem in-kind (second user).
+ * FolioX localnet/devnet E2E — step 3/4: mint in-kind + redeem in kind (second user).
+ *
+ * BASKET SELECTOR: FOLIOX_E2E_BASKET=<nonce> picks state.baskets[<nonce>];
+ * unset = the newest basket (highest nonce). Works against any ladder rung.
  *
  * user2 (fresh keypair in the state dir):
  *   1. prep — user2 constituent ATAs created (mint_in_kind requires them to
  *      exist) + funded by the mock-mint authority (the payer);
  *   2. mint_in_kind proportional 10% of the vault — remaining_accounts use the
- *      4n layout: [mint, user_ata, vault_ata]×3 triplets THEN 3 WhitelistedMint
- *      PDAs; asserts gross=100_000, entry fee 1_000 (900 creator / 100
- *      treasury), net=99_000 minted to user2;
- *   3. pauses constituent[0] on the whitelist, then REDEEMS 49_500 shares with
- *      the 3n-only remaining-accounts layout — success while PAUSED proves
- *      redeem_in_kind has no whitelist gate; asserts floor pro-rata outputs;
+ *      4n layout: [mint, user_ata, vault_ata]×n triplets THEN n WhitelistedMint
+ *      PDAs; asserts entry fee split 9000/1000 and net minted to user2;
+ *   3. pauses constituent[0] on the whitelist, then REDEEMS half of user2's
+ *      net shares with the 3n-only remaining-accounts layout — success while
+ *      PAUSED proves redeem_in_kind has no whitelist gate; asserts floor
+ *      pro-rata outputs;
  *   4. unpauses, then does a large top-up mint (gross target 550M shares) so
  *      the supply makes the management fee observable in seconds (step 4).
+ *
+ * WIRE FORMAT: for n >= 4 the mint_in_kind tx (12 + 4n accounts) exceeds the
+ * 1232-byte legacy packet limit, so these sends go through lib.sendFitting —
+ * legacy while it fits, v0 + Address Lookup Table when size demands it. The
+ * ALT (authority = payer) is created/extended idempotently per basket.
+ *
+ * Everything derives from state.json (constituents, weights, seed amounts) —
+ * no hard-coded constituent count, so the same script runs for the localnet
+ * 3-constituent basket and any devnet ladder rung (6/5/4/3).
  *
  * All share math mirrors the program: u128-style BigInt, floor division.
  */
 
 import { Keypair, PublicKey } from "@solana/web3.js";
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  BASKET_PROGRAM_ID,
+  SYSTEM_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   createAtaIdempotent,
   deriveAta,
   deriveVaultAuthority,
@@ -35,14 +51,18 @@ import {
   readMint,
   readTokenAmount,
   saveState,
+  selectBasket,
   send,
+  sendFitting,
   stateKeypair,
   step,
   hasStepFailure,
 } from "./lib.ts";
 
-const SMALL_DEPOSIT = [50_000_000n, 30_000_000n, 20_000_000n]; // exactly 10% of the 500/300/200 seeds
-const REDEEM_SHARES = 49_500n; // half of user2's 99_000 net shares
+// 10% of each seeded amount — the basket constituents and seeds come from
+// state.json (written by createBasket.ts), so this scales with any ladder rung.
+const DEPOSIT_FRAC = 10n;
+const REDEEM_FRAC = 2n; // redeem half of user2's net shares
 const BIG_GROSS_TARGET = 550_000_000n; // top-up so the mgmt fee > 0 within seconds
 const BIG_TOPUP_BUDGET = 3_200_000_000_000n; // per-constituent funding headroom for user2
 
@@ -54,20 +74,57 @@ async function main() {
   const conn = newConnection();
   const payer = payerKeypair(); // mock mint authority + whitelist authority
   const state = loadState();
-  const need = ["mints", "basket", "shareMint", "creator", "treasury", "feesBps"];
-  for (const k of need) {
-    if (!state[k]) throw new Error(`state.${k} missing — run scripts/createWhitelist.ts and scripts/createBasket.ts first`);
+  // Basket selector: FOLIOX_E2E_BASKET=<nonce> or the newest state.baskets entry.
+  const { key: basketKey, entry } = selectBasket(state);
+  console.log(`basket selector: FOLIOX_E2E_BASKET=${basketKey} (nonce ${entry.nonce ?? basketKey})`);
+  const required: (keyof typeof entry)[] = ["basket", "shareMint", "creator", "treasury", "feesBps", "seedAmounts"];
+  for (const k of required) {
+    if (!entry[k]) throw new Error(`state.baskets[${basketKey}].${String(k)} missing — run scripts/createBasket.ts first`);
   }
-  const mints: PublicKey[] = state.mints.map((m: string) => new PublicKey(m));
-  const basket = new PublicKey(state.basket);
-  const shareMint = new PublicKey(state.shareMint);
-  const creator = new PublicKey(state.creator);
-  const treasury = new PublicKey(state.treasury);
-  const entryBps = state.feesBps.entry;
-  const exitBps = state.feesBps.exit;
+  // The BASKET constituents (a subset of the whitelisted mocks) — prefer the
+  // basket entry's constituents, fall back to the flat state.mints for the
+  // pre-registry localnet state.
+  const mints: PublicKey[] = (entry.constituents ?? state.mints).map((m: string) => new PublicKey(m));
+  const seedAmounts: bigint[] = entry.seedAmounts!.map((s: string | number) => BigInt(s));
+  if (seedAmounts.length !== mints.length) {
+    throw new Error(`state mismatch: ${mints.length} constituents vs ${seedAmounts.length} seed amounts`);
+  }
+  const SMALL_DEPOSIT = seedAmounts.map((s) => s / DEPOSIT_FRAC); // exactly 10% of each seed
+  const basket = new PublicKey(entry.basket);
+  const shareMint = new PublicKey(entry.shareMint);
+  const creator = new PublicKey(entry.creator);
+  const treasury = new PublicKey(entry.treasury);
+  const entryBps = entry.feesBps!.entry;
+  const exitBps = entry.feesBps!.exit;
   const vaultAuthority = deriveVaultAuthority(basket);
 
   const user2 = stateKeypair("user2.json");
+
+  // ALT payload for the flow txs on this basket: every account mint/redeem
+  // touches EXCEPT the signing user (signers stay in static keys — sendFitting
+  // filters them). Only created/extended when the legacy wire size demands it.
+  const flowAltAddresses: (PublicKey | null | undefined)[] = [
+    basket,
+    shareMint,
+    deriveAta(user2.publicKey, shareMint),
+    vaultAuthority,
+    creator,
+    deriveAta(creator, shareMint),
+    treasury,
+    deriveAta(treasury, shareMint),
+    TOKEN_2022_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    SYSTEM_PROGRAM_ID,
+    BASKET_PROGRAM_ID,
+  ];
+  mints.forEach((m) => {
+    flowAltAddresses.push(m, deriveAta(user2.publicKey, m), deriveAta(vaultAuthority, m), deriveWhitelistedMint(m));
+  });
+  const altOpts = {
+    altName: `flow-basket-${basketKey}`,
+    altAddresses: flowAltAddresses,
+    altAuthority: payer, // ALT management is paid/owned by the payer, not user2
+  };
   console.log(`rpc: ${conn.rpcEndpoint}`);
   console.log(`user2: ${user2.publicKey.toBase58()}`);
   await ensureSol(conn, user2, 1, 5);
@@ -80,6 +137,8 @@ async function main() {
     treasury,
     constituents: mints,
   };
+  // Every tx signature for this run, recorded under state.flows[<basket key>].
+  const flowSigs: Record<string, string> = {};
 
   async function readSupply(): Promise<bigint> {
     const m = await readMint(conn, shareMint);
@@ -104,7 +163,7 @@ async function main() {
         mintTo(m, deriveAta(user2.publicKey, m), payer.publicKey, SMALL_DEPOSIT[i] + BIG_TOPUP_BUDGET),
       ),
     );
-    await send(conn, "prep_user2", ixs, [payer, user2]);
+    flowSigs.prep = await send(conn, "prep_user2", ixs, [payer, user2]);
     for (let i = 0; i < mints.length; i++) {
       const bal = await readTokenAmount(conn, deriveAta(user2.publicKey, mints[i]));
       if (bal === null || bal < SMALL_DEPOSIT[i] + BIG_TOPUP_BUDGET) {
@@ -115,7 +174,7 @@ async function main() {
   });
 
   // ---- small proportional mint (10% of vault, 4n remaining accounts) ----
-  await step("mint_in_kind 10% of vault (4n remaining accounts: 3 triplets + 3 whitelist PDAs)", async () => {
+  await step(`mint_in_kind 10% of vault (4n remaining accounts: ${mints.length} triplets + ${mints.length} whitelist PDAs)`, async () => {
     const supplyBefore = await readSupply();
     const vaults = await readVaults();
     console.log(`  supply=${supplyBefore} vault=[${vaults.join(", ")}]`);
@@ -134,10 +193,13 @@ async function main() {
     );
 
     const ix = ixMintInKind(core, SMALL_DEPOSIT, vaults);
-    if (ix.keys.length !== 12 + 4 * 3) {
-      throw new Error(`4n layout broken: ${ix.keys.length} keys != 24`);
+    if (ix.keys.length !== 12 + 4 * mints.length) {
+      throw new Error(`4n layout broken: ${ix.keys.length} keys != ${12 + 4 * mints.length}`);
     }
-    await send(conn, "mint_in_kind", [ix], [user2]);
+    // v0+ALT automatically when the legacy wire size exceeds 1232B (n >= 4).
+    const sig = await sendFitting(conn, "mint_in_kind", [ix], [user2], altOpts);
+    flowSigs.mint = sig.signature;
+    console.log(`  mint_in_kind signature: ${sig.signature} (wire: ${sig.wire}${sig.v0Size ? ` ${sig.legacySize}B→${sig.v0Size}B` : `, ${sig.legacySize}B`})`);
 
     const userShareBal = await readTokenAmount(conn, deriveAta(user2.publicKey, shareMint));
     if (userShareBal !== net) throw new Error(`user2 share balance ${userShareBal} != net ${net}`);
@@ -166,17 +228,19 @@ async function main() {
 
   // ---- redeem WHILE CONSTITUENT[0] IS PAUSED (no whitelist gate on redeem) ----
   await step("whitelist pause_mint(constituent[0])", async () => {
-    await send(conn, "pause_mint", [ixSetMintPaused(payer.publicKey, mints[0], true)], [payer]);
+    flowSigs.pause = await send(conn, "pause_mint", [ixSetMintPaused(payer.publicKey, mints[0], true)], [payer]);
     const rec = await conn.getAccountInfo(deriveWhitelistedMint(mints[0]));
     if (!rec || rec.data[49] !== 1) throw new Error("constituent[0] not PausedNewMints (byte 49)");
     console.log(`  ${mints[0].toBase58()} is now PausedNewMints`);
   });
 
-  await step("redeem_in_kind 49,500 of 99,000 shares (3n remaining accounts, NO whitelist PDA)", async () => {
+  await step(`redeem_in_kind half of user2's net shares (3n remaining accounts, NO whitelist PDA)`, async () => {
     const supplyBefore = await readSupply(); // S_before for pro-rata math
     const vaults = await readVaults();
     const userShareBal = (await readTokenAmount(conn, deriveAta(user2.publicKey, shareMint)))!;
-    if (REDEEM_SHARES > userShareBal) throw new Error("redeem shares exceed user2 balance");
+    // Redeem half of whatever user2 actually holds (net of the entry fee).
+    const REDEEM_SHARES = userShareBal / REDEEM_FRAC;
+    if (REDEEM_SHARES === 0n) throw new Error("user2 share balance too small to redeem half");
 
     const exitFee = floorDiv(REDEEM_SHARES * BigInt(exitBps), 10_000n);
     const burn = REDEEM_SHARES - exitFee;
@@ -185,8 +249,8 @@ async function main() {
     console.log(`  expected: exit_fee=${exitFee} burn=${burn} outs=[${outs.join(", ")}]`);
 
     const ix = ixRedeemInKind(core, REDEEM_SHARES, vaults);
-    if (ix.keys.length !== 12 + 3 * 3) {
-      throw new Error(`3n layout broken: ${ix.keys.length} keys != 21`);
+    if (ix.keys.length !== 12 + 3 * mints.length) {
+      throw new Error(`3n layout broken: ${ix.keys.length} keys != ${12 + 3 * mints.length}`);
     }
     const hasWhitelistPda = ix.keys.some((k) =>
       mints.some((m) => k.pubkey.equals(deriveWhitelistedMint(m))),
@@ -203,7 +267,9 @@ async function main() {
       if (b === null) throw new Error(`user2 ATA missing for ${m.toBase58()}`);
       tokenBalBefore.push(b);
     }
-    await send(conn, "redeem_in_kind", [ix], [user2]);
+    const redeemSig = await sendFitting(conn, "redeem_in_kind", [ix], [user2], altOpts);
+    flowSigs.redeem = redeemSig.signature;
+    console.log(`  redeem_in_kind signature: ${redeemSig.signature} (wire: ${redeemSig.wire}${redeemSig.v0Size ? ` ${redeemSig.legacySize}B→${redeemSig.v0Size}B` : `, ${redeemSig.legacySize}B`})`);
 
     // verify received amounts match the floor math exactly
     for (let i = 0; i < mints.length; i++) {
@@ -227,7 +293,7 @@ async function main() {
   });
 
   await step("whitelist unpause_mint(constituent[0])", async () => {
-    await send(conn, "unpause_mint", [ixSetMintPaused(payer.publicKey, mints[0], false)], [payer]);
+    flowSigs.unpause = await send(conn, "unpause_mint", [ixSetMintPaused(payer.publicKey, mints[0], false)], [payer]);
     const rec = await conn.getAccountInfo(deriveWhitelistedMint(mints[0]));
     if (!rec || rec.data[49] !== 0) throw new Error("constituent[0] not Active after unpause");
   });
@@ -250,7 +316,9 @@ async function main() {
       throw new Error("top-up deposit exceeds user2 funding — test bug");
     }
 
-    await send(conn, "mint_in_kind_topup", [ixMintInKind(core, deposits, vaults)], [user2]);
+    const sig = await sendFitting(conn, "mint_in_kind_topup", [ixMintInKind(core, deposits, vaults)], [user2], altOpts);
+    flowSigs.topupMint = sig.signature;
+    console.log(`  mint_in_kind_topup signature: ${sig.signature} (wire: ${sig.wire})`);
 
     const supplyAfter = await readSupply();
     const userShareBal = await readTokenAmount(conn, deriveAta(user2.publicKey, shareMint));
@@ -258,7 +326,10 @@ async function main() {
     console.log(`  user2 shares now = ${fmtRaw(userShareBal!)}`);
   });
 
-  saveState({ user2: user2.publicKey.toBase58() });
+  saveState({
+    user2: user2.publicKey.toBase58(),
+    flows: { ...(state.flows ?? {}), [basketKey]: { ...((state.flows ?? {})[basketKey] ?? {}), ...flowSigs } },
+  });
 
   if (hasStepFailure()) process.exit(1);
 }

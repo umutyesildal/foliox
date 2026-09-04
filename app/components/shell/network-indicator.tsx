@@ -1,17 +1,19 @@
 "use client";
 
 import { useClusterHealth } from "@/components/shell/use-cluster-health";
-import { RPC_ENDPOINT, clusterFromEndpoint } from "@/lib/wallet";
+import { CLUSTER, RPC_ENDPOINT } from "@/lib/wallet";
 import { cn } from "@/lib/utils";
 
 /**
  * Network indicator for the header, demoted per the designer critique: a small
  * colored dot plus muted mono cluster label (no bordered chip, no red text on
  * every page). The dot carries the health signal; hover/focus reveals the RPC
- * endpoint detail via title.
+ * endpoint detail via title. The label is the resolved CLUSTER
+ * (NEXT_PUBLIC_CLUSTER, default devnet) — the same cluster every explorer
+ * link targets.
  */
 export function NetworkIndicator({ className }: { className?: string }) {
-  const cluster = clusterFromEndpoint(RPC_ENDPOINT);
+  const cluster = CLUSTER;
   const health = useClusterHealth(true);
   const title =
     health === "unreachable"

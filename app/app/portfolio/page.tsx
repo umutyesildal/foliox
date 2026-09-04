@@ -9,9 +9,9 @@ import { WalletButton } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { ChangeValue } from "@/components/stocks/change-value";
 import { LegalReviewTag } from "@/components/create";
-import { formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
+import { formatTokenAmount, formatUsd, prettyTicker, truncateAddress } from "@/lib/format";
+import { apiFetch } from "@/lib/api-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 /** Basket share mints are fixed 6 decimals, no ScaledUiAmount multiplier. */
 const SHARE_MINT_DECIMALS = 6;
 
@@ -275,8 +275,8 @@ export default function PortfolioPage() {
 
     async function run() {
       try {
-        const res = await fetch(
-          `${API_BASE}/api/v1/users/${wallet}/portfolio`,
+        const res = await apiFetch(
+          `/api/v1/users/${encodeURIComponent(wallet)}/portfolio`,
           { signal: controller.signal, cache: "no-store" },
         );
         const payload = (await res.json().catch(() => null)) as
@@ -323,7 +323,7 @@ export default function PortfolioPage() {
 
     async function loadTickers() {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/whitelist`, {
+        const res = await apiFetch("/api/v1/whitelist", {
           signal: controller.signal,
           cache: "no-store",
           headers: { accept: "application/json" },
@@ -340,7 +340,7 @@ export default function PortfolioPage() {
             typeof row.price_source === "string"
               ? row.price_source.split(":").pop() ?? ""
               : "";
-          const ticker = fromField || fromSource;
+          const ticker = prettyTicker(fromField || fromSource);
           if (ticker) map.set(row.mint, ticker);
         }
         setMintTickers(map);
@@ -362,7 +362,7 @@ export default function PortfolioPage() {
 
     async function loadBaskets() {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/baskets?limit=100`, {
+        const res = await apiFetch("/api/v1/baskets?limit=100", {
           signal: controller.signal,
           cache: "no-store",
           headers: { accept: "application/json" },

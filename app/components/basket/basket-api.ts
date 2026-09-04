@@ -8,7 +8,10 @@
  * to FreshnessBadge.
  */
 
-export const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
+import { prettyTicker } from "@/lib/format";
+import { API_BASE, apiFetch } from "@/lib/api-client";
+
+export { API_BASE };
 
 /** Postgres numeric serialized as text by the indexer. */
 export type Numeric = string | number | null | undefined;
@@ -91,7 +94,7 @@ export class ApiError extends Error {
 async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await apiFetch(path, {
       signal,
       cache: "no-store",
       headers: { accept: "application/json" },
@@ -207,7 +210,7 @@ export async function fetchMintTickers(
     const fromField = typeof row.ticker === "string" ? row.ticker.trim() : "";
     const fromSource =
       typeof row.price_source === "string" ? row.price_source.split(":").pop() ?? "" : "";
-    const ticker = fromField || fromSource;
+    const ticker = prettyTicker(fromField || fromSource);
     if (ticker) map.set(row.mint, ticker);
   }
   return map;
@@ -265,7 +268,7 @@ export async function fetchZapInQuote(
 ): Promise<ZapInQuote> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/v1/quotes/zap-in`, {
+    res = await apiFetch("/api/v1/quotes/zap-in", {
       method: "POST",
       signal,
       cache: "no-store",

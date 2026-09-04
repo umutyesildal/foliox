@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { fetchMockXStockCatalog } from "@/lib/xstock-catalog";
+import { apiFetch } from "@/lib/api-client";
+
 /**
  * Closing strip — takes over the deleted bento's navigation role with one
- * hairline-divided row of three cells: STOCKS (live tickers from the real
- * xStocks registry), TOKENIZED ETFS (SPYx), BASKETS. Each cell links; its ↗
+ * hairline-divided row of three cells: STOCKS (the dev catalog tickers —
+ * GET /api/v1/xstocks/mock, falling back to the xStocks registry),
+ * TOKENIZED ETFS (SPYx), BASKETS. Each cell links; its ↗
  * lifts and warms to pompeian red on hover. Nothing renders in the ticker
  * line when the backend is unreachable (no fabricated tickers) — and no
  * endpoint/as-of text is shown.
  */
-
-const API_BASE = process.env.NEXT_PUBLIC_API || "http://localhost:3001";
 
 const CELLS = [
   { label: "Stocks", href: "/stocks", line: (tickers: string | null) => tickers },
@@ -29,17 +31,25 @@ export function ClosingStrip() {
   useEffect(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    fetch(`${API_BASE}/api/v1/xstocks`, {
-      cache: "no-store",
-      signal: controller.signal,
-      headers: { accept: "application/json" },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json: { data?: { ticker: string }[] } | null) => {
-        const rows = json?.data;
-        if (!rows?.length) return;
-        const names = rows.map((r) => r.ticker).filter(Boolean);
-        if (!names.length) return;
+    // Dev catalog first (the 12 mock xStocks the devnet demo actually lists),
+    // then the live xStocks registry as fallback.
+    const loadTickers = async () => {
+      const catalog = await fetchMockXStockCatalog();
+      if (catalog) return catalog.map((entry) => entry.ticker);
+      const res = await apiFetch("/api/v1/xstocks", {
+        cache: "no-store",
+        signal: controller.signal,
+        headers: { accept: "application/json" },
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as { data?: { ticker: string }[] } | null;
+      const rows = json?.data;
+      if (!rows?.length) return null;
+      return rows.map((r) => r.ticker).filter(Boolean);
+    };
+    loadTickers()
+      .then((names) => {
+        if (!names?.length) return;
         const shown =
           names.length > MAX_TICKERS
             ? `${names.slice(0, MAX_TICKERS).join(" ")} …`

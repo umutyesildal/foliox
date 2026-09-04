@@ -3,30 +3,58 @@
 import { useCallback, useRef, useState } from "react";
 import {
   Transaction,
+  VersionedTransaction,
   type TransactionInstruction,
   type TransactionSignature,
 } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
 import { describeRpcError, describeWalletError } from "@/lib/wallet";
-import { decodeProgramError, isMintPausedError } from "@/lib/transactions";
+import {
+  computeBudgetInstructions,
+  decodeProgramError,
+  isMintPausedError,
+} from "@/lib/transactions";
 
 /**
  * Local transaction-flow state machine shared by Buy / Redeem / the accrual
- * crank: simulate → awaiting-signature (wallet open) → confirming →
- * confirmed | failed | rejected. Simulation runs BEFORE the wallet prompt so
- * program errors (WeightMismatch, MintPaused, VaultBalanceMismatch, …) surface
- * with logs and never cost a signature.
+ * crank: (optional lookup-table preparation) → simulate → awaiting-signature
+ * (wallet open) → confirming → confirmed | failed | rejected. Simulation runs
+ * BEFORE the wallet prompt so program errors (WeightMismatch, MintPaused,
+ * VaultBalanceMismatch, …) surface with logs and never cost a signature.
+ *
+ * Two wire shapes:
+ *  - `build` returning TransactionInstruction[] compiles a legacy Transaction;
+ *    the compute-budget pair (500k CU limit + priority price) is prepended
+ *    here so every legacy-path tx is budgeted.
+ *  - `build` returning a PreparedTransaction (v0 message, ALT-compiled when
+ *    mintRedeemNeedsAlt(n)) is simulated and sent as-is — its compute budget
+ *    is already baked in by the builder.
  */
 
 export type TransactionFlowStatus =
   | "idle"
+  | "preparing-alt"
   | "simulating"
   | "awaiting-signature"
   | "confirming"
   | "confirmed"
   | "failed"
   | "rejected";
+
+/** A v0 transaction compiled together with its blockhash context. */
+export interface PreparedTransaction {
+  transaction: VersionedTransaction;
+  blockhash: string;
+  lastValidBlockHeight: number;
+}
+
+/** Either shape the flow can send: a legacy instruction list or a v0 tx. */
+export type TransactionBuildResult = TransactionInstruction[] | PreparedTransaction;
+
+export type TransactionBuild = () =>
+  | TransactionBuildResult
+  | Promise<TransactionBuildResult>;
 
 export interface TransactionFlowState {
   status: TransactionFlowStatus;
@@ -61,13 +89,23 @@ export function useTransactionFlow() {
     setState(INITIAL);
   }, []);
 
+  const fail = useCallback((patch: Partial<TransactionFlowState>) => {
+    setState({ ...INITIAL, ...patch });
+    inFlight.current = false;
+  }, []);
+
   /**
-   * Run the flow. `build` returns the instruction list (or throws with a
-   * client-side validation message, which lands in the failed state without
-   * touching the wallet).
+   * Run the flow. `build` returns the instruction list (legacy wire) or a
+   * PreparedTransaction (v0/ALT wire) — or throws with a client-side
+   * validation message, which lands in the failed state without touching the
+   * wallet. `prepare` (e.g. wallet-signed lookup-table creation) runs first
+   * under the honest "preparing-alt" status.
    */
   const run = useCallback(
-    async (build: () => TransactionInstruction[]): Promise<boolean> => {
+    async (
+      build: TransactionBuild,
+      prepare?: () => Promise<unknown>,
+    ): Promise<boolean> => {
       if (inFlight.current) return false;
       if (!publicKey) {
         setState({ ...INITIAL, status: "failed", error: "Connect a wallet first." });
@@ -75,44 +113,65 @@ export function useTransactionFlow() {
       }
       inFlight.current = true;
 
-      // ---- 1. build + simulate ----
-      setState({ ...INITIAL, status: "simulating" });
-      let transaction: Transaction;
-      let blockhash: { blockhash: string; lastValidBlockHeight: number };
-      try {
-        const instructions = build();
-        blockhash = await connection.getLatestBlockhash("confirmed");
-        transaction = new Transaction({
-          feePayer: publicKey,
-          blockhash: blockhash.blockhash,
-          lastValidBlockHeight: blockhash.lastValidBlockHeight,
-        });
-        transaction.add(...instructions);
-        const simulation = await connection.simulateTransaction(transaction);
-        if (simulation.value.err) {
-          const decoded = decodeProgramError(simulation.value.err);
-          setState({
-            ...INITIAL,
+      // ---- 0. optional preparation (e.g. wallet-signed lookup table) ----
+      if (prepare) {
+        setState({ ...INITIAL, status: "preparing-alt" });
+        try {
+          await prepare();
+        } catch (err) {
+          fail({
             status: "failed",
-            error: decoded
-              ? `${decoded.name} — ${decoded.message}`
-              : "The simulation failed before signing. See the logs below.",
-            programErrorName: decoded?.name ?? null,
-            mintPaused: isMintPausedError(simulation.value.err),
-            logs: simulation.value.logs ?? [],
+            error:
+              describeWalletError(err as { name?: string; message?: string } | null) ||
+              describeRpcError(err) ||
+              "Lookup-table preparation failed.",
           });
-          inFlight.current = false;
           return false;
         }
+      }
+
+      // ---- 1. build + simulate ----
+      setState({ ...INITIAL, status: "simulating" });
+      let legacy: Transaction | null = null;
+      let prepared: PreparedTransaction | null = null;
+      try {
+        const built = await build();
+        if (Array.isArray(built)) {
+          const blockhash = await connection.getLatestBlockhash("confirmed");
+          legacy = new Transaction({
+            feePayer: publicKey,
+            blockhash: blockhash.blockhash,
+            lastValidBlockHeight: blockhash.lastValidBlockHeight,
+          });
+          legacy.add(...computeBudgetInstructions(), ...built);
+        } else {
+          prepared = built;
+        }
       } catch (err) {
-        setState({
-          ...INITIAL,
+        fail({
           status: "failed",
-          // 429s get calm honest copy instead of the raw "Server responded
-          // with 429. Retrying after 4000ms delay…" string.
-          error: describeRpcError(err) || "Simulation failed.",
+          error: describeRpcError(err) || "Building the transaction failed.",
         });
-        inFlight.current = false;
+        return false;
+      }
+
+      const simulation = legacy
+        ? await connection.simulateTransaction(legacy)
+        : await connection.simulateTransaction(prepared!.transaction, {
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+          });
+      if (simulation.value.err) {
+        const decoded = decodeProgramError(simulation.value.err);
+        fail({
+          status: "failed",
+          error: decoded
+            ? `${decoded.name} — ${decoded.message}`
+            : "The simulation failed before signing. See the logs below.",
+          programErrorName: decoded?.name ?? null,
+          mintPaused: isMintPausedError(simulation.value.err),
+          logs: simulation.value.logs ?? [],
+        });
         return false;
       }
 
@@ -120,10 +179,14 @@ export function useTransactionFlow() {
       setState((s) => ({ ...s, status: "awaiting-signature" }));
       let signature: TransactionSignature;
       try {
-        signature = await sendTransaction(transaction, connection, {
-          skipPreflight: false,
-          preflightCommitment: "confirmed",
-        });
+        signature = await sendTransaction(
+          legacy ?? prepared!.transaction,
+          connection,
+          {
+            skipPreflight: false,
+            preflightCommitment: "confirmed",
+          },
+        );
       } catch (err) {
         const message = describeWalletError(
           err as { name?: string; message?: string } | null,
@@ -131,31 +194,37 @@ export function useTransactionFlow() {
         const rejected =
           message.includes("rejected") ||
           (err instanceof Error && err.name === "WalletSignTransactionError");
-        setState({
-          ...INITIAL,
+        fail({
           status: rejected ? "rejected" : "failed",
           error: message,
           logs: [],
         });
-        inFlight.current = false;
         return false;
       }
 
       // ---- 3. confirm ----
       setState((s) => ({ ...s, status: "confirming", signature }));
+      const blockhashCtx = legacy
+        ? {
+            blockhash: legacy.recentBlockhash ?? "",
+            lastValidBlockHeight: legacy.lastValidBlockHeight ?? 0,
+          }
+        : {
+            blockhash: prepared!.blockhash,
+            lastValidBlockHeight: prepared!.lastValidBlockHeight,
+          };
       try {
         const result = await connection.confirmTransaction(
           {
             signature,
-            blockhash: blockhash.blockhash,
-            lastValidBlockHeight: blockhash.lastValidBlockHeight,
+            blockhash: blockhashCtx.blockhash,
+            lastValidBlockHeight: blockhashCtx.lastValidBlockHeight,
           },
           "confirmed",
         );
         if (result.value.err) {
           const decoded = decodeProgramError(result.value.err);
-          setState({
-            ...INITIAL,
+          fail({
             status: "failed",
             error: decoded
               ? `${decoded.name} — ${decoded.message}`
@@ -164,7 +233,6 @@ export function useTransactionFlow() {
             mintPaused: isMintPausedError(result.value.err),
             signature,
           });
-          inFlight.current = false;
           return false;
         }
         setState({
@@ -177,8 +245,7 @@ export function useTransactionFlow() {
       } catch (err) {
         // Confirmation uncertainty is not the same as failure — surface the
         // signature either way so the user can check the explorer.
-        setState({
-          ...INITIAL,
+        fail({
           status: "failed",
           error:
             err instanceof Error
@@ -186,11 +253,10 @@ export function useTransactionFlow() {
               : "Confirmation could not be verified.",
           signature,
         });
-        inFlight.current = false;
         return false;
       }
     },
-    [connection, publicKey, sendTransaction],
+    [connection, publicKey, sendTransaction, fail],
   );
 
   return { state, run, reset, connected: Boolean(publicKey) };

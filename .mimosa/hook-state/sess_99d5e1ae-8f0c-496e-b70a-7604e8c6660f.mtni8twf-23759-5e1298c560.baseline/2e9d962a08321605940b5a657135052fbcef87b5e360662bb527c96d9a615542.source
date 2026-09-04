@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "programs/whitelist",
+    "programs/basket_factory",
+    "programs/basket"
+]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true
+
+[workspace.dependencies]
+anchor-lang = "0.30.1"
+anchor-spl = "0.30.1"
+spl-associated-token-account = "4.0.0"
+spl-token-2022 = "3.0.5"
+thiserror = "1.0"

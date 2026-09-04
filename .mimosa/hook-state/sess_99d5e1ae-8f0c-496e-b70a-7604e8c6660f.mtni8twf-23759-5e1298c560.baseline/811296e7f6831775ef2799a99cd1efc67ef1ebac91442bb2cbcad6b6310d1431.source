@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
@@ -21,11 +21,7 @@ import type { BasketDetail } from "@/components/basket/basket-api";
 import {
   buildCreateAtaInstructions,
   buildMintInKind,
-  buildMintInKindTransaction,
   deriveAta,
-  ensureMintRedeemAlt,
-  mintRedeemNeedsAlt,
-  type BasketCoreKeys,
   type ExpectedAccount,
 } from "@/lib/transactions";
 import { scaledFromRaw, truncateAddress } from "@/lib/format";
@@ -45,7 +41,7 @@ export function InKindMintForm({
   /** Raw vault balance per constituent (null when the holding is not indexed). */
   vaultBalances: (bigint | null)[];
 }) {
-  const { publicKey, connected, sendTransaction } = useWallet();
+  const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
   const flow = useTransactionFlow();
   const [open, setOpen] = useState(false);
@@ -54,42 +50,6 @@ export function InKindMintForm({
   const [expectedAccounts, setExpectedAccounts] = useState<ExpectedAccount[] | null>(null);
   const [createAccounts, setCreateAccounts] = useState<ExpectedAccount[]>([]);
   const [createIxs, setCreateIxs] = useState<ReturnType<typeof buildCreateAtaInstructions>>([]);
-  /** Inline note from the Fill proportional handler (honest fallbacks only). */
-  const [fillNote, setFillNote] = useState<string | null>(null);
-
-  // Lookup table for n >= 4 baskets — created/extended wallet-signed once per
-  // session, then reused by every subsequent mint on this basket.
-  const altRef = useRef<PublicKey | null>(null);
-
-  const coreKeys: BasketCoreKeys | null = useMemo(
-    () =>
-      publicKey
-        ? {
-            basket: new PublicKey(detail.pubkey),
-            factory: new PublicKey(detail.factory),
-            creator: new PublicKey(detail.creator),
-            treasury: new PublicKey(detail.treasury),
-            shareMint: new PublicKey(detail.share_mint),
-            constituents: detail.constituents,
-            user: publicKey,
-          }
-        : null,
-    [detail, publicKey],
-  );
-
-  const needsAlt = mintRedeemNeedsAlt(detail.constituents.length);
-
-  const ensureAlt = useCallback(async (): Promise<PublicKey> => {
-    if (altRef.current) return altRef.current;
-    if (!publicKey || !coreKeys) throw new Error("Connect a wallet first.");
-    const handle = await ensureMintRedeemAlt({
-      connection,
-      keys: coreKeys,
-      sendTransaction,
-    });
-    altRef.current = handle.lookupTableAddress;
-    return handle.lookupTableAddress;
-  }, [connection, coreKeys, publicKey, sendTransaction]);
 
   const supply = useMemo(() => {
     const raw = detail.nav?.supply;
@@ -168,7 +128,7 @@ export function InKindMintForm({
     balanceErrors.every((e) => e === null);
 
   const openReview = () => {
-    if (!publicKey || !coreKeys || !check?.ok) return;
+    if (!publicKey || !check?.ok) return;
     const parsed = amounts as bigint[];
     // Missing user ATAs are created idempotently in the same tx (rent disclosed).
     const missingAtaIndices: number[] = [];
@@ -179,7 +139,15 @@ export function InKindMintForm({
       buildCreateAtaInstructions(publicKey, publicKey, [new PublicKey(detail.constituents[i])]),
     ).flat();
     const built = buildMintInKind({
-      keys: coreKeys,
+      keys: {
+        basket: new PublicKey(detail.pubkey),
+        factory: new PublicKey(detail.factory),
+        creator: new PublicKey(detail.creator),
+        treasury: new PublicKey(detail.treasury),
+        shareMint: new PublicKey(detail.share_mint),
+        constituents: detail.constituents,
+        user: publicKey,
+      },
       amounts: parsed,
       vaultBalances: vaultsForCheck,
     });
@@ -199,84 +167,6 @@ export function InKindMintForm({
   const close = () => {
     setOpen(false);
     flow.reset();
-  };
-
-  /**
-   * One click fills EVERY constituent input — never a silent no-op:
-   *  1. anchored on the largest typed amount, every leg follows the vault ratio;
-   *  2. with nothing typed, the largest proportional fill the wallet can
-   *     actually afford (D_i = min_j floor(B_j · V_i / V_j));
-   *  3. when ratios are unusable (zero vault leg, rounding collapse, no
-   *     balances) — equal raw shares plus an honest inline note.
-   */
-  const fillProportional = () => {
-    setFillNote(null);
-    const filledIdx: number[] = [];
-    amounts.forEach((a, i) => {
-      if (a !== null && a > 0n) filledIdx.push(i);
-    });
-
-    if (filledIdx.length > 0) {
-      const best = filledIdx.reduce((b, i) =>
-        (amounts[i] ?? 0n) > (amounts[b] ?? 0n) ? i : b,
-      );
-      const proportional = proportionalDeposits(amounts as bigint[], vaultsForCheck, best);
-      if (proportional.every((a) => a > 0n)) {
-        setInputs(proportional.map((a) => a.toString()));
-        return;
-      }
-      // A proportional leg rounds to zero raw units — fall through to the
-      // equal-shares fallback with a note.
-    } else if (connected && balances !== null && vaultsForCheck.every((v) => v > 0n)) {
-      // No typed anchor: the largest affordable proportional fill. D_i is capped
-      // by every leg's balance transposed through the vault ratios, so the fill
-      // never exceeds any single balance.
-      let bestI = -1;
-      let bestDi = 0n;
-      vaultsForCheck.forEach((vi, i) => {
-        let di = balances[i] ?? 0n;
-        vaultsForCheck.forEach((vj, j) => {
-          const cap = ((balances[j] ?? 0n) * vi) / vj;
-          if (cap < di) di = cap;
-        });
-        if (di > bestDi) {
-          bestDi = di;
-          bestI = i;
-        }
-      });
-      if (bestI >= 0 && bestDi > 0n) {
-        const anchorVault = vaultsForCheck[bestI];
-        const fill = vaultsForCheck.map((vj) => (bestDi * vj) / anchorVault);
-        if (fill.every((a) => a > 0n)) {
-          setInputs(fill.map((a) => a.toString()));
-          return;
-        }
-      }
-      // Balances too small to give every leg at least 1 raw unit — fallback.
-    } else {
-      // Nothing typed and no balances to scale from (wallet disconnected or
-      // still loading) — a nominal, clearly-labelled placeholder instead of a
-      // dead button. The review gate re-validates everything anyway.
-      setInputs(detail.constituents.map(() => "1000000"));
-      setFillNote(
-        "No typed amount and no wallet balances to scale from yet — filled every leg with a nominal 1,000,000 raw units. Edit before reviewing.",
-      );
-      return;
-    }
-
-    const positiveBalances = (balances ?? []).filter(
-      (b): b is bigint => b !== null && b > 0n,
-    );
-    const equal =
-      positiveBalances.length > 0
-        ? positiveBalances.reduce((m, b) => (b < m ? b : m))
-        : 1_000_000n;
-    setInputs(detail.constituents.map(() => equal.toString()));
-    setFillNote(
-      vaultsForCheck.some((v) => v === 0n)
-        ? "A vault leg holds zero raw units, so proportional ratios are undefined — filled equal raw shares instead. The on-chain mint would abort with ZeroVault."
-        : "Vault ratios are too coarse for these amounts (a proportional leg rounds to zero raw units) — filled equal raw shares instead.",
-    );
   };
 
   if (missingVault || supply === null) {
@@ -324,10 +214,9 @@ export function InKindMintForm({
                     autoComplete="off"
                     placeholder="raw amount"
                     value={inputs[i]}
-                    onChange={(e) => {
-                      setFillNote(null);
-                      setInputs((prev) => prev.map((v, j) => (j === i ? e.target.value : v)));
-                    }}
+                    onChange={(e) =>
+                      setInputs((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+                    }
                     className="h-9 w-44 rounded-md border border-border bg-background px-3 font-mono text-xs tabular-nums outline-none placeholder:font-sans placeholder:text-muted-foreground focus:border-ring"
                     aria-invalid={balanceErrors[i] !== null}
                   />
@@ -359,19 +248,26 @@ export function InKindMintForm({
         </ul>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={fillProportional}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              // Anchor on the largest filled leg; every other leg follows the vault ratio.
+              const best = amounts.reduce<number>(
+                (best, a, i) => (a !== null && a > (amounts[best] ?? 0n) ? i : best),
+                -1,
+              );
+              if (best === -1) return;
+              const proportional = proportionalDeposits(amounts as bigint[], vaultsForCheck, best);
+              setInputs(proportional.map((a) => (a > 0n ? a.toString() : "")));
+            }}
+          >
             Fill proportional
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void refreshBalances()}>
             Refresh balances
           </Button>
         </div>
-
-        {fillNote ? (
-          <p role="note" className="text-xs leading-5 text-muted-foreground">
-            {fillNote}
-          </p>
-        ) : null}
 
         {showFaucetHint ? (
           <p className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
@@ -483,35 +379,23 @@ export function InKindMintForm({
           }
           flowState={flow.state}
           onConfirm={() => {
-            if (!publicKey || !coreKeys || !check?.ok) return;
-            const parsed = amounts as bigint[];
-            void flow.run(
-              async () => {
-                if (!needsAlt) {
-                  // n ≤ 3: legacy wire exactly as before — the flow hook adds
-                  // the compute-budget instructions.
-                  return [
-                    ...createIxs,
-                    ...buildMintInKind({
-                      keys: coreKeys,
-                      amounts: parsed,
-                      vaultBalances: vaultsForCheck,
-                    }).instructions,
-                  ];
-                }
-                // n ≥ 4: v0 through the wallet-signed lookup table.
-                const table = await ensureAlt();
-                return buildMintInKindTransaction({
-                  connection,
-                  keys: coreKeys,
-                  amounts: parsed,
-                  vaultBalances: vaultsForCheck,
-                  preInstructions: createIxs,
-                  lookupTableAddresses: [table],
-                });
-              },
-              needsAlt ? () => ensureAlt() : undefined,
-            );
+            if (!publicKey || !check?.ok) return;
+            void flow.run(() => [
+              ...createIxs,
+              ...buildMintInKind({
+                keys: {
+                  basket: new PublicKey(detail.pubkey),
+                  factory: new PublicKey(detail.factory),
+                  creator: new PublicKey(detail.creator),
+                  treasury: new PublicKey(detail.treasury),
+                  shareMint: new PublicKey(detail.share_mint),
+                  constituents: detail.constituents,
+                  user: publicKey,
+                },
+                amounts: amounts as bigint[],
+                vaultBalances: vaultsForCheck,
+              }).instructions,
+            ]);
           }}
           confirmLabel="Simulate & sign"
           endpoint={RPC_ENDPOINT}

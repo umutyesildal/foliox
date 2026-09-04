@@ -1,0 +1,206 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260904T221304371Z-25271-c1d541851951",
+  "runId": "20260904T221304371Z-25271-c1d541851951",
+  "runStatus": "inconclusive",
+  "coverage": {
+    "status": "partial",
+    "reasons": [
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "lib/create-basket.ts",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "lib/format.ts",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "lib/transactions.ts",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "lib/wallet.ts",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/create/deploy-panel.tsx",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/create/fees-editor.tsx",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/create/seed-preview.tsx",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/create/summary-rail.tsx",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/create/weights-editor.tsx",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/basket/basket-api.ts",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/basket/inkind-mint-form.tsx",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "components/basket/use-transaction-flow.ts",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "app/basket/[pubkey]/buy/page.tsx",
+        "detail": "spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "lib/create-basket.ts",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "lib/format.ts",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "lib/transactions.ts",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "lib/wallet.ts",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/create/deploy-panel.tsx",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/create/fees-editor.tsx",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/create/seed-preview.tsx",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/create/summary-rail.tsx",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/create/weights-editor.tsx",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/basket/basket-api.ts",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/basket/inkind-mint-form.tsx",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "components/basket/use-transaction-flow.ts",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "app/basket/[pubkey]/buy/page.tsx",
+        "detail": "scanner_failed: spawnSync /usr/local/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "81ec69405f9901b1120b4ef7511ee7f101e26a22",
+  "diffHash": "d5a73bc07b41c0743dac56ec1f46d9b68806317643932c8631ac6a88d94a3ec7",
+  "rulesVersion": "unavailable",
+  "sessionHash": "26eb03d190608641c96de8bec54105e9b2fbd8779decd433010c62ef152633f7",
+  "reportRef": ".mimosa/reports/task-review-sess_99d5e1ae-8f0c-496e-b70a-7604e8c6660f-20260904T221304371Z-25271-c1d541851951.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-09-04T22:13:05.839Z"
+}

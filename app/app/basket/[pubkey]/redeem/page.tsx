@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
@@ -26,7 +26,11 @@ import {
 } from "@/components/basket/basket-api";
 import {
   buildRedeemInKind,
+  buildRedeemInKindTransaction,
   deriveAta,
+  ensureMintRedeemAlt,
+  mintRedeemNeedsAlt,
+  type BasketCoreKeys,
   type ExpectedAccount,
 } from "@/lib/transactions";
 import { formatUsd, scaledFromRaw, truncateAddress } from "@/lib/format";
@@ -60,7 +64,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
   const { pubkey: rawPubkey } = use(params);
   const pubkey = decodeURIComponent(rawPubkey);
 
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const flow = useTransactionFlow();
 
@@ -182,18 +186,41 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
   }, [detail, mintTickers]);
   const headline = name ?? composition ?? truncateAddress(pubkey, 6, 6);
 
+  // n ≥ 4 baskets exceed the legacy packet limit — the redeem compiles through
+  // a wallet-signed lookup table (created once per session, reused after).
+  const coreKeys: BasketCoreKeys | null = useMemo(
+    () =>
+      publicKey && detail
+        ? {
+            basket: new PublicKey(detail.pubkey),
+            factory: new PublicKey(detail.factory),
+            creator: new PublicKey(detail.creator),
+            treasury: new PublicKey(detail.treasury),
+            shareMint: new PublicKey(detail.share_mint),
+            constituents: detail.constituents,
+            user: publicKey,
+          }
+        : null,
+    [detail, publicKey],
+  );
+  const needsAlt = mintRedeemNeedsAlt(detail?.constituents.length ?? 0);
+  const altRef = useRef<PublicKey | null>(null);
+  const ensureAlt = useCallback(async (): Promise<PublicKey> => {
+    if (altRef.current) return altRef.current;
+    if (!publicKey || !coreKeys) throw new Error("Connect a wallet first.");
+    const handle = await ensureMintRedeemAlt({
+      connection,
+      keys: coreKeys,
+      sendTransaction,
+    });
+    altRef.current = handle.lookupTableAddress;
+    return handle.lookupTableAddress;
+  }, [connection, coreKeys, publicKey, sendTransaction]);
+
   const openReview = () => {
-    if (!publicKey || !detail || shares === null || preview === null) return;
+    if (!publicKey || !coreKeys || shares === null || preview === null) return;
     const built = buildRedeemInKind({
-      keys: {
-        basket: new PublicKey(detail.pubkey),
-        factory: new PublicKey(detail.factory),
-        creator: new PublicKey(detail.creator),
-        treasury: new PublicKey(detail.treasury),
-        shareMint: new PublicKey(detail.share_mint),
-        constituents: detail.constituents,
-        user: publicKey,
-      },
+      keys: coreKeys,
       sharesToBurn: shares,
       vaultBalances: vaultBalances as bigint[],
     });
@@ -480,21 +507,27 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
             }
             flowState={flow.state}
             onConfirm={() => {
-              if (!publicKey || !detail || shares === null) return;
-              void flow.run(() =>
-                buildRedeemInKind({
-                  keys: {
-                    basket: new PublicKey(detail.pubkey),
-                    factory: new PublicKey(detail.factory),
-                    creator: new PublicKey(detail.creator),
-                    treasury: new PublicKey(detail.treasury),
-                    shareMint: new PublicKey(detail.share_mint),
-                    constituents: detail.constituents,
-                    user: publicKey,
-                  },
-                  sharesToBurn: shares,
-                  vaultBalances: vaultBalances as bigint[],
-                }).instructions,
+              if (!publicKey || !coreKeys || shares === null) return;
+              const parsed = shares;
+              void flow.run(
+                async () => {
+                  if (!needsAlt) {
+                    return buildRedeemInKind({
+                      keys: coreKeys,
+                      sharesToBurn: parsed,
+                      vaultBalances: vaultBalances as bigint[],
+                    }).instructions;
+                  }
+                  const table = await ensureAlt();
+                  return buildRedeemInKindTransaction({
+                    connection,
+                    keys: coreKeys,
+                    sharesToBurn: parsed,
+                    vaultBalances: vaultBalances as bigint[],
+                    lookupTableAddresses: [table],
+                  });
+                },
+                needsAlt ? () => ensureAlt() : undefined,
               );
             }}
             confirmLabel="Simulate & sign"

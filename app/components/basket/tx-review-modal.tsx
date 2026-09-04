@@ -177,6 +177,8 @@ function isTerminal(status: TransactionFlowState["status"]): boolean {
 
 function statusLabel(status: TransactionFlowState["status"]): string {
   switch (status) {
+    case "preparing-alt":
+      return "Preparing lookup table — approve in your wallet…";
     case "simulating":
       return "Simulating…";
     case "awaiting-signature":
@@ -202,6 +204,7 @@ function StatusLine({
           Simulation runs first — nothing is signed until the simulation passes.
         </p>
       );
+    case "preparing-alt":
     case "simulating":
     case "awaiting-signature":
     case "confirming":

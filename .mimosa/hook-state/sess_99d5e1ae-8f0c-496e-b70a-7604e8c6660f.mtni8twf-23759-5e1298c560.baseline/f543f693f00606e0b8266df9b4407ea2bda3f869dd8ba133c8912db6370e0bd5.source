@@ -610,11 +610,11 @@ export interface BuiltCreateBasketTx {
 /**
  * Build the create_basket transaction exactly as the wizard sends it.
  *
- * - n <= 3: v0 message with NO lookup tables — same wire shape as before, plus
- *   the compute-budget instructions every UI protocol tx now carries.
+ * - n <= 3: v0 message with NO lookup tables and no compute-budget
+ *   instructions — byte-identical behavior to the previous builder.
  * - n >= 4: requires `lookupTableAddresses` (call `ensureCreateBasketAlt()`
- *   first); compiles a v0 message through the tables (the 4+ constituent CPI
- *   chain exceeds the 200k CU default and the legacy packet limit).
+ *   first); compiles a v0 message through the tables with a compute-unit
+ *   limit prepended (the 4+ constituent CPI chain exceeds the 200k default).
  *
  * Throws when the result would still exceed the packet limit — honest failure
  * instead of a wallet rejection downstream.
@@ -650,10 +650,9 @@ export async function buildCreateBasketTransaction(params: {
   // wizard's tx ~48s of validity — long enough to expire while the user
   // reviews the wallet popup. Confirmed gives the full 150-slot window.
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-  // EVERY create tx gets the compute budget (limit + modest priority price) —
-  // the atomic deploy CPI chain exceeds the 200k default, and the price keeps
-  // the tx competitive on shared clusters. Mirrors scripts/lib.ts withV0Budget.
-  const instructions = [...computeBudgetInstructions(CREATE_BASKET_COMPUTE_UNITS), instruction];
+  const instructions = needsAlt
+    ? [ComputeBudgetProgram.setComputeUnitLimit({ units: CREATE_BASKET_COMPUTE_UNITS }), instruction]
+    : [instruction];
   const message = new TransactionMessage({
     payerKey: new PublicKey(creator),
     recentBlockhash: blockhash,
@@ -707,9 +706,9 @@ export interface EnsureCreateBasketAltResult {
  *    referenced indexes the executing node had not indexed yet.
  *
  * The wizard calls this BEFORE buildCreateBasketTransaction() whenever
- * `createBasketNeedsAlt()` is true. The consumer mint/redeem transactions use
- * their own table through `ensureMintRedeemAlt()` (below) with the same
- * create → poll → extend → verify contract.
+ * `createBasketNeedsAlt()` is true; both consumer transactions (mint/redeem)
+ * are unaffected — they still fit in a legacy-shaped message for the sizes the
+ * app produces today.
  */
 export async function ensureCreateBasketAlt(params: {
   connection: Connection;
@@ -723,31 +722,8 @@ export async function ensureCreateBasketAlt(params: {
   recentSlot?: number;
 }): Promise<EnsureCreateBasketAltResult> {
   const { connection, creator, args, sendTransaction, onAwaitingWallet } = params;
-  return ensureAltCovering({
-    connection,
-    authority: new PublicKey(creator),
-    addresses: deriveCreateBasketAltAddresses(creator, args),
-    sendTransaction,
-    onAwaitingWallet,
-    recentSlot: params.recentSlot,
-  });
-}
-
-/**
- * Shared create → poll-visible → extend-in-chunks → verify-converged ALT
- * provisioning. The authority (the connected wallet in the UI, the payer in the
- * e2e scripts) signs the create/extend transactions; the consumer transaction
- * never needs the authority. See ensureCreateBasketAlt for the full contract.
- */
-async function ensureAltCovering(params: {
-  connection: Connection;
-  authority: PublicKey;
-  addresses: PublicKey[];
-  sendTransaction: WalletSendTransaction;
-  onAwaitingWallet?: (awaiting: boolean) => void;
-  recentSlot?: number;
-}): Promise<EnsureCreateBasketAltResult> {
-  const { connection, authority, addresses, sendTransaction, onAwaitingWallet } = params;
+  const authority = new PublicKey(creator);
+  const addresses = deriveCreateBasketAltAddresses(creator, args);
   const recentSlot = params.recentSlot ?? (await connection.getSlot("finalized"));
   const lookupTableAddress = PublicKey.findProgramAddressSync(
     [authority.toBuffer(), borshU64(BigInt(recentSlot))],
@@ -845,251 +821,6 @@ async function ensureAltCovering(params: {
     }
   }
   return { lookupTableAddress, created, extended: missing.length };
-}
-
-// ===================== v0 + ALT + compute budget (mint/redeem) =====================
-//
-// The BUY side had the same wire problem create_basket had: mint_in_kind
-// touches 12 + 4n accounts and redeem_in_kind 12 + 3n, so a 6-constituent
-// basket blew the 1232-byte legacy packet limit on the buy page
-// ("Transaction too large: 1437 > 1232"). Same treatment as the create side,
-// proven by scripts/mintAndRedeem.ts + scripts/lib.ts sendFitting on devnet:
-// for n >= 4 the SAME instruction compiles into a v0 message whose non-signer
-// keys are 1-byte ALT indexes. The table is created/extended wallet-signed via
-// ensureMintRedeemAlt() with the same visibility-verify-then-extend contract.
-//
-// Compute budget: the program's per-constituent CPI loop (whitelist reads +
-// TransferChecked legs + possible idempotent ATA creations) exceeds the 200k
-// default at n = 6 — the owner hit ComputationalBudgetExceeded on an unbudgeted
-// tx. EVERY UI protocol transaction now carries a 500k CU limit plus a modest
-// priority price as its first instructions, matching scripts/lib.ts.
-
-/** Compute-unit limit for every UI-built protocol transaction. */
-export const UI_COMPUTE_UNIT_LIMIT = 500_000;
-/** Priority price (micro-lamports/CU) — small on devnet, keeps txs competitive. */
-export const UI_PRIORITY_PRICE_MICROLAMPORTS = 20_000;
-
-/**
- * The compute-budget instruction pair prepended to EVERY mint/redeem/create
- * transaction the UI builds (and to the flow hook's legacy path): set-limit
- * first, price second — both before the program instruction.
- */
-export function computeBudgetInstructions(
-  units: number = UI_COMPUTE_UNIT_LIMIT,
-  priceMicroLamports: number = UI_PRIORITY_PRICE_MICROLAMPORTS,
-): TransactionInstruction[] {
-  return [
-    ComputeBudgetProgram.setComputeUnitLimit({ units }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priceMicroLamports }),
-  ];
-}
-
-/**
- * Estimated serialized size of a legacy transaction carrying the WORST of
- * mint_in_kind (12 + 4n accounts) / redeem_in_kind (12 + 3n) for this many
- * constituents, INCLUDING the two compute-budget instructions the send path
- * always prepends (set-limit = [tag u8][u32] → 8B instruction, set-price =
- * [tag u8][u64] → 12B instruction).
- */
-export function estimateMintRedeemTxSize(numConstituents: number): number {
-  const accountKeys = 12 + 4 * numConstituents; // mint shape — the larger one
-  const mintData = 8 + (4 + 8 * numConstituents) * 2; // disc + Vec<u64> amounts + Vec<u64> vault
-  const redeemData = 8 + 8 + 4 + 8 * numConstituents; // disc + u64 shares + Vec<u64> vault
-  const data = Math.max(mintData, redeemData);
-  return 64 + 3 + 32 + accountKeys * 32 + 2 + 8 + 12 + 3 + data;
-}
-
-/**
- * True when a mint/redeem transaction with this many constituents must be
- * compiled through a lookup table. n >= 4 opts the whole consumer flow into
- * v0+ALT (one table per basket+wallet covers both mint and redeem); the
- * estimate is the honest fallback gate for the ≤3 paths.
- */
-export function mintRedeemNeedsAlt(numConstituents: number): boolean {
-  return (
-    numConstituents >= 4 || estimateMintRedeemTxSize(numConstituents) > PACKET_LIMIT
-  );
-}
-
-/**
- * Every address a mint_in_kind OR redeem_in_kind transaction references EXCEPT
- * the signing user — the exact payload for the consumer lookup table. Redeem's
- * 3n family is a subset of mint's 4n family (no whitelist PDAs), so one table
- * per (basket, wallet) serves both. Signers stay in the transaction's static
- * keys, so the user is excluded (also when user == creator/treasury).
- */
-export function deriveMintRedeemAltAddresses(keys: BasketCoreKeys): PublicKey[] {
-  const [vaultAuthority] = deriveVaultAuthority(keys.basket);
-  const candidates: PublicKey[] = [
-    keys.basket,
-    keys.shareMint,
-    deriveAta(keys.user, keys.shareMint),
-    vaultAuthority,
-    keys.creator,
-    deriveAta(keys.creator, keys.shareMint),
-    keys.treasury,
-    deriveAta(keys.treasury, keys.shareMint),
-    TOKEN_2022_PROGRAM_ID,
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    SystemProgram.programId,
-    BASKET_PROGRAM_ID,
-  ];
-  keys.constituents.forEach((mint) => {
-    const mintKey = new PublicKey(mint);
-    const [whitelistedPda] = deriveWhitelistedMint(mintKey);
-    candidates.push(
-      mintKey,
-      deriveAta(keys.user, mintKey),
-      deriveAta(vaultAuthority, mintKey),
-      whitelistedPda,
-    );
-  });
-  const seen = new Set<string>();
-  const out: PublicKey[] = [];
-  for (const key of candidates) {
-    if (key.equals(keys.user)) continue;
-    const base58 = key.toBase58();
-    if (!seen.has(base58)) {
-      seen.add(base58);
-      out.push(key);
-    }
-  }
-  return out;
-}
-
-/**
- * Ensure an Address Lookup Table covering every non-signer mint/redeem account
- * exists on-chain, owned by (and paid for by) the connected user wallet.
- * Wallet-signed via the same visibility-verify-then-extend contract as
- * `ensureCreateBasketAlt` — the table is polled until the on-chain read-back
- * contains ALL addresses, so a compiled message can never reference an index
- * the executing node has not indexed yet. Idempotent: once created, the table
- * is reused and only missing addresses are extended.
- */
-export async function ensureMintRedeemAlt(params: {
-  connection: Connection;
-  keys: BasketCoreKeys;
-  sendTransaction: WalletSendTransaction;
-  /** Optional hook so the UI can flip into a "preparing lookup table" phase. */
-  onAwaitingWallet?: (awaiting: boolean) => void;
-  /** Override the derivation slot (testing only — defaults to last finalized). */
-  recentSlot?: number;
-}): Promise<EnsureCreateBasketAltResult> {
-  const { connection, keys, sendTransaction, onAwaitingWallet } = params;
-  return ensureAltCovering({
-    connection,
-    authority: keys.user,
-    addresses: deriveMintRedeemAltAddresses(keys),
-    sendTransaction,
-    onAwaitingWallet,
-    recentSlot: params.recentSlot,
-  });
-}
-
-export interface BuiltMintRedeemTx {
-  transaction: VersionedTransaction;
-  blockhash: string;
-  lastValidBlockHeight: number;
-  /** Exact serialized size in bytes (zeroed signatures). */
-  sizeBytes: number;
-  /** False = the n ≤ 3 v0 message with no lookup tables. */
-  usedLookupTable: boolean;
-}
-
-/**
- * Compile a mint/redeem instruction set into the exact transaction the UI
- * sends: compute budget first, then the (optional pre-) instructions, through
- * the lookup tables when `mintRedeemNeedsAlt` says the legacy wire cannot hold
- * them. Throws when no table was provided for an n ≥ 4 basket (call
- * `ensureMintRedeemAlt()` first) or when the compiled size still exceeds the
- * packet limit — honest failure instead of a wallet rejection downstream.
- */
-async function buildMintRedeemTransaction(params: {
-  connection: Connection;
-  /** The signing wallet — must stay a static key (signer). */
-  payer: PublicKey;
-  /** The program instruction(s), optionally preceded by create-ATA ixs. */
-  mainInstructions: TransactionInstruction[];
-  numConstituents: number;
-  /** Required for n >= 4 — from ensureMintRedeemAlt(). Ignored for n <= 3. */
-  lookupTableAddresses?: PublicKey[];
-}): Promise<BuiltMintRedeemTx> {
-  const { connection, payer, mainInstructions, numConstituents } = params;
-  const needsAlt = mintRedeemNeedsAlt(numConstituents);
-  const tables: AddressLookupTableAccount[] = [];
-  if (needsAlt) {
-    const provided = params.lookupTableAddresses ?? [];
-    if (provided.length === 0) {
-      throw new Error(
-        `mint/redeem with ${numConstituents} constituents exceeds the ${PACKET_LIMIT}B packet limit — call ensureMintRedeemAlt() first and pass the lookup table address`,
-      );
-    }
-    for (const address of provided) {
-      const table = await connection.getAddressLookupTable(address);
-      if (!table.value) {
-        throw new Error(`address lookup table ${address.toBase58()} not found on ${connection.rpcEndpoint}`);
-      }
-      tables.push(table.value);
-    }
-  }
-  // Fresh CONFIRMED blockhash (see buildCreateBasketTransaction).
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-  const instructions = [...computeBudgetInstructions(), ...mainInstructions];
-  const message = new TransactionMessage({
-    payerKey: payer,
-    recentBlockhash: blockhash,
-    instructions,
-  }).compileToV0Message(tables);
-  const transaction = new VersionedTransaction(message);
-  const sizeBytes = transaction.message.serialize().length + transaction.signatures.length * 64;
-  if (sizeBytes > PACKET_LIMIT) {
-    throw new Error(
-      `serialized transaction is ${sizeBytes}B > ${PACKET_LIMIT}B — lookup-table compression was insufficient`,
-    );
-  }
-  return { transaction, blockhash, lastValidBlockHeight, sizeBytes, usedLookupTable: needsAlt };
-}
-
-/** Build the full `mint_in_kind` transaction exactly as the buy page sends it. */
-export async function buildMintInKindTransaction(params: {
-  connection: Connection;
-  keys: BasketCoreKeys;
-  amounts: bigint[];
-  vaultBalances: bigint[];
-  /** Idempotent create-ATA instructions prepended before the mint. */
-  preInstructions?: TransactionInstruction[];
-  /** Required for n >= 4 — from ensureMintRedeemAlt(). */
-  lookupTableAddresses?: PublicKey[];
-}): Promise<BuiltMintRedeemTx> {
-  const { keys, amounts, vaultBalances, preInstructions } = params;
-  const built = buildMintInKind({ keys, amounts, vaultBalances });
-  return buildMintRedeemTransaction({
-    connection: params.connection,
-    payer: keys.user,
-    mainInstructions: [...(preInstructions ?? []), ...built.instructions],
-    numConstituents: keys.constituents.length,
-    lookupTableAddresses: params.lookupTableAddresses,
-  });
-}
-
-/** Build the full `redeem_in_kind` transaction exactly as the redeem page sends it. */
-export async function buildRedeemInKindTransaction(params: {
-  connection: Connection;
-  keys: BasketCoreKeys;
-  sharesToBurn: bigint;
-  vaultBalances: bigint[];
-  /** Required for n >= 4 — from ensureMintRedeemAlt(). */
-  lookupTableAddresses?: PublicKey[];
-}): Promise<BuiltMintRedeemTx> {
-  const { keys, sharesToBurn, vaultBalances } = params;
-  const built = buildRedeemInKind({ keys, sharesToBurn, vaultBalances });
-  return buildMintRedeemTransaction({
-    connection: params.connection,
-    payer: keys.user,
-    mainInstructions: built.instructions,
-    numConstituents: keys.constituents.length,
-    lookupTableAddresses: params.lookupTableAddresses,
-  });
 }
 
 /** Bounded wait helper (jittered by callers) — no tight RPC polling. */

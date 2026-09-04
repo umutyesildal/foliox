@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
@@ -18,7 +18,11 @@ import {
 import {
   buildCreateAtaInstructions,
   buildMintInKind,
+  buildMintInKindTransaction,
   deriveAta,
+  ensureMintRedeemAlt,
+  mintRedeemNeedsAlt,
+  type BasketCoreKeys,
   type ExpectedAccount,
 } from "@/lib/transactions";
 import { truncateAddress } from "@/lib/format";
@@ -43,9 +47,40 @@ export function ZapInForm({
   detail: BasketDetail;
   vaultBalances: (bigint | null)[];
 }) {
-  const { publicKey, connected, signTransaction } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const flow = useTransactionFlow();
+
+  // n ≥ 4 baskets: the closing mint compiles through a wallet-signed lookup
+  // table (created once per session on first use).
+  const coreKeys: BasketCoreKeys | null = useMemo(
+    () =>
+      publicKey
+        ? {
+            basket: new PublicKey(detail.pubkey),
+            factory: new PublicKey(detail.factory),
+            creator: new PublicKey(detail.creator),
+            treasury: new PublicKey(detail.treasury),
+            shareMint: new PublicKey(detail.share_mint),
+            constituents: detail.constituents,
+            user: publicKey,
+          }
+        : null,
+    [detail, publicKey],
+  );
+  const needsAlt = mintRedeemNeedsAlt(detail.constituents.length);
+  const altRef = useRef<PublicKey | null>(null);
+  const ensureAlt = useCallback(async (): Promise<PublicKey> => {
+    if (altRef.current) return altRef.current;
+    if (!publicKey || !coreKeys) throw new Error("Connect a wallet first.");
+    const handle = await ensureMintRedeemAlt({
+      connection,
+      keys: coreKeys,
+      sendTransaction,
+    });
+    altRef.current = handle.lookupTableAddress;
+    return handle.lookupTableAddress;
+  }, [connection, coreKeys, publicKey, sendTransaction]);
 
   const [amountUsdc, setAmountUsdc] = useState("");
   const [slippageBps, setSlippageBps] = useState("50");
@@ -211,21 +246,13 @@ export function ZapInForm({
     }
     setMintAmounts(received);
     const built = buildMintInKind({
-      keys: {
-        basket: new PublicKey(detail.pubkey),
-        factory: new PublicKey(detail.factory),
-        creator: new PublicKey(detail.creator),
-        treasury: new PublicKey(detail.treasury),
-        shareMint: new PublicKey(detail.share_mint),
-        constituents: detail.constituents,
-        user: publicKey,
-      },
+      keys: coreKeys!,
       amounts: received,
       vaultBalances: vaultBalances.map((v) => v ?? 0n),
     });
     setExpectedAccounts(built.expectedAccounts);
     setOpen(true);
-  }, [connection, detail, publicKey, vaultBalances]);
+  }, [connection, detail, publicKey, coreKeys, vaultBalances]);
 
   const close = () => {
     setOpen(false);
@@ -415,21 +442,27 @@ export function ZapInForm({
           }
           flowState={flow.state}
           onConfirm={() => {
-            if (!publicKey || !mintAmounts) return;
-            void flow.run(() =>
-              buildMintInKind({
-                keys: {
-                  basket: new PublicKey(detail.pubkey),
-                  factory: new PublicKey(detail.factory),
-                  creator: new PublicKey(detail.creator),
-                  treasury: new PublicKey(detail.treasury),
-                  shareMint: new PublicKey(detail.share_mint),
-                  constituents: detail.constituents,
-                  user: publicKey,
-                },
-                amounts: mintAmounts,
-                vaultBalances: vaultBalances.map((v) => v ?? 0n),
-              }).instructions,
+            if (!publicKey || !coreKeys || !mintAmounts) return;
+            const parsed = mintAmounts;
+            void flow.run(
+              async () => {
+                if (!needsAlt) {
+                  return buildMintInKind({
+                    keys: coreKeys,
+                    amounts: parsed,
+                    vaultBalances: vaultBalances.map((v) => v ?? 0n),
+                  }).instructions;
+                }
+                const table = await ensureAlt();
+                return buildMintInKindTransaction({
+                  connection,
+                  keys: coreKeys,
+                  amounts: parsed,
+                  vaultBalances: vaultBalances.map((v) => v ?? 0n),
+                  lookupTableAddresses: [table],
+                });
+              },
+              needsAlt ? () => ensureAlt() : undefined,
             );
           }}
           confirmLabel="Simulate & sign"

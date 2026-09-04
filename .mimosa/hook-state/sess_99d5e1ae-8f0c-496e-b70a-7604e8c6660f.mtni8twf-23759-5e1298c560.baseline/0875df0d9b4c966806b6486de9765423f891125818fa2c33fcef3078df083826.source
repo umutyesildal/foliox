@@ -1,0 +1,27 @@
+[package]
+name = "basket_factory"
+version = "0.1.0"
+description = "FolioX basket factory — deploys immutable baskets with atomic seed"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "basket_factory"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+# `cpi` (=> no-entrypoint) suppresses the entrypoint!/global-allocator codegen
+# in these library builds, so basket_factory's own entrypoint does not
+# conflict — the deployed whitelist/basket programs are built independently and
+# are unaffected.
+whitelist = { path = "../whitelist", features = ["cpi"] }
+basket = { path = "../basket", features = ["cpi"] }

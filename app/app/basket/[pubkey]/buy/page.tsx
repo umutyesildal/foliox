@@ -279,7 +279,7 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
             hidden={tab !== "inkind"}
           >
             {tab === "inkind" ? (
-              <InKindMintForm detail={detail} vaultBalances={vaultBalances} />
+              <InKindMintForm detail={detail} vaultBalances={vaultBalances} onSuccess={retry} />
             ) : null}
           </div>
           <div
@@ -290,7 +290,7 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
             hidden={tab !== "zap"}
           >
             {tab === "zap" ? (
-              <ZapInForm detail={detail} vaultBalances={vaultBalances} />
+              <ZapInForm detail={detail} vaultBalances={vaultBalances} onSuccess={retry} />
             ) : null}
           </div>
         </>

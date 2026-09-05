@@ -12,6 +12,7 @@
     "e2e": "bash scripts/e2e.sh",
     "faucet": "tsx --tsconfig app/tsconfig.json scripts/faucet.ts",
     "proof:buyflow": "tsx --tsconfig app/tsconfig.json scripts/verifyBuyFlow.ts",
+    "proof:retryflow": "tsx --tsconfig app/tsconfig.json scripts/verifyRetryFlow.ts",
     "lint": "cargo clippy"
   },
   "dependencies": {

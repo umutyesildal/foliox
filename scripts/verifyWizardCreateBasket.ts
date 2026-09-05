@@ -264,11 +264,14 @@ async function main() {
     const { built, result } = await simulateLikeWizard("2-constituent", args, null);
     if (built.usedLookupTable) throw new Error("2-constituent tx unexpectedly used a lookup table");
     // MessageV0 exposes compiledInstructions (index-referenced) — a compiled
-    // v0 message never carries the legacy `instructions` property.
+    // v0 message never carries the legacy `instructions` property. Since the
+    // buy/redeem v0+ALT wave, EVERY create tx (legacy-shaped included) carries
+    // the compute-budget pair first: [setComputeUnitLimit, setComputeUnitPrice,
+    // create_basket] — 3 instructions, no lookup tables on this path.
     const compiled = built.transaction.message as { compiledInstructions?: unknown[]; addressTableLookups?: unknown[] };
-    if ((compiled.compiledInstructions ?? []).length !== 1) {
+    if ((compiled.compiledInstructions ?? []).length !== 3) {
       throw new Error(
-        `legacy path must carry exactly one instruction, got ${compiled.compiledInstructions?.length}`,
+        `legacy path must carry the compute-budget pair + create_basket (3 instructions), got ${compiled.compiledInstructions?.length}`,
       );
     }
     if ((compiled.addressTableLookups ?? []).length !== 0) {

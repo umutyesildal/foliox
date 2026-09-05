@@ -15,6 +15,8 @@
  * The pure functions here are unit-testable with vitest as-is.
  */
 
+import { RpcRetriesExhaustedError } from "@/lib/rpc-retry";
+
 export type ClusterLabel =
   | "localnet"
   | "devnet"
@@ -168,14 +170,26 @@ export function isRateLimitError(error: unknown): boolean {
 
 /**
  * Calm inline copy for rate-limit errors — the honest state: the public
- * cluster is throttling shared traffic and web3.js retries automatically.
+ * cluster is throttling shared traffic, and every transaction-flow RPC call is
+ * wrapped in the shared backoff loop (lib/rpc-retry withRetry: 6 attempts,
+ * 2s→4s→8s→16s→30s) before an error like this can surface at all.
  */
 export function describeRpcRateLimit(endpoint: string = RPC_ENDPOINT): string {
-  return `devnet public RPC is rate-limited — retrying automatically (${endpoint}). This usually clears in a few seconds; no action needed.`;
+  return `The public RPC (${endpoint}) is rate-limiting shared traffic (429). The app retries with backoff automatically; this usually clears within a minute — no action needed.`;
 }
 
-/** Map a thrown error to display text: calm copy for 429s, raw otherwise. */
+/**
+ * Map a thrown error to display text: typed exhausted-retry copy first (its
+ * message already carries the real next action — never rewrite it back to
+ * "retrying automatically"), then calm copy for 429s, raw otherwise.
+ */
 export function describeRpcError(err: unknown): string {
+  if (
+    err instanceof Error &&
+    (err.name === "RpcRetriesExhaustedError" || err instanceof RpcRetriesExhaustedError)
+  ) {
+    return err.message;
+  }
   if (isRateLimitError(err)) return describeRpcRateLimit();
   return err instanceof Error ? err.message : String(err);
 }

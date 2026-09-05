@@ -593,6 +593,85 @@ export async function userPortfolio(db: PgLike, user: string): Promise<{ status:
   return { status: 200, payload: { data, count: data.length, source: "onchain-indexed" } };
 }
 
+/**
+ * Static SQL for GET /positions?wallet= — one literal, every dynamic value a
+ * bound parameter. Joins user_positions with baskets (symbol from off-chain
+ * metadata when present) and the latest nav_snapshots.share_price; value_usd
+ * is computed IN POSTGRES from the raw balance × share_price (exact NUMERIC —
+ * never a JS-number product). share_price = nav / supply_raw, i.e. USD per
+ * raw base unit, matching cost_basis units in indexer/positions.ts.
+ */
+const POSITIONS_BY_WALLET_SQL = `
+  SELECT up.basket,
+         b.metadata_json->>'symbol' AS basket_symbol,
+         up.share_balance::text AS share_balance,
+         up.cost_basis::text AS cost_basis,
+         up.cost_basis_source AS cost_basis_source,
+         sp.share_price::text AS share_price,
+         sp.ts AS share_price_as_of,
+         (up.share_balance * sp.share_price)::text AS value_usd,
+         up.updated_at
+  FROM user_positions up
+  JOIN baskets b ON b.pubkey = up.basket
+  LEFT JOIN LATERAL (
+    SELECT share_price, ts FROM nav_snapshots WHERE basket = up.basket ORDER BY ts DESC LIMIT 1
+  ) sp ON true
+  WHERE up."user" = $1
+  ORDER BY up.basket`;
+
+export interface WalletPositionItem {
+  basket: string;
+  /** Display symbol from baskets.metadata_json (null when metadata is absent). */
+  basketSymbol: string | null;
+  /** Raw u64 base units as a decimal string (integer-safe). */
+  shareBalance: string;
+  /** Latest nav_snapshots.share_price (USD per raw unit) or null (no NAV yet). */
+  sharePrice: string | null;
+  /** share_balance × share_price, exact NUMERIC string, or null (no NAV yet). */
+  valueUsd: string | null;
+  /** Event-derived cost basis (USD) or null when unknown. */
+  costBasis: string | null;
+  /** cost_basis provenance: 'reference' | 'balance-sync' | null (unknown). */
+  source: string | null;
+  /** Freshness of sharePrice. */
+  sharePriceAsOf: string | null;
+}
+
+/**
+ * GET /positions?wallet= — the "did my tx land" Portfolio source of truth:
+ * the wallet's user_positions (kept reconciled to chain by the indexer's
+ * positions sync) joined with basket symbols + current NAV share price.
+ * Static SQL + bound params only.
+ */
+export async function userPositionsByWallet(
+  db: PgLike,
+  wallet: string,
+): Promise<{ status: number; payload: unknown }> {
+  const res = await db.query(POSITIONS_BY_WALLET_SQL, [wallet]);
+  const rows = res.rows as Array<Record<string, unknown>>;
+  const data: WalletPositionItem[] = rows.map((r) => ({
+    basket: r.basket as string,
+    basketSymbol: (r.basket_symbol as string | null) ?? null,
+    shareBalance: r.share_balance as string,
+    sharePrice: (r.share_price as string | null) ?? null,
+    valueUsd: (r.value_usd as string | null) ?? null,
+    costBasis: (r.cost_basis as string | null) ?? null,
+    source: (r.cost_basis_source as string | null) ?? null,
+    sharePriceAsOf: r.share_price_as_of ? new Date(r.share_price_as_of as string).toISOString() : null,
+  }));
+  return {
+    status: 200,
+    payload: {
+      data,
+      count: data.length,
+      wallet,
+      asOf: new Date().toISOString(),
+      source: "onchain-indexed",
+      note: "share_balance is reconciled to on-chain token accounts by the indexer positions sync; an empty list means this wallet has no live positions on indexed baskets.",
+    },
+  };
+}
+
 /** GET /health — indexer lag, last slot, holdings staleness (spec §8). */
 export async function healthReport(
   db: PgLike | null,
@@ -871,6 +950,35 @@ export function createHandler(ctx: ApiContext = { db: null }) {
         sendJson(res, out.status, out.payload);
       } catch (err) {
         sendError(res, 503, "DB_UNAVAILABLE", err instanceof Error ? err.message : "portfolio query failed");
+      }
+      return;
+    }
+
+    // --- Positions by wallet ("did my tx land" — Portfolio source of truth) ---
+    // GET /api/v1/positions?wallet=<pubkey>
+    if (pathname === "/api/v1/positions" && req.method === "GET") {
+      const db = await resolveDb(ctx);
+      if (!isPgLike(db)) { sendError(res, 503, "DB_UNAVAILABLE", "no Postgres configured — indexed position data is unavailable (never fabricated)"); return; }
+      // Canonicalize + guard (400) before dispatch — same trust boundary as
+      // the basket routes: only canonical base58 reaches the DB layer.
+      const walletRaw = url.searchParams.get("wallet");
+      let wallet: string;
+      try {
+        if (!walletRaw) throw new Error("missing wallet");
+        wallet = new PublicKey(decodeURIComponent(walletRaw)).toBase58();
+      } catch {
+        sendError(res, 400, "INVALID_PUBKEY", `wallet query parameter must be a valid Solana pubkey${walletRaw ? `: ${walletRaw.slice(0, 64)}` : " (missing)"}`);
+        return;
+      }
+      if (!isValidPubkey(wallet)) {
+        sendError(res, 400, "INVALID_PUBKEY", `wallet query parameter must be a valid Solana pubkey: ${wallet}`);
+        return;
+      }
+      try {
+        const out = await userPositionsByWallet(db, wallet);
+        sendJson(res, out.status, out.payload);
+      } catch (err) {
+        sendError(res, 503, "DB_UNAVAILABLE", err instanceof Error ? err.message : "positions query failed");
       }
       return;
     }

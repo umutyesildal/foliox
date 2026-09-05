@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState, ErrorState, FreshnessBadge } from "@/components/states";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
+import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import { formatRawShares6 } from "@/components/basket/basket-math";
 import {
   fetchZapInQuote,
@@ -20,13 +21,12 @@ import {
   buildMintInKind,
   buildMintInKindTransaction,
   deriveAta,
-  ensureMintRedeemAlt,
-  mintRedeemNeedsAlt,
   type BasketCoreKeys,
   type ExpectedAccount,
 } from "@/lib/transactions";
 import { truncateAddress } from "@/lib/format";
-import { RPC_ENDPOINT } from "@/lib/wallet";
+import { withRetry, withRetryOnce } from "@/lib/rpc-retry";
+import { RPC_ENDPOINT, describeRpcError, describeWalletError } from "@/lib/wallet";
 
 const JUPITER_SWAP_URL = "https://quote-api.jup.ag/v6/swap";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // backend default (quotes.ts)
@@ -43,16 +43,19 @@ type Phase = "idle" | "quoting" | "quoted" | "swapping" | "ready-to-mint" | "don
 export function ZapInForm({
   detail,
   vaultBalances,
+  onSuccess,
 }: {
   detail: BasketDetail;
   vaultBalances: (bigint | null)[];
+  /** Called after a confirmed closing mint so the page can refetch detail. */
+  onSuccess?: () => void;
 }) {
-  const { publicKey, connected, signTransaction, sendTransaction } = useWallet();
+  const { publicKey, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
   const flow = useTransactionFlow();
 
   // n ≥ 4 baskets: the closing mint compiles through a wallet-signed lookup
-  // table (created once per session on first use).
+  // table — prepared in the background (shared with the in-kind form's table).
   const coreKeys: BasketCoreKeys | null = useMemo(
     () =>
       publicKey
@@ -68,19 +71,8 @@ export function ZapInForm({
         : null,
     [detail, publicKey],
   );
-  const needsAlt = mintRedeemNeedsAlt(detail.constituents.length);
-  const altRef = useRef<PublicKey | null>(null);
-  const ensureAlt = useCallback(async (): Promise<PublicKey> => {
-    if (altRef.current) return altRef.current;
-    if (!publicKey || !coreKeys) throw new Error("Connect a wallet first.");
-    const handle = await ensureMintRedeemAlt({
-      connection,
-      keys: coreKeys,
-      sendTransaction,
-    });
-    altRef.current = handle.lookupTableAddress;
-    return handle.lookupTableAddress;
-  }, [connection, coreKeys, publicKey, sendTransaction]);
+  const prewarm = useAltPrewarm(coreKeys);
+  const needsAlt = prewarm.needsAlt;
 
   const [amountUsdc, setAmountUsdc] = useState("");
   const [slippageBps, setSlippageBps] = useState("50");
@@ -141,7 +133,10 @@ export function ZapInForm({
     await Promise.all(
       detail.constituents.map(async (mint, i) => {
         try {
-          await connection.getTokenAccountBalance(deriveAta(publicKey, new PublicKey(mint)));
+          await withRetryOnce(
+            () => connection.getTokenAccountBalance(deriveAta(publicKey, new PublicKey(mint))),
+            "token balance read",
+          );
         } catch {
           missing.push(i);
         }
@@ -149,7 +144,10 @@ export function ZapInForm({
     );
     if (missing.length > 0) {
       try {
-        const blockhash = await connection.getLatestBlockhash("confirmed");
+        const blockhash = await withRetry(
+          () => connection.getLatestBlockhash("confirmed"),
+          { label: "blockhash read" },
+        );
         const tx = new Transaction({
           feePayer: publicKey,
           blockhash: blockhash.blockhash,
@@ -163,16 +161,25 @@ export function ZapInForm({
           ),
         );
         const signed = await signTransaction(tx);
-        const signature = await connection.sendRawTransaction(signed.serialize());
-        await connection.confirmTransaction(
-          { signature, blockhash: blockhash.blockhash, lastValidBlockHeight: blockhash.lastValidBlockHeight },
-          "confirmed",
+        // Re-sending is safe: an identical signed transaction dedups on-cluster.
+        const signature = await withRetry(
+          () => connection.sendRawTransaction(signed.serialize()),
+          { label: "ATA prepare send" },
+        );
+        await withRetry(
+          () =>
+            connection.confirmTransaction(
+              { signature, blockhash: blockhash.blockhash, lastValidBlockHeight: blockhash.lastValidBlockHeight },
+              "confirmed",
+            ),
+          { label: "ATA prepare confirm" },
         );
       } catch (err) {
+        const reason = describeWalletError(
+          err as { name?: string; message?: string } | null,
+        );
         setSwapWarning(
-          `Prepare step failed: ${
-            err instanceof Error ? err.message : "unknown error"
-          }. Nothing was swapped.`,
+          `Prepare step failed: ${reason} Nothing was swapped, your funds are safe. Press "Execute ${quote.legs.length} swap legs" to retry.`,
         );
         setPhase("quoted");
         return;
@@ -205,16 +212,24 @@ export function ZapInForm({
           Uint8Array.from(atob(payload.swapTransaction), (c) => c.charCodeAt(0)),
         );
         const signed = await signTransaction(swapTx);
-        const signature = await connection.sendRawTransaction(signed.serialize());
-        const confirmed = await connection.confirmTransaction(signature, "confirmed");
+        // Re-sending is safe: an identical signed transaction dedups on-cluster.
+        const signature = await withRetry(
+          () => connection.sendRawTransaction(signed.serialize()),
+          { label: `swap leg ${i + 1} send` },
+        );
+        const confirmed = await withRetry(
+          () => connection.confirmTransaction(signature, "confirmed"),
+          { label: `swap leg ${i + 1} confirm` },
+        );
         if (confirmed.value.err) throw new Error(`leg ${i + 1} failed on-chain`);
         setLegStates((prev) => prev.map((s, j) => (j === i ? "confirmed" : s)));
       } catch (err) {
         setLegStates((prev) => prev.map((s, j) => (j === i ? "failed" : s)));
+        const reason = describeWalletError(
+          err as { name?: string; message?: string } | null,
+        );
         setSwapWarning(
-          `Leg ${i + 1} did not complete: ${
-            err instanceof Error ? err.message : "unknown error"
-          }. The zap is sequential and non-atomic — you may be holding intermediate tokens. No funds are lost, but continuing requires extra transactions.`,
+          `Leg ${i + 1} did not complete: ${reason} The zap is sequential and non-atomic — you may be holding intermediate tokens. No funds are lost, but continuing requires extra transactions.`,
         );
         setPhase("quoted");
         return;
@@ -229,8 +244,9 @@ export function ZapInForm({
     const received = await Promise.all(
       detail.constituents.map(async (mint) => {
         try {
-          const res = await connection.getTokenAccountBalance(
-            deriveAta(publicKey, new PublicKey(mint)),
+          const res = await withRetryOnce(
+            () => connection.getTokenAccountBalance(deriveAta(publicKey, new PublicKey(mint))),
+            "token balance read",
           );
           return BigInt(res.value.amount);
         } catch {
@@ -257,6 +273,40 @@ export function ZapInForm({
   const close = () => {
     setOpen(false);
     flow.reset();
+  };
+
+  /**
+   * Start (or Retry) the closing mint. Re-invocable after a failure: the
+   * lookup table is cached and re-verified on-chain, so a retry never re-asks
+   * approvals for an existing table. Shares the background pre-warm's
+   * preparation — no duplicate approvals.
+   */
+  const startMint = () => {
+    if (!publicKey || !coreKeys || !mintAmounts) return;
+    const parsed = mintAmounts;
+    void flow.run(
+      async () => {
+        if (!needsAlt) {
+          return buildMintInKind({
+            keys: coreKeys,
+            amounts: parsed,
+            vaultBalances: vaultBalances.map((v) => v ?? 0n),
+          }).instructions;
+        }
+        const table = await prewarm.ensureAlt();
+        return buildMintInKindTransaction({
+          connection,
+          keys: coreKeys,
+          amounts: parsed,
+          vaultBalances: vaultBalances.map((v) => v ?? 0n),
+          lookupTableAddresses: [table],
+        });
+      },
+      needsAlt ? () => prewarm.ensureAlt() : undefined,
+      {
+        onComplete: () => onSuccess?.(),
+      },
+    );
   };
 
   const supply = detail.nav?.supply;
@@ -441,32 +491,16 @@ export function ZapInForm({
             </dl>
           }
           flowState={flow.state}
-          onConfirm={() => {
-            if (!publicKey || !coreKeys || !mintAmounts) return;
-            const parsed = mintAmounts;
-            void flow.run(
-              async () => {
-                if (!needsAlt) {
-                  return buildMintInKind({
-                    keys: coreKeys,
-                    amounts: parsed,
-                    vaultBalances: vaultBalances.map((v) => v ?? 0n),
-                  }).instructions;
-                }
-                const table = await ensureAlt();
-                return buildMintInKindTransaction({
-                  connection,
-                  keys: coreKeys,
-                  amounts: parsed,
-                  vaultBalances: vaultBalances.map((v) => v ?? 0n),
-                  lookupTableAddresses: [table],
-                });
-              },
-              needsAlt ? () => ensureAlt() : undefined,
-            );
-          }}
+          onConfirm={startMint}
+          onRetry={startMint}
           confirmLabel="Simulate & sign"
           endpoint={RPC_ENDPOINT}
+          successLine={
+            quote && /^\d+$/.test(quote.expectedShares?.trim() ?? "")
+              ? `🎉 Done — +${formatRawShares6(BigInt(quote.expectedShares!.trim()))} shares`
+              : "🎉 Done"
+          }
+          setupProgress={prewarm.setupProgress}
           errorSlot={
             flow.state.mintPaused ? (
               <div

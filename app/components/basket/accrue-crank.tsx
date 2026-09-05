@@ -77,6 +77,12 @@ export function AccrueCrankButton({
     flow.reset();
   };
 
+  /** Start (or Retry) the crank — re-invocable after a transient failure. */
+  const startCrank = () => {
+    if (!keys) return;
+    void flow.run(() => buildAccrueManagementFee(keys).instructions);
+  };
+
   const elapsedLabel =
     secondsSinceAccrual === null
       ? null
@@ -112,15 +118,14 @@ export function AccrueCrankButton({
         open={open}
         onClose={close}
         title="Accrue management fee"
-        description="Permissionless crank: streams the management fee since the last checkpoint (share dilution, minted 90/10 to creator/treasury). The caller only pays possible ATA rent."
+        description="Streams the management fee since the last checkpoint — you only pay possible ATA rent."
         accounts={expectedAccounts ?? []}
         flowState={flow.state}
-        onConfirm={() => {
-          if (!keys) return;
-          void flow.run(() => buildAccrueManagementFee(keys).instructions);
-        }}
+        onConfirm={startCrank}
+        onRetry={startCrank}
         confirmLabel="Simulate & sign"
         endpoint={RPC_ENDPOINT}
+        successLine="🎉 Done — fee accrued"
       />
     </>
   );

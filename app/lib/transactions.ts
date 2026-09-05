@@ -38,6 +38,7 @@ import {
   ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
+  Transaction,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
@@ -51,6 +52,7 @@ import {
 import { Buffer } from "buffer";
 
 import { CREATE_BASKET_COMPUTE_UNITS, buildCreateBasketInstruction, deriveCreateBasketPdas, estimateCreateBasketTxSize, type CreateBasketArgs } from "@/lib/create-basket";
+import { withRetry, withRetryOnce } from "@/lib/rpc-retry";
 
 /**
  * UTF-8 seed bytes (stand-in for Buffer.from so no Buffer global/polyfill is
@@ -558,6 +560,16 @@ export function createBasketNeedsAlt(numConstituents: number): boolean {
  * Every address a create_basket transaction references EXCEPT the creator —
  * the exact payload for the wizard's lookup table. Signers (the creator/payer)
  * must stay in the transaction's static keys, so they are excluded here.
+ *
+ * Compression contract (the 1283B regression fix): EVERY non-signer account
+ * the instruction can touch goes into the table — every PDA (factory, basket,
+ * share mint, vault authority, creator share ATA, per-constituent whitelist
+ * PDAs + ATAs) AND every program id (factory, whitelist, basket, Token-2022,
+ * ATA program, system, compute budget). web3.js keeps invoked program ids
+ * static during compile, but a complete table is what lets the build path
+ * PROVE coverage (buildCreateBasketTransaction refuses to compile against a
+ * table that is missing any wanted address — the partial-table read that
+ * measured 1283B).
  */
 export function deriveCreateBasketAltAddresses(
   creator: string,
@@ -566,15 +578,21 @@ export function deriveCreateBasketAltAddresses(
   const pda = deriveCreateBasketPdas(creator, args);
   const creatorKey = new PublicKey(creator);
   const candidates: PublicKey[] = [
+    // program ids first — the instruction's own program, the CPI target, both
+    // token programs, system and the compute-budget program prepended to the tx
+    FACTORY_PROGRAM_ID,
+    WHITELIST_PROGRAM_ID,
+    BASKET_PROGRAM_ID,
+    TOKEN_2022_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    SystemProgram.programId,
+    ComputeBudgetProgram.programId,
+    // then every PDA
     pda.factory,
     pda.basket,
     pda.shareMint,
     pda.vaultAuthority,
     pda.creatorShareAta,
-    TOKEN_2022_PROGRAM_ID,
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    SystemProgram.programId,
-    BASKET_PROGRAM_ID,
   ];
   args.constituents.forEach((mint, i) => {
     candidates.push(
@@ -616,8 +634,14 @@ export interface BuiltCreateBasketTx {
  *   first); compiles a v0 message through the tables (the 4+ constituent CPI
  *   chain exceeds the 200k CU default and the legacy packet limit).
  *
- * Throws when the result would still exceed the packet limit — honest failure
- * instead of a wallet rejection downstream.
+ * HARDENING (the 1283B regression): before compiling, every provided table is
+ * read back and PROVEN to contain every non-signer address the instruction
+ * touches. A load-balanced public RPC can serve a stale table that is missing
+ * the most recent extension chunk; compiling against it silently leaves ~20
+ * keys as 32-byte static entries (measured in the field: 1283B > 1232B).
+ * The read is retried with jittered backoff until coverage converges; if the
+ * compiled size STILL exceeds the packet limit the build throws with an
+ * honest "use fewer constituents" message — never a silent failure.
  */
 export async function buildCreateBasketTransaction(params: {
   connection: Connection;
@@ -637,19 +661,43 @@ export async function buildCreateBasketTransaction(params: {
         `create_basket with ${args.constituents.length} constituents exceeds the ${PACKET_LIMIT}B packet limit — call ensureCreateBasketAlt() first and pass the lookup table address`,
       );
     }
+    // Every non-signer key the instruction touches must sit in a table.
+    const wanted = deriveCreateBasketAltAddresses(creator, args).map((k) => k.toBase58());
     for (const address of provided) {
-      const table = await connection.getAddressLookupTable(address);
-      if (!table.value) {
-        throw new Error(`address lookup table ${address.toBase58()} not found on ${connection.rpcEndpoint}`);
+      let table: AddressLookupTableAccount | null = null;
+      let missingCount = wanted.length;
+      // A stale RPC node can serve a table missing the last extension chunk —
+      // retry the READ until the on-chain content covers every wanted address.
+      for (let attempt = 0; attempt < 8 && missingCount > 0; attempt++) {
+        if (attempt > 0) {
+          await sleepMs(750 + Math.floor(Math.random() * 750));
+        }
+        const fetched = await withRetry(() => connection.getAddressLookupTable(address), {
+          label: "create_basket build: lookup table read",
+        });
+        if (!fetched.value) {
+          throw new Error(`address lookup table ${address.toBase58()} not found on ${connection.rpcEndpoint}`);
+        }
+        table = fetched.value;
+        const covered = new Set(table.state.addresses.map((k) => k.toBase58()));
+        missingCount = wanted.filter((k) => !covered.has(k)).length;
       }
-      tables.push(table.value);
+      if (!table || missingCount > 0) {
+        throw new Error(
+          `lookup table ${address.toBase58()} is missing ${missingCount} of ${wanted.length} create_basket addresses — the table has not fully propagated; try again in a moment`,
+        );
+      }
+      tables.push(table);
     }
   }
   // Fresh CONFIRMED blockhash (same as scripts/lib.ts sendFitting): a
   // finalized-blockhash is already ~32 slots old when fetched, which left the
   // wizard's tx ~48s of validity — long enough to expire while the user
   // reviews the wallet popup. Confirmed gives the full 150-slot window.
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  const { blockhash, lastValidBlockHeight } = await withRetry(
+    () => connection.getLatestBlockhash(),
+    { label: "create_basket build: blockhash read" },
+  );
   // EVERY create tx gets the compute budget (limit + modest priority price) —
   // the atomic deploy CPI chain exceeds the 200k default, and the price keeps
   // the tx competitive on shared clusters. Mirrors scripts/lib.ts withV0Budget.
@@ -664,9 +712,14 @@ export async function buildCreateBasketTransaction(params: {
   // required signer (VersionedTransaction.serialize() takes no args in the
   // web3.js version the app resolves).
   const sizeBytes = transaction.message.serialize().length + transaction.signatures.length * 64;
+  // Log the real wire size before the wallet is ever asked to sign.
+  console.info(
+    `[foliox] create_basket wire size: ${sizeBytes}B / ${PACKET_LIMIT}B limit ` +
+      `(constituents: ${args.constituents.length}, lookup table: ${needsAlt ? `${tables.length} table(s)` : "none"})`,
+  );
   if (sizeBytes > PACKET_LIMIT) {
     throw new Error(
-      `serialized create_basket transaction is ${sizeBytes}B > ${PACKET_LIMIT}B — lookup-table compression was insufficient`,
+      `serialized create_basket transaction is ${sizeBytes}B > ${PACKET_LIMIT}B even with lookup-table compression — this basket has too many constituents for one transaction; create it with fewer constituents`,
     );
   }
   return { transaction, blockhash, lastValidBlockHeight, sizeBytes, usedLookupTable: needsAlt };
@@ -684,6 +737,30 @@ export interface EnsureCreateBasketAltResult {
   created: boolean;
   /** How many addresses were newly extended into the table. */
   extended: number;
+  /** The derivation slot — the caller's cache key for reuse across remounts. */
+  recentSlot: number;
+  /** How many wallet approvals the setup consumed (0 when fully prepared). */
+  approvals: number;
+}
+
+/**
+ * Module-level (per browser tab) cache of wallet-owned lookup tables, keyed
+ * "user:basket" (mint/redeem) or "creator:CREATE:<addresses hash>" (create
+ * wizard) → the recent slot each table derives from. Survives client-side page
+ * remounts, so pressing Retry after a mid-flow failure re-derives the SAME
+ * table address; ensureAltCovering then reads the on-chain table, finds full
+ * coverage, and skips create/extend entirely — no new wallet approvals. A
+ * stale entry is harmless: coverage is always re-verified on-chain and only
+ * genuinely missing addresses are ever extended.
+ */
+const ALT_CACHE = new Map<string, number>();
+
+function altCacheKey(kind: "mint-redeem", user: string, basket: string): string;
+function altCacheKey(kind: "create", creator: string, addresses: PublicKey[]): string;
+function altCacheKey(kind: string, a: string, b: string | PublicKey[]): string {
+  return kind === "mint-redeem"
+    ? `mint-redeem:${a}:${b}`
+    : `create:${a}:${(b as PublicKey[]).map((k) => k.toBase58()).join(",")}`;
 }
 
 /**
@@ -719,25 +796,40 @@ export async function ensureCreateBasketAlt(params: {
   sendTransaction: WalletSendTransaction;
   /** Optional hook so the UI can flip into an "awaiting wallet" phase. */
   onAwaitingWallet?: (awaiting: boolean) => void;
+  /** Setup progress for the UI: called once per wallet approval ("Setup 1/2"). */
+  onProgress?: (step: number, total: number) => void;
   /** Override the derivation slot (testing only — defaults to last finalized). */
   recentSlot?: number;
 }): Promise<EnsureCreateBasketAltResult> {
   const { connection, creator, args, sendTransaction, onAwaitingWallet } = params;
+  const addresses = deriveCreateBasketAltAddresses(creator, args);
+  const cacheKey = altCacheKey("create", creator, addresses);
   return ensureAltCovering({
     connection,
     authority: new PublicKey(creator),
-    addresses: deriveCreateBasketAltAddresses(creator, args),
+    addresses,
     sendTransaction,
     onAwaitingWallet,
-    recentSlot: params.recentSlot,
+    onProgress: params.onProgress,
+    recentSlot:
+      params.recentSlot ??
+      ALT_CACHE.get(cacheKey),
+    onResolved: (resolved) => ALT_CACHE.set(cacheKey, resolved),
   });
 }
 
 /**
- * Shared create → poll-visible → extend-in-chunks → verify-converged ALT
- * provisioning. The authority (the connected wallet in the UI, the payer in the
- * e2e scripts) signs the create/extend transactions; the consumer transaction
- * never needs the authority. See ensureCreateBasketAlt for the full contract.
+ * Shared decide-first → batch-send → verify-converged ALT provisioning. The
+ * create and the first extension share one transaction when they fit the
+ * packet limit, so a first-time basket costs the wallet ONE approval for most
+ * basket sizes (two at most); the authority (the connected wallet in the UI,
+ * the payer in the e2e scripts) signs the setup, and the consumer transaction
+ * never needs it. See ensureCreateBasketAlt for the full contract.
+ *
+ * Every RPC read here (slot, account existence, table read-back) runs through
+ * the shared withRetry loop, so a devnet 429 inside ALT preparation waits out
+ * the throttle instead of ending the flow after the user already approved the
+ * create/extend transactions.
  */
 async function ensureAltCovering(params: {
   connection: Connection;
@@ -746,9 +838,15 @@ async function ensureAltCovering(params: {
   sendTransaction: WalletSendTransaction;
   onAwaitingWallet?: (awaiting: boolean) => void;
   recentSlot?: number;
+  /** Called with the derivation slot once the table is verified — cache me. */
+  onResolved?: (recentSlot: number) => void;
+  /** Setup progress for the UI: "Setup {step}/{total}" — one event per wallet approval. */
+  onProgress?: (step: number, total: number) => void;
 }): Promise<EnsureCreateBasketAltResult> {
   const { connection, authority, addresses, sendTransaction, onAwaitingWallet } = params;
-  const recentSlot = params.recentSlot ?? (await connection.getSlot("finalized"));
+  const recentSlot =
+    params.recentSlot ??
+    (await withRetry(() => connection.getSlot("finalized"), { label: "lookup table: fetch recent slot" }));
   const lookupTableAddress = PublicKey.findProgramAddressSync(
     [authority.toBuffer(), borshU64(BigInt(recentSlot))],
     AddressLookupTableProgram.programId,
@@ -759,9 +857,24 @@ async function ensureAltCovering(params: {
     if (!uniqueWanted.some((w) => w.equals(a))) uniqueWanted.push(a);
   }
 
-  let created = false;
-  if (!(await connection.getAccountInfo(lookupTableAddress))) {
-    const [createIx, derived] = AddressLookupTableProgram.createLookupTable({
+  const readTableAddresses = async (): Promise<PublicKey[]> => {
+    const table = await withRetry(
+      () => connection.getAddressLookupTable(lookupTableAddress),
+      { label: "lookup table: read-back" },
+    );
+    return table.value ? [...table.value.state.addresses] : [];
+  };
+
+  // ---- decide the management instructions BEFORE signing anything ----
+  // The create and the first extend ride the SAME transaction when they fit
+  // the packet limit, so first-time-on-a-basket costs ONE approval for most
+  // baskets (two at most) instead of three mysterious ones.
+  let createIx: TransactionInstruction | null = null;
+  const needsCreate = !(
+    await withRetry(() => connection.getAccountInfo(lookupTableAddress), { label: "lookup table: existence read" })
+  );
+  if (needsCreate) {
+    const [ix, derived] = AddressLookupTableProgram.createLookupTable({
       authority,
       payer: authority,
       recentSlot,
@@ -771,19 +884,60 @@ async function ensureAltCovering(params: {
         `lookup table derivation mismatch: ${derived.toBase58()} != ${lookupTableAddress.toBase58()}`,
       );
     }
-    await sendWithWallet(
-      connection,
-      sendTransaction,
-      [createIx],
-      authority,
-      onAwaitingWallet,
+    createIx = ix;
+  }
+
+  const haveBefore = createIx ? [] : await readTableAddresses();
+  const missing = uniqueWanted.filter((a) => !haveBefore.some((h) => h.equals(a)));
+  const extendIxs: TransactionInstruction[] = [];
+  for (let i = 0; i < missing.length; i += 20) {
+    extendIxs.push(
+      AddressLookupTableProgram.extendLookupTable({
+        payer: authority,
+        authority,
+        lookupTable: lookupTableAddress,
+        addresses: missing.slice(i, i + 20),
+      }),
     );
-    created = true;
-    // The table account must be visible before it can be extended or compiled
-    // against — poll (mirrors scripts/lib.ts getOrCreateAlt).
+  }
+
+  // ---- pack [create, extends...] into the fewest packet-safe transactions ----
+  const groups: TransactionInstruction[][] = [];
+  if (createIx || extendIxs.length > 0) {
+    let current: TransactionInstruction[] = [];
+    for (const ix of [createIx, ...extendIxs].filter((ix): ix is TransactionInstruction => ix !== null)) {
+      if (current.length === 0) {
+        current = [ix];
+        continue;
+      }
+      if (estimateLegacyTxSize([...current, ix], authority) <= PACKET_LIMIT - 132) {
+        current.push(ix);
+      } else {
+        groups.push(current);
+        current = [ix];
+      }
+    }
+    if (current.length > 0) groups.push(current);
+  }
+
+  let step = 0;
+  for (const group of groups) {
+    step += 1;
+    params.onProgress?.(step, groups.length);
+    await sendWithWallet(connection, sendTransaction, group, authority, onAwaitingWallet);
+  }
+
+  if (createIx) {
+    // The table account must be visible before it can be compiled against —
+    // poll (mirrors scripts/lib.ts getOrCreateAlt).
     let visible = false;
     for (let i = 0; i < 20 && !visible; i++) {
-      visible = Boolean(await connection.getAccountInfo(lookupTableAddress));
+      visible = Boolean(
+        await withRetryOnce(
+          () => connection.getAccountInfo(lookupTableAddress),
+          "lookup table: visibility poll",
+        ),
+      );
       if (!visible) await sleepMs(500);
     }
     if (!visible) {
@@ -793,31 +947,7 @@ async function ensureAltCovering(params: {
     }
   }
 
-  const readTableAddresses = async (): Promise<PublicKey[]> => {
-    const table = await connection.getAddressLookupTable(lookupTableAddress);
-    return table.value ? [...table.value.state.addresses] : [];
-  };
-
-  const haveBefore = await readTableAddresses();
-  const missing = uniqueWanted.filter((a) => !haveBefore.some((h) => h.equals(a)));
-  for (let i = 0; i < missing.length; i += 20) {
-    const chunk = missing.slice(i, i + 20);
-    const extendIx = AddressLookupTableProgram.extendLookupTable({
-      payer: authority,
-      authority,
-      lookupTable: lookupTableAddress,
-      addresses: chunk,
-    });
-    await sendWithWallet(
-      connection,
-      sendTransaction,
-      [extendIx],
-      authority,
-      onAwaitingWallet,
-    );
-  }
-
-  if (missing.length > 0 || !created) {
+  if (missing.length > 0 || createIx === null) {
     // Verify the on-chain table contains every wanted address before the
     // consumer tx compiles against it. Public devnet is load-balanced: the
     // node that served the compile read and the node that executes the
@@ -844,7 +974,30 @@ async function ensureAltCovering(params: {
       );
     }
   }
-  return { lookupTableAddress, created, extended: missing.length };
+  params.onResolved?.(recentSlot);
+  return {
+    lookupTableAddress,
+    created: Boolean(createIx),
+    extended: missing.length,
+    recentSlot,
+    approvals: groups.length,
+  };
+}
+
+/** A plausible 32-byte blockhash used ONLY for offline size measurement. */
+const MEASURE_BLOCKHASH = "11111111111111111111111111111111";
+
+/**
+ * Exact serialized size of a legacy transaction carrying these instructions
+ * (zeroed 64B signature + message), used to pack lookup-table management
+ * instructions into as few wallet approvals as the packet limit allows.
+ */
+function estimateLegacyTxSize(instructions: TransactionInstruction[], payer: PublicKey): number {
+  const tx = new Transaction();
+  tx.feePayer = payer;
+  tx.recentBlockhash = MEASURE_BLOCKHASH;
+  tx.add(...instructions);
+  return 64 + tx.serializeMessage().length;
 }
 
 // ===================== v0 + ALT + compute budget (mint/redeem) =====================
@@ -929,10 +1082,11 @@ export function deriveMintRedeemAltAddresses(keys: BasketCoreKeys): PublicKey[] 
     deriveAta(keys.creator, keys.shareMint),
     keys.treasury,
     deriveAta(keys.treasury, keys.shareMint),
+    BASKET_PROGRAM_ID,
     TOKEN_2022_PROGRAM_ID,
     ASSOCIATED_TOKEN_PROGRAM_ID,
     SystemProgram.programId,
-    BASKET_PROGRAM_ID,
+    ComputeBudgetProgram.programId,
   ];
   keys.constituents.forEach((mint) => {
     const mintKey = new PublicKey(mint);
@@ -972,18 +1126,28 @@ export async function ensureMintRedeemAlt(params: {
   sendTransaction: WalletSendTransaction;
   /** Optional hook so the UI can flip into a "preparing lookup table" phase. */
   onAwaitingWallet?: (awaiting: boolean) => void;
+  /** Setup progress for the UI: called once per wallet approval ("Setup 1/2"). */
+  onProgress?: (step: number, total: number) => void;
   /** Override the derivation slot (testing only — defaults to last finalized). */
   recentSlot?: number;
 }): Promise<EnsureCreateBasketAltResult> {
   const { connection, keys, sendTransaction, onAwaitingWallet } = params;
-  return ensureAltCovering({
+  const cacheKey = altCacheKey("mint-redeem", keys.user.toBase58(), keys.basket.toBase58());
+  const result = await ensureAltCovering({
     connection,
     authority: keys.user,
     addresses: deriveMintRedeemAltAddresses(keys),
     sendTransaction,
     onAwaitingWallet,
-    recentSlot: params.recentSlot,
+    onProgress: params.onProgress,
+    // A cached slot re-derives the SAME table address from a previous session
+    // in this tab; ensureAltCovering re-verifies on-chain coverage and skips
+    // creation when the table already covers everything — so Retry after a
+    // mid-flow failure never re-asks approvals for an existing table.
+    recentSlot: params.recentSlot ?? ALT_CACHE.get(cacheKey),
+    onResolved: (slot) => ALT_CACHE.set(cacheKey, slot),
   });
+  return result;
 }
 
 export interface BuiltMintRedeemTx {
@@ -1025,7 +1189,9 @@ async function buildMintRedeemTransaction(params: {
       );
     }
     for (const address of provided) {
-      const table = await connection.getAddressLookupTable(address);
+      const table = await withRetry(() => connection.getAddressLookupTable(address), {
+        label: "transaction build: lookup table read",
+      });
       if (!table.value) {
         throw new Error(`address lookup table ${address.toBase58()} not found on ${connection.rpcEndpoint}`);
       }
@@ -1033,7 +1199,10 @@ async function buildMintRedeemTransaction(params: {
     }
   }
   // Fresh CONFIRMED blockhash (see buildCreateBasketTransaction).
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  const { blockhash, lastValidBlockHeight } = await withRetry(
+    () => connection.getLatestBlockhash(),
+    { label: "transaction build: blockhash read" },
+  );
   const instructions = [...computeBudgetInstructions(), ...mainInstructions];
   const message = new TransactionMessage({
     payerKey: payer,
@@ -1097,7 +1266,13 @@ function sleepMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Compile → wallet-sign → confirm a small management transaction. */
+/**
+ * Compile → wallet-sign → confirm a small management transaction. The blockhash
+ * read, the send, and the confirmation each run through the shared withRetry
+ * loop: a 429 between the user's approvals and the table landing waits out the
+ * throttle instead of killing the flow. Re-sending is safe — an identical
+ * transaction (same blockhash + signatures) dedups on-cluster by signature.
+ */
 async function sendWithWallet(
   connection: Connection,
   sendTransaction: WalletSendTransaction,
@@ -1107,7 +1282,10 @@ async function sendWithWallet(
 ): Promise<TransactionSignature> {
   // Confirmed blockhash — a finalized one is already ~32 slots old, which
   // starves the confirmation window on a throttled public RPC.
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  const { blockhash, lastValidBlockHeight } = await withRetry(
+    () => connection.getLatestBlockhash(),
+    { label: "lookup table tx: blockhash read" },
+  );
   const message = new TransactionMessage({
     payerKey: payer,
     recentBlockhash: blockhash,
@@ -1116,10 +1294,16 @@ async function sendWithWallet(
   const transaction = new VersionedTransaction(message);
   onAwaitingWallet?.(true);
   try {
-    const signature = await sendTransaction(transaction, connection);
-    const confirmation = await connection.confirmTransaction(
-      { blockhash, lastValidBlockHeight, signature },
-      "confirmed",
+    const signature = await withRetry(() => sendTransaction(transaction, connection), {
+      label: "lookup table tx: send",
+    });
+    const confirmation = await withRetry(
+      () =>
+        connection.confirmTransaction(
+          { blockhash, lastValidBlockHeight, signature },
+          "confirmed",
+        ),
+      { label: "lookup table tx: confirm" },
     );
     if (confirmation.value.err) {
       throw new Error(

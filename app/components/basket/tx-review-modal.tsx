@@ -1,18 +1,29 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { truncateAddress } from "@/lib/format";
 import type { ExpectedAccount } from "@/lib/transactions";
 import { explorerTxUrl } from "@/lib/transactions";
 import type { TransactionFlowState } from "@/components/basket/use-transaction-flow";
+import type { SetupProgress } from "@/components/basket/use-alt-prewarm";
 
 /**
- * Transaction review modal. Lists EVERY account the transaction will touch
- * (from the builder's expectedAccounts) plus a summary slot, then drives the
- * simulate → sign → confirm states. Escape closes while idle only — closing is
- * disabled mid-flight so the outcome state is always visible.
+ * Transaction review modal: summary slot + a compact 3-state result card.
+ *
+ * Copy contract (≤ 2 sentences per state, no walls of text):
+ *  - PENDING   spinner + one line ("Sending your transaction…"); lookup-table
+ *              setup is labelled as such in the header ("Setup 1/2").
+ *  - SENT      big ✓ pending style + ONE explorer link + one "few seconds"
+ *              reassurance line. Never an error, never a paragraph.
+ *  - SUCCESS   "🎉 Done — +X shares of <BASKET>" (or −X / "Basket created")
+ *              + [View Portfolio] [View on Explorer].
+ *  - FAILURE   one plain sentence + Retry; the technical log hides behind a
+ *              collapsed "Details" disclosure.
+ * The rate-limit line is one short sentence. Escape closes while idle only —
+ * closing is disabled mid-flight so the outcome state is always visible.
  */
 export function TxReviewModal({
   open,
@@ -23,9 +34,13 @@ export function TxReviewModal({
   summary,
   flowState,
   onConfirm,
+  onRetry,
   confirmLabel,
   endpoint,
   errorSlot,
+  successLine,
+  portfolioHref = "/portfolio",
+  setupProgress = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -35,11 +50,19 @@ export function TxReviewModal({
   summary?: ReactNode;
   flowState: TransactionFlowState;
   onConfirm: () => void;
+  /** Resumes from the failed step (re-runs the same build/prepare). */
+  onRetry?: () => void;
   confirmLabel: string;
   /** RPC endpoint for cluster-aware explorer links. */
   endpoint: string;
   /** Extra inline alert rendered above the actions (e.g. MintPaused explainer). */
   errorSlot?: ReactNode;
+  /** SUCCESS headline, e.g. "🎉 Done — +12.5 shares of ROMAN" (or null for default). */
+  successLine?: ReactNode;
+  /** Where "View Portfolio" points (create flows may link elsewhere). */
+  portfolioHref?: string;
+  /** Live lookup-table setup progress → "Setup 1/2" badge in the header. */
+  setupProgress?: SetupProgress | null;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +107,12 @@ export function TxReviewModal({
   const explorerHref = flowState.signature
     ? explorerTxUrl(flowState.signature, endpoint)
     : null;
+  // Retry only when the failure was transient (the flow marks deterministic
+  // program errors non-retryable — re-running would fail identically).
+  const canRetry =
+    Boolean(onRetry) &&
+    (flowState.status === "failed" || flowState.status === "rejected") &&
+    flowState.retryable;
 
   return (
     <div
@@ -99,10 +128,15 @@ export function TxReviewModal({
         className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
       >
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold">{title}</h2>
-            {description ? (
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+            {flowState.status === "preparing-alt" && setupProgress ? (
+              <span
+                data-testid="setup-badge"
+                className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground"
+              >
+                Setup {setupProgress.step}/{setupProgress.total}
+              </span>
             ) : null}
           </div>
           <Button
@@ -115,43 +149,29 @@ export function TxReviewModal({
             ×
           </Button>
         </div>
+        {description ? (
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+        ) : null}
 
         {summary ? (
-          <div className="mt-5 rounded-md border border-border bg-muted/30 p-3 text-sm">
+          <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-sm">
             {summary}
           </div>
         ) : null}
 
-        <h3 className="mt-5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Accounts this transaction touches ({accounts.length})
-        </h3>
-        <ul className="mt-2 divide-y divide-border overflow-hidden rounded-md border border-border">
-          {accounts.map((account) => (
-            <li key={`${account.label}-${account.pubkey.toBase58()}`} className="px-3 py-2">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
-                <span className="font-mono text-xs font-medium">{account.label}</span>
-                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                  {truncateAddress(account.pubkey.toBase58(), 6, 6)}
-                </span>
-              </div>
-              <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <p className="text-[11px] leading-4 text-muted-foreground">{account.note}</p>
-                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80">
-                  {account.signer ? "signer " : ""}
-                  {account.writable ? "writable" : "read-only"}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-
         {errorSlot}
 
-        <div aria-live="polite" className="mt-5">
-          <StatusLine state={flowState} explorerHref={explorerHref} />
+        <div aria-live="polite" className="mt-4">
+          <StatusCard
+            state={flowState}
+            explorerHref={explorerHref}
+            successLine={successLine}
+            portfolioHref={portfolioHref}
+          />
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+          {canRetry ? <Button variant="outline" onClick={onRetry}>Retry</Button> : null}
           <Button variant="outline" onClick={onClose} disabled={inFlight}>
             {terminal ? "Close" : "Cancel"}
           </Button>
@@ -162,6 +182,33 @@ export function TxReviewModal({
             {inFlight ? statusLabel(flowState.status) : confirmLabel}
           </Button>
         </div>
+
+        {accounts.length > 0 ? (
+          <details className="mt-4 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+            <summary className="cursor-pointer select-none">
+              Accounts this transaction touches ({accounts.length})
+            </summary>
+            <ul className="mt-2 divide-y divide-border overflow-hidden rounded-md border border-border">
+              {accounts.map((account) => (
+                <li key={`${account.label}-${account.pubkey.toBase58()}`} className="px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+                    <span className="font-mono text-xs font-medium text-foreground">{account.label}</span>
+                    <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {truncateAddress(account.pubkey.toBase58(), 6, 6)}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                    <p className="text-[11px] leading-4 text-muted-foreground">{account.note}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80">
+                      {account.signer ? "signer " : ""}
+                      {account.writable ? "writable" : "read-only"}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </div>
     </div>
   );
@@ -172,17 +219,24 @@ function isIdle(status: TransactionFlowState["status"]): boolean {
 }
 
 function isTerminal(status: TransactionFlowState["status"]): boolean {
-  return status === "confirmed" || status === "failed" || status === "rejected";
+  return (
+    status === "confirmed" ||
+    // Sent-and-pending is also a settled outcome for the modal (not in-flight):
+    // it renders the explorer link and never re-enables the sign button.
+    status === "submitted" ||
+    status === "failed" ||
+    status === "rejected"
+  );
 }
 
 function statusLabel(status: TransactionFlowState["status"]): string {
   switch (status) {
     case "preparing-alt":
-      return "Preparing lookup table — approve in your wallet…";
+      return "Setup in wallet…";
     case "simulating":
       return "Simulating…";
     case "awaiting-signature":
-      return "Approve in your wallet…";
+      return "Approve in wallet…";
     case "confirming":
       return "Confirming…";
     default:
@@ -190,69 +244,168 @@ function statusLabel(status: TransactionFlowState["status"]): string {
   }
 }
 
-function StatusLine({
+/** One plain sentence for a failure — no codes, no multi-clause paragraphs. */
+function shortReason(state: TransactionFlowState): string {
+  const raw = (state.error ?? "").trim();
+  if (raw.length <= 140) return raw.replace(/\.$/, "");
+  const cut = raw.slice(0, 140);
+  const lastStop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("—"));
+  return (lastStop > 40 ? cut.slice(0, lastStop) : cut).trim();
+}
+
+/** Spinner: pure CSS, no icon dependency. */
+function Spinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground"
+    />
+  );
+}
+
+function StatusCard({
   state,
   explorerHref,
+  successLine,
+  portfolioHref,
 }: {
   state: TransactionFlowState;
   explorerHref: string | null;
+  successLine?: ReactNode;
+  portfolioHref: string;
 }) {
   switch (state.status) {
     case "idle":
       return (
         <p className="text-xs text-muted-foreground">
-          Simulation runs first — nothing is signed until the simulation passes.
+          Simulated before signing — nothing is sent without your approval.
         </p>
       );
+
     case "preparing-alt":
     case "simulating":
     case "awaiting-signature":
     case "confirming":
+      // PENDING: spinner + ONE line. Setup phases are labelled as one-time
+      // setup, never as a mysterious second approval.
       return (
-        <p role="status" className="font-mono text-xs tabular-nums text-muted-foreground">
-          {statusLabel(state.status)}
-        </p>
+        <div role="status" data-testid="tx-status-card" className="space-y-1">
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <Spinner />
+            {state.status === "preparing-alt"
+              ? "Preparing your basket account… one-time setup"
+              : "Sending your transaction…"}
+          </p>
+          {state.progress ? (
+            <p className="text-xs text-muted-foreground">
+              Network is busy — retrying automatically…
+            </p>
+          ) : null}
+        </div>
       );
+
     case "confirmed":
+      // SUCCESS: the delta in plain language + the two useful actions.
       return (
-        <div role="status" className="space-y-1">
-          <p className="text-xs font-medium text-foreground">Confirmed.</p>
+        <div
+          role="status"
+          data-testid="tx-status-card"
+          className="rounded-md border border-border bg-muted/30 p-3"
+        >
+          <p className="text-sm font-semibold">{successLine ?? "🎉 Done"}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button render={<Link href={portfolioHref} />} size="sm">
+              View Portfolio
+            </Button>
+            {explorerHref ? (
+              <a
+                href={explorerHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-2.5 text-sm hover:bg-muted"
+              >
+                View on Explorer
+              </a>
+            ) : null}
+          </div>
+        </div>
+      );
+
+    case "submitted":
+      // SENT: big ✓ pending style — the send landed, confirmation is only
+      // catching up. One link, one reassurance line, zero paragraphs.
+      return (
+        <div
+          role="status"
+          data-testid="tx-status-card"
+          className="rounded-md border border-border bg-muted/30 p-3"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <span aria-hidden="true" className="text-lg leading-none">✓</span>
+            Sent! Confirming on-chain…
+          </p>
           {explorerHref ? (
             <a
               href={explorerHref}
               target="_blank"
               rel="noreferrer"
-              className="font-mono text-xs tabular-nums underline underline-offset-4 hover:text-foreground"
+              className="mt-2 inline-block text-xs underline underline-offset-4 hover:text-foreground"
             >
-              View transaction on Solana Explorer
+              View on Explorer
             </a>
           ) : null}
+          <p className="mt-1 text-xs text-muted-foreground">
+            You&apos;ll see it in your Portfolio in a few seconds.
+          </p>
         </div>
       );
+
     case "rejected":
       return (
-        <div role="alert" className="rounded-md border border-border bg-muted/40 p-3">
-          <p className="text-xs font-medium">Not signed</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{state.error}</p>
+        <div role="alert" data-testid="tx-status-card" className="rounded-md border border-border bg-muted/40 p-3">
+          <p className="text-sm">Not signed — nothing moved. You cancelled in your wallet.</p>
         </div>
       );
+
     case "failed":
+      // FAILURE: one plain sentence + Retry; the technical report collapses.
       return (
         <div
           role="alert"
+          data-testid="tx-status-card"
           className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3"
         >
-          <p className="text-xs font-medium text-destructive">{state.error}</p>
-          {state.logs.length > 0 ? (
-            <details className="text-[11px] leading-4 text-muted-foreground">
-              <summary className="cursor-pointer select-none">Program logs</summary>
-              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap font-mono">
-                {state.logs.join("\n")}
-              </pre>
-            </details>
-          ) : null}
+          <p className="text-sm">
+            The network rejected the trade: {shortReason(state)}. Nothing was lost — try again.
+          </p>
+          <details className="text-[11px] leading-4 text-muted-foreground">
+            <summary className="cursor-pointer select-none">Details</summary>
+            <div className="mt-1 space-y-2">
+              {state.error ? <p>{state.error}</p> : null}
+              {state.approvedEarlier ? (
+                <p>
+                  Everything approved so far is already on-chain — Retry continues from where it
+                  stopped without re-asking those approvals.
+                </p>
+              ) : null}
+              {explorerHref ? (
+                <a
+                  href={explorerHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block font-mono tabular-nums underline underline-offset-4 hover:text-foreground"
+                >
+                  View transaction {state.signature?.slice(0, 16)}… on Solana Explorer
+                </a>
+              ) : null}
+              {state.logs.length > 0 ? (
+                <pre className="max-h-32 overflow-auto whitespace-pre-wrap font-mono">
+                  {state.logs.join("\n")}
+                </pre>
+              ) : null}
+            </div>
+          </details>
         </div>
       );
   }
 }
-

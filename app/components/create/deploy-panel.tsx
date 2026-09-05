@@ -23,6 +23,7 @@ import {
   type CreateBasketArgs,
 } from "@/lib/create-basket";
 import { RPC_ENDPOINT, describeRpcError, describeWalletError } from "@/lib/wallet";
+import { withRetry } from "@/lib/rpc-retry";
 // Sibling contract: shared helpers from the basket-group worker's lib.
 import {
   buildCreateBasketTransaction,
@@ -189,6 +190,7 @@ export function DeployPanel({
   // reused for the rest of the session.
   const altRef = useRef<PublicKey | null>(null);
   const [altAddress, setAltAddress] = useState<string | null>(null);
+  const [setupProgress, setSetupProgress] = useState<{ step: number; total: number } | null>(null);
   const needsAlt = args ? createBasketNeedsAlt(args.constituents.length) : false;
 
   const ensureAlt = useCallback(
@@ -200,6 +202,7 @@ export function DeployPanel({
         creator,
         args,
         sendTransaction,
+        onProgress: (step, total) => setSetupProgress({ step, total }),
         onAwaitingWallet: (awaiting) => setPhase(awaiting ? "preparing-alt" : resumePhase),
       });
       altRef.current = handle.lookupTableAddress;
@@ -232,10 +235,14 @@ export function DeployPanel({
     try {
       const built = await buildVersionedTransaction("simulating");
       if (!built) return;
-      const result = await connection.simulateTransaction(built.transaction, {
-        sigVerify: false,
-        replaceRecentBlockhash: true,
-      });
+      const result = await withRetry(
+        () =>
+          connection.simulateTransaction(built.transaction, {
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+          }),
+        { label: "create_basket simulation" },
+      );
       if (result.value.err) {
         setSimulationLogs(result.value.logs ?? []);
         setErrorMessage(
@@ -248,10 +255,13 @@ export function DeployPanel({
       setPhase("idle");
       await loadBalances();
     } catch (error) {
-      // 429s render as a calm rate-limit notice instead of the raw
-      // "Server responded with 429. Retrying after 4000ms delay…" string.
+      // Typed retry copy: after the withRetry loop (6 attempts, 2s→4s→8s→16s→30s)
+      // the honest message names what failed and the next action — no fake
+      // "retrying automatically" and no "unexpected error".
       const message = describeRpcError(error);
-      setErrorMessage(`Simulation failed to run: ${message}`);
+      setErrorMessage(
+        `Simulation could not run: ${message} Nothing was signed — press Simulate to try again.`,
+      );
       setPhase("simulation-failed");
     }
   }, [args, creator, buildVersionedTransaction, connection, loadBalances]);
@@ -263,16 +273,25 @@ export function DeployPanel({
     try {
       const built = await buildVersionedTransaction();
       if (!built) return;
-      const txSignature = await sendTransaction(built.transaction, connection);
+      // Re-sending is safe: an identical transaction (same blockhash +
+      // signatures) dedups on-cluster by signature.
+      const txSignature = await withRetry(
+        () => sendTransaction(built.transaction, connection),
+        { label: "create_basket send" },
+      );
       setSignature(txSignature);
       setPhase("pending");
-      const confirmation = await connection.confirmTransaction(
-        {
-          blockhash: built.blockhash,
-          lastValidBlockHeight: built.lastValidBlockHeight,
-          signature: txSignature,
-        },
-        "confirmed",
+      const confirmation = await withRetry(
+        () =>
+          connection.confirmTransaction(
+            {
+              blockhash: built.blockhash,
+              lastValidBlockHeight: built.lastValidBlockHeight,
+              signature: txSignature,
+            },
+            "confirmed",
+          ),
+        { label: "create_basket confirm" },
       );
       if (confirmation.value.err) {
         setErrorMessage(
@@ -308,43 +327,47 @@ export function DeployPanel({
   if (phase === "confirmed" && signature) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-lg border border-border/60 bg-muted/40 p-4">
-          <p className="text-sm font-medium">Basket deployed</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            create_basket confirmed. Genesis {GENESIS_SHARES.toLocaleString()} shares were minted
-            to your wallet; the mint authority now belongs to the basket program&apos;s vault
-            authority PDA.
+        <div
+          role="status"
+          data-testid="deploy-success-card"
+          className="rounded-md border border-border bg-muted/30 p-4"
+        >
+          <p className="text-base font-semibold">🎉 Basket created</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {GENESIS_SHARES.toLocaleString()} genesis shares are in your wallet.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/portfolio"
+              className="rounded-lg bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              View Portfolio
+            </Link>
+            <a
+              href={explorerTxUrl(signature, RPC_ENDPOINT)}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              View on Explorer
+            </a>
+          </div>
         </div>
-        <dl className="grid gap-x-4 gap-y-1.5 font-mono text-xs tabular-nums sm:grid-cols-[auto_1fr]">
-          <dt className="text-muted-foreground">Signature</dt>
-          <dd className="break-all">{signature}</dd>
-          <dt className="text-muted-foreground">Basket PDA</dt>
-          <dd className="break-all">{pda.basket.toBase58()}</dd>
-          <dt className="text-muted-foreground">Share mint</dt>
-          <dd className="break-all">{pda.shareMint.toBase58()}</dd>
-        </dl>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={explorerTxUrl(signature, RPC_ENDPOINT)}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            View on explorer
-          </a>
-          <Link
-            href="/portfolio"
-            className="rounded-lg bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            Open portfolio
-          </Link>
-        </div>
-        <p className="text-xs leading-5 text-muted-foreground">
-          Rankings, NAV and holdings appear once the indexer picks up the
-          BasketCreated event. The basket is immutable — constituents, weights,
-          fees, creator and metadata hash never change.
-        </p>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer select-none">Details</summary>
+          <dl className="mt-2 grid gap-x-4 gap-y-1.5 font-mono text-xs tabular-nums sm:grid-cols-[auto_1fr]">
+            <dt className="text-muted-foreground">Signature</dt>
+            <dd className="break-all">{signature}</dd>
+            <dt className="text-muted-foreground">Basket PDA</dt>
+            <dd className="break-all">{pda.basket.toBase58()}</dd>
+            <dt className="text-muted-foreground">Share mint</dt>
+            <dd className="break-all">{pda.shareMint.toBase58()}</dd>
+          </dl>
+          <p className="mt-2">
+            The basket is immutable; rankings, NAV and holdings appear once the indexer picks up
+            the BasketCreated event.
+          </p>
+        </details>
       </div>
     );
   }
@@ -419,11 +442,9 @@ export function DeployPanel({
         <p className="mt-2 font-mono text-xs tabular-nums text-muted-foreground">
           sha256 = {toHex(metadataHash)}
         </p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          IPFS/Arweave upload is out of scope for V0 — this wizard hashes the
-          JSON directly with sha256 and stores the 32-byte digest on-chain. The
-          metadata hash is immutable; publish the JSON yourself if you want it
-          resolvable.
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          Hashed with sha256 and stored on-chain — not uploaded. The hash is immutable; publish
+          the JSON yourself if you want it resolvable.
         </p>
       </div>
 
@@ -435,12 +456,10 @@ export function DeployPanel({
       )}
       {overLimit && !blocked && (
         <p className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground">
-          This basket touches {9 + constituents.length * 4} accounts, so the
-          legacy serialized transaction is ~{estSize.toLocaleString()} bytes — over the
-          {` ${PACKET_LIMIT} `}byte Solana packet limit. The first simulate or
-          deploy click therefore asks your wallet to create and fill an address
-          lookup table (two extra signatures), after which the transaction
-          compiles through it and fits comfortably.
+          One-time setup: this basket is too large for one plain transaction (~
+          {estSize.toLocaleString()} B), so the first simulate or deploy also creates a lookup
+          table — you may approve 1–2 setup transactions, after which every deploy is a single
+          click.
         </p>
       )}
 
@@ -454,18 +473,15 @@ export function DeployPanel({
         <ErrorState title="Deploy failed" message={errorMessage ?? undefined} />
       )}
       {phase === "pending" && signature && (
-        <div className="rounded-md border border-border bg-muted/30 p-3 text-xs leading-5">
-          <p>
-            Transaction sent — awaiting confirmation.{" "}
-            <a
-              href={explorerTxUrl(signature, RPC_ENDPOINT)}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              {truncateAddress(signature, 12, 8)}
-            </a>
-          </p>
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground"
+          />
+          Sending your transaction…
         </div>
       )}
 
@@ -506,9 +522,19 @@ export function DeployPanel({
             className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
           >
             <div className="flex items-start justify-between gap-3">
-              <h2 id="deploy-review-title" className="text-base font-medium">
-                Review create_basket
-              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="deploy-review-title" className="text-base font-medium">
+                  Review create_basket
+                </h2>
+                {phase === "preparing-alt" && setupProgress ? (
+                  <span
+                    data-testid="setup-badge"
+                    className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground"
+                  >
+                    Setup {setupProgress.step}/{setupProgress.total}
+                  </span>
+                ) : null}
+              </div>
               <button
                 type="button"
                 onClick={() => setReviewOpen(false)}
@@ -657,10 +683,7 @@ export function DeployPanel({
               </Button>
             </div>
             <p className="mt-3 text-[11px] leading-4 text-muted-foreground">
-              Simulation runs against {RPC_ENDPOINT} before your wallet is
-              asked to sign. Signing is always explicit; nothing is sent
-              without approval. LEGAL_REVIEW_REQUIRED — deploying makes you the
-              immutable fee recipient (90% split).
+              Simulated before signing — nothing is sent without your approval.
             </p>
           </div>
         </div>

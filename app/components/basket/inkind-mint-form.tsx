@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/states";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
+import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import {
   checkGrossShares,
   entryFeeOf,
@@ -23,29 +24,48 @@ import {
   buildMintInKind,
   buildMintInKindTransaction,
   deriveAta,
-  ensureMintRedeemAlt,
-  mintRedeemNeedsAlt,
   type BasketCoreKeys,
   type ExpectedAccount,
 } from "@/lib/transactions";
 import { scaledFromRaw, truncateAddress } from "@/lib/format";
+import { withRetryOnce } from "@/lib/rpc-retry";
 import { CLUSTER, RPC_ENDPOINT } from "@/lib/wallet";
+
+/** Basket display name out of the metadata JSON (null when unparseable). */
+function basketName(detail: BasketDetail): string | null {
+  const mj = detail.metadata_json;
+  let obj: unknown = mj;
+  if (typeof mj === "string") {
+    try {
+      obj = JSON.parse(mj);
+    } catch {
+      return null;
+    }
+  }
+  const n = obj && typeof obj === "object" ? (obj as Record<string, unknown>).name : null;
+  return typeof n === "string" && n.trim() ? n.trim() : null;
+}
 
 /**
  * In-kind mint: per-constituent RAW deposit inputs with live, exact-BigInt
  * replication of the program's WeightMismatch check (min(D·S/V) with the 1%
  * tolerance), scaled display, entry-fee/net-share preview, balance checks, and
- * the review → simulate → sign flow.
+ * the review → simulate → sign flow. The basket's lookup table is prepared in
+ * the background on form open (one-time setup), so a confirmed trade after the
+ * first is a single approval.
  */
 export function InKindMintForm({
   detail,
   vaultBalances,
+  onSuccess,
 }: {
   detail: BasketDetail;
   /** Raw vault balance per constituent (null when the holding is not indexed). */
   vaultBalances: (bigint | null)[];
+  /** Called after a confirmed mint so the page can refetch detail/holdings. */
+  onSuccess?: () => void;
 }) {
-  const { publicKey, connected, sendTransaction } = useWallet();
+  const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
   const flow = useTransactionFlow();
   const [open, setOpen] = useState(false);
@@ -56,10 +76,6 @@ export function InKindMintForm({
   const [createIxs, setCreateIxs] = useState<ReturnType<typeof buildCreateAtaInstructions>>([]);
   /** Inline note from the Fill proportional handler (honest fallbacks only). */
   const [fillNote, setFillNote] = useState<string | null>(null);
-
-  // Lookup table for n >= 4 baskets — created/extended wallet-signed once per
-  // session, then reused by every subsequent mint on this basket.
-  const altRef = useRef<PublicKey | null>(null);
 
   const coreKeys: BasketCoreKeys | null = useMemo(
     () =>
@@ -77,19 +93,10 @@ export function InKindMintForm({
     [detail, publicKey],
   );
 
-  const needsAlt = mintRedeemNeedsAlt(detail.constituents.length);
-
-  const ensureAlt = useCallback(async (): Promise<PublicKey> => {
-    if (altRef.current) return altRef.current;
-    if (!publicKey || !coreKeys) throw new Error("Connect a wallet first.");
-    const handle = await ensureMintRedeemAlt({
-      connection,
-      keys: coreKeys,
-      sendTransaction,
-    });
-    altRef.current = handle.lookupTableAddress;
-    return handle.lookupTableAddress;
-  }, [connection, coreKeys, publicKey, sendTransaction]);
+  // One-time basket account (lookup table) preparation — starts now, quietly,
+  // so Confirm later needs only the main approval.
+  const prewarm = useAltPrewarm(coreKeys);
+  const { needsAlt } = prewarm;
 
   const supply = useMemo(() => {
     const raw = detail.nav?.supply;
@@ -110,7 +117,12 @@ export function InKindMintForm({
       detail.constituents.map(async (mint) => {
         try {
           const ata = deriveAta(publicKey, new PublicKey(mint));
-          const res = await connection.getTokenAccountBalance(ata);
+          // Background page read: one calm retry through the shared loop
+          // before the "no ATA / zero balance" fallback.
+          const res = await withRetryOnce(
+            () => connection.getTokenAccountBalance(ata),
+            "token balance read",
+          );
           return BigInt(res.value.amount);
         } catch {
           return null; // ATA does not exist — treated as zero balance below
@@ -202,6 +214,51 @@ export function InKindMintForm({
   };
 
   /**
+   * Start (or Retry) the mint flow. Re-invocable after a failure: the lookup
+   * table is cached at module level and re-verified on-chain, so a retry
+   * resumes from the failed step without re-asking approvals for an existing
+   * table. If the background pre-warm is still running, this awaits the SAME
+   * preparation — no duplicate approvals.
+   */
+  const startMint = () => {
+    if (!publicKey || !coreKeys || !check?.ok) return;
+    const parsed = amounts as bigint[];
+    void flow.run(
+      async () => {
+        if (!needsAlt) {
+          // n ≤ 3: legacy wire exactly as before — the flow hook adds
+          // the compute-budget instructions.
+          return [
+            ...createIxs,
+            ...buildMintInKind({
+              keys: coreKeys,
+              amounts: parsed,
+              vaultBalances: vaultsForCheck,
+            }).instructions,
+          ];
+        }
+        // n ≥ 4: v0 through the wallet-signed lookup table.
+        const table = await prewarm.ensureAlt();
+        return buildMintInKindTransaction({
+          connection,
+          keys: coreKeys,
+          amounts: parsed,
+          vaultBalances: vaultsForCheck,
+          preInstructions: createIxs,
+          lookupTableAddresses: [table],
+        });
+      },
+      needsAlt ? () => prewarm.ensureAlt() : undefined,
+      {
+        onComplete: () => {
+          void refreshBalances();
+          onSuccess?.();
+        },
+      },
+    );
+  };
+
+  /**
    * One click fills EVERY constituent input — never a silent no-op:
    *  1. anchored on the largest typed amount, every leg follows the vault ratio;
    *  2. with nothing typed, the largest proportional fill the wallet can
@@ -284,7 +341,7 @@ export function InKindMintForm({
       <EmptyState
         chip="NO SNAPSHOT"
         title="Vault ratios are not indexed yet"
-        description="The in-kind form replicates the on-chain weight check from indexed vault holdings and supply. This basket has no complete holdings snapshot yet, so no deposit can be validated — nothing is guessed."
+        description="This basket has no complete holdings snapshot yet, so deposits can't be validated — nothing is guessed."
       />
     );
   }
@@ -451,6 +508,31 @@ export function InKindMintForm({
           ) : null}
         </div>
 
+        {/* one-time basket setup — chip while preparing, explainer line after */}
+        {needsAlt && connected ? (
+          <p
+            data-testid="alt-prewarm"
+            aria-live="polite"
+            className="flex items-center gap-2 text-xs text-muted-foreground"
+          >
+            {prewarm.status === "preparing" ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground"
+                />
+                {prewarm.awaitingWallet
+                  ? "Setup — approve in your wallet…"
+                  : "Preparing your basket account… one-time setup"}
+              </>
+            ) : prewarm.status === "failed" ? (
+              "One-time setup will be requested with your first trade — every trade after that is a single click."
+            ) : (
+              "One-time setup for this basket: you may approve 1–2 setup transactions; every trade after this is a single click."
+            )}
+          </p>
+        ) : null}
+
         <TxReviewModal
           open={open}
           onClose={close}
@@ -482,39 +564,16 @@ export function InKindMintForm({
             </dl>
           }
           flowState={flow.state}
-          onConfirm={() => {
-            if (!publicKey || !coreKeys || !check?.ok) return;
-            const parsed = amounts as bigint[];
-            void flow.run(
-              async () => {
-                if (!needsAlt) {
-                  // n ≤ 3: legacy wire exactly as before — the flow hook adds
-                  // the compute-budget instructions.
-                  return [
-                    ...createIxs,
-                    ...buildMintInKind({
-                      keys: coreKeys,
-                      amounts: parsed,
-                      vaultBalances: vaultsForCheck,
-                    }).instructions,
-                  ];
-                }
-                // n ≥ 4: v0 through the wallet-signed lookup table.
-                const table = await ensureAlt();
-                return buildMintInKindTransaction({
-                  connection,
-                  keys: coreKeys,
-                  amounts: parsed,
-                  vaultBalances: vaultsForCheck,
-                  preInstructions: createIxs,
-                  lookupTableAddresses: [table],
-                });
-              },
-              needsAlt ? () => ensureAlt() : undefined,
-            );
-          }}
+          onConfirm={startMint}
+          onRetry={startMint}
           confirmLabel="Simulate & sign"
           endpoint={RPC_ENDPOINT}
+          successLine={
+            net !== null
+              ? `🎉 Done — +${formatRawShares6(net)} shares${basketName(detail) ? ` of ${basketName(detail)}` : ""}`
+              : "🎉 Done"
+          }
+          setupProgress={prewarm.setupProgress}
           errorSlot={
             flow.state.mintPaused ? (
               <div

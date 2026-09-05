@@ -68,8 +68,9 @@ async function main(): Promise<void> {
   console.log(` - GET  /api/v1/baskets            (basket_rankings, source: onchain-indexed)`);
   console.log(` - GET  /api/v1/baskets/:pubkey    (detail + NAV + holdings + drift)`);
   console.log(` - GET  /api/v1/baskets/:pubkey/holdings | /nav/history | /performance`);
-  console.log(` - GET  /api/v1/whitelist | /creators/:p | /users/:p/portfolio | /health`);
-  console.log(` - POST /api/v1/quotes/zap-in|zap-out (Jupiter quote legs — quotes only, backend never signs)`);
+ console.log(` - GET  /api/v1/whitelist | /creators/:p | /users/:p/portfolio | /health`);
+ console.log(` - GET  /api/v1/positions?wallet=:p  (chain-reconciled user positions + NAV price)`);
+ console.log(` - POST /api/v1/quotes/zap-in|zap-out (Jupiter quote legs — quotes only, backend never signs)`);
   console.log(
     ` subsystems: db=${db ? "on" : "off"} indexer=${indexer ? "on" : "off"} ` +
       `navEngine=${navEngine ? "on" : "off"} feeCrank=${feeCrank ? "on" : "off"} ` +

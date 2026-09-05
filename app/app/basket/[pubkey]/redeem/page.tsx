@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
+import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import { AccrueCrankButton } from "@/components/basket/accrue-crank";
 import { computeRedeemPreview, formatRawShares6, parseRawInput } from "@/components/basket/basket-math";
 import {
@@ -28,12 +29,11 @@ import {
   buildRedeemInKind,
   buildRedeemInKindTransaction,
   deriveAta,
-  ensureMintRedeemAlt,
-  mintRedeemNeedsAlt,
   type BasketCoreKeys,
   type ExpectedAccount,
 } from "@/lib/transactions";
 import { formatUsd, scaledFromRaw, truncateAddress } from "@/lib/format";
+import { withRetryOnce } from "@/lib/rpc-retry";
 import { RPC_ENDPOINT } from "@/lib/wallet";
 
 const MAX_COMPOSITION_PARTS = 4;
@@ -64,7 +64,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
   const { pubkey: rawPubkey } = use(params);
   const pubkey = decodeURIComponent(rawPubkey);
 
-  const { publicKey, connected, sendTransaction } = useWallet();
+  const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
   const flow = useTransactionFlow();
 
@@ -116,8 +116,14 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
   const refreshShareBalance = useCallback(async () => {
     if (!publicKey || !detail) return;
     try {
-      const res = await connection.getTokenAccountBalance(
-        deriveAta(publicKey, new PublicKey(detail.share_mint)),
+      // Background page read: one calm retry through the shared loop before
+      // the inline "no share ATA" fallback — never a hard failure surface.
+      const res = await withRetryOnce(
+        () =>
+          connection.getTokenAccountBalance(
+            deriveAta(publicKey, new PublicKey(detail.share_mint)),
+          ),
+        "share balance read",
       );
       setShareBalance(BigInt(res.value.amount));
     } catch {
@@ -187,7 +193,9 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
   const headline = name ?? composition ?? truncateAddress(pubkey, 6, 6);
 
   // n ≥ 4 baskets exceed the legacy packet limit — the redeem compiles through
-  // a wallet-signed lookup table (created once per session, reused after).
+  // a wallet-signed lookup table. Preparation starts in the background on page
+  // open (one-time setup) and is shared with the buy page's table for the same
+  // basket, so a trade is a single approval and redeem reuses it.
   const coreKeys: BasketCoreKeys | null = useMemo(
     () =>
       publicKey && detail
@@ -203,19 +211,8 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
         : null,
     [detail, publicKey],
   );
-  const needsAlt = mintRedeemNeedsAlt(detail?.constituents.length ?? 0);
-  const altRef = useRef<PublicKey | null>(null);
-  const ensureAlt = useCallback(async (): Promise<PublicKey> => {
-    if (altRef.current) return altRef.current;
-    if (!publicKey || !coreKeys) throw new Error("Connect a wallet first.");
-    const handle = await ensureMintRedeemAlt({
-      connection,
-      keys: coreKeys,
-      sendTransaction,
-    });
-    altRef.current = handle.lookupTableAddress;
-    return handle.lookupTableAddress;
-  }, [connection, coreKeys, publicKey, sendTransaction]);
+  const prewarm = useAltPrewarm(coreKeys);
+  const needsAlt = prewarm.needsAlt;
 
   const openReview = () => {
     if (!publicKey || !coreKeys || shares === null || preview === null) return;
@@ -231,6 +228,43 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
   const close = () => {
     setOpen(false);
     flow.reset();
+  };
+
+  /**
+   * Start (or Retry) the redeem flow. Re-invocable after a failure: the
+   * lookup table is cached and re-verified on-chain, so a retry never re-asks
+   * approvals for an existing table. If the background pre-warm is still
+   * running this awaits the SAME preparation — no duplicate approvals.
+   */
+  const startRedeem = () => {
+    if (!publicKey || !coreKeys || shares === null) return;
+    const parsed = shares;
+    void flow.run(
+      async () => {
+        if (!needsAlt) {
+          return buildRedeemInKind({
+            keys: coreKeys,
+            sharesToBurn: parsed,
+            vaultBalances: vaultBalances as bigint[],
+          }).instructions;
+        }
+        const table = await prewarm.ensureAlt();
+        return buildRedeemInKindTransaction({
+          connection,
+          keys: coreKeys,
+          sharesToBurn: parsed,
+          vaultBalances: vaultBalances as bigint[],
+          lookupTableAddresses: [table],
+        });
+      },
+      needsAlt ? () => prewarm.ensureAlt() : undefined,
+      {
+        onComplete: () => {
+          void refreshShareBalance();
+          retry(); // refetch detail → holdings/NAV update without a manual refresh
+        },
+      },
+    );
   };
 
   const holdingsAligned = useMemo(() => {
@@ -443,15 +477,14 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                 <EmptyState
                   chip="NO SNAPSHOT"
                   title="Preview unavailable"
-                  description="This preview replicates the on-chain pro-rata math from indexed vault holdings and supply. This basket has no complete snapshot yet — the on-chain instruction remains available over RPC."
+                  description="This basket has no complete holdings snapshot yet, so the pro-rata preview can't be computed. The on-chain instruction itself still works."
                 />
               ) : null}
             </CardContent>
           </Card>
 
           <p className="text-xs text-muted-foreground">
-            Redeem is permissionless and oracle-free — no whitelist, no backend, works over any RPC —
-            and irreversible once confirmed.
+            Permissionless and oracle-free. Irreversible once confirmed.
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -477,11 +510,36 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
             ) : null}
           </div>
 
+          {/* one-time basket setup — chip while preparing, explainer line after */}
+          {needsAlt && connected ? (
+            <p
+              data-testid="alt-prewarm"
+              aria-live="polite"
+              className="flex items-center gap-2 text-xs text-muted-foreground"
+            >
+              {prewarm.status === "preparing" ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground"
+                  />
+                  {prewarm.awaitingWallet
+                    ? "Setup — approve in your wallet…"
+                    : "Preparing your basket account… one-time setup"}
+                </>
+              ) : prewarm.status === "failed" ? (
+                "One-time setup will be requested with your first trade — every trade after that is a single click."
+              ) : (
+                "One-time setup for this basket: you may approve 1–2 setup transactions; every trade after this is a single click."
+              )}
+            </p>
+          ) : null}
+
           <TxReviewModal
             open={open}
             onClose={close}
             title="Review redeem"
-            description="redeem_in_kind — burns your shares and transfers the pro-rata underlying to your wallet. Irreversible once confirmed."
+            description="Burns your shares, returns the pro-rata underlying. Irreversible once confirmed."
             accounts={expectedAccounts ?? []}
             summary={
               preview ? (
@@ -506,32 +564,16 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
               ) : undefined
             }
             flowState={flow.state}
-            onConfirm={() => {
-              if (!publicKey || !coreKeys || shares === null) return;
-              const parsed = shares;
-              void flow.run(
-                async () => {
-                  if (!needsAlt) {
-                    return buildRedeemInKind({
-                      keys: coreKeys,
-                      sharesToBurn: parsed,
-                      vaultBalances: vaultBalances as bigint[],
-                    }).instructions;
-                  }
-                  const table = await ensureAlt();
-                  return buildRedeemInKindTransaction({
-                    connection,
-                    keys: coreKeys,
-                    sharesToBurn: parsed,
-                    vaultBalances: vaultBalances as bigint[],
-                    lookupTableAddresses: [table],
-                  });
-                },
-                needsAlt ? () => ensureAlt() : undefined,
-              );
-            }}
+            onConfirm={startRedeem}
+            onRetry={startRedeem}
             confirmLabel="Simulate & sign"
             endpoint={RPC_ENDPOINT}
+            successLine={
+              preview !== null
+                ? `🎉 Done — −${formatRawShares6(preview.burn)} shares${headline ? ` of ${headline}` : ""}`
+                : "🎉 Done"
+            }
+            setupProgress={prewarm.setupProgress}
           />
         </>
       ) : null}

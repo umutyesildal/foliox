@@ -74,13 +74,21 @@ export function AccrueCrankButton({
 
   const close = () => {
     setOpen(false);
-    flow.reset();
+    // Once a signature exists the tx is sent — closing only hides the UI; the
+    // confirmation keeps running and the page-level banner reports the outcome.
+    if (!flow.state.signature) flow.reset();
   };
 
   /** Start (or Retry) the crank — re-invocable after a transient failure. */
   const startCrank = () => {
     if (!keys) return;
-    void flow.run(() => buildAccrueManagementFee(keys).instructions);
+    void flow.run(() => buildAccrueManagementFee(keys).instructions, undefined, {
+      describe: {
+        kind: "crank",
+        label: "fee accrual",
+        successLine: "🎉 Done — fee accrued",
+      },
+    });
   };
 
   const elapsedLabel =
@@ -123,8 +131,9 @@ export function AccrueCrankButton({
         flowState={flow.state}
         onConfirm={startCrank}
         onRetry={startCrank}
-        confirmLabel="Simulate & sign"
+        confirmLabel="Confirm"
         endpoint={RPC_ENDPOINT}
+        pendingTxId={flow.state.pendingTxId}
         successLine="🎉 Done — fee accrued"
       />
     </>

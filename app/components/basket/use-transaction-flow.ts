@@ -15,12 +15,18 @@ import {
   withRetry,
   type RetryEvent,
 } from "@/lib/rpc-retry";
-import { describeRpcError, describeWalletError } from "@/lib/wallet";
+import { RPC_ENDPOINT, describeRpcError, describeWalletError } from "@/lib/wallet";
 import {
   computeBudgetInstructions,
   decodeProgramError,
   isMintPausedError,
 } from "@/lib/transactions";
+import {
+  removePendingTx,
+  trackPendingTx,
+  updatePendingTx,
+  type PendingTxKind,
+} from "@/components/feedback/pending-tx";
 
 /**
  * Local transaction-flow state machine shared by Buy / Redeem / the accrual
@@ -87,6 +93,22 @@ export type TransactionBuild = () =>
   | TransactionBuildResult
   | Promise<TransactionBuildResult>;
 
+/**
+ * What the page-level "sent while hidden" banner needs to say about this flow
+ * (app/components/feedback). Registered the moment a signature exists.
+ */
+export interface PendingTxDescribe {
+  kind: PendingTxKind;
+  /** Banner noun, lowercase: "buy", "redeem", "basket creation". */
+  label: string;
+  /** SUCCESS headline for the banner, e.g. "🎉 Done — +2,475 shares". */
+  successLine?: string;
+  /** Where the outcome action link points (e.g. "/portfolio"). */
+  actionHref?: string;
+  /** Outcome action label, e.g. "View Portfolio". */
+  actionLabel?: string;
+}
+
 export interface TransactionFlowState {
   status: TransactionFlowStatus;
   /** Human-readable error for failed/rejected states. Never "unexpected error". */
@@ -105,6 +127,8 @@ export interface TransactionFlowState {
   retryable: boolean;
   /** Live progress line while the retry loop waits out a throttled RPC. */
   progress: string | null;
+  /** Registry entry for the sent-and-confirming banner (null until sent). */
+  pendingTxId: string | null;
 }
 
 const INITIAL: TransactionFlowState = {
@@ -118,6 +142,7 @@ const INITIAL: TransactionFlowState = {
   approvedEarlier: false,
   retryable: false,
   progress: null,
+  pendingTxId: null,
 };
 
 /** Confirmation poll budget for an already-submitted transaction (spec: ~90s). */
@@ -142,7 +167,9 @@ export function useTransactionFlow() {
   }, []);
 
   const fail = useCallback((patch: Partial<TransactionFlowState>) => {
-    setState({ ...INITIAL, ...patch });
+    // Keep the registry id: a modal hidden mid-flight stays linked to its
+    // banner entry even when the flow later fails.
+    setState((s) => ({ ...INITIAL, pendingTxId: s.pendingTxId, ...patch }));
     inFlight.current = false;
   }, []);
 
@@ -161,7 +188,7 @@ export function useTransactionFlow() {
     async (
       build: TransactionBuild,
       prepare?: () => Promise<unknown>,
-      options?: { onComplete?: () => void },
+      options?: { onComplete?: () => void; describe?: PendingTxDescribe },
     ): Promise<boolean> => {
       if (inFlight.current) return false;
       if (!publicKey) {
@@ -169,6 +196,24 @@ export function useTransactionFlow() {
         return false;
       }
       inFlight.current = true;
+
+      // Pre-arm the banner registry: the entry exists from flow start with an
+      // empty signature and is patched in the moment the tx is really sent.
+      // If the user closes the modal while the wallet prompt is open and then
+      // approves anyway, the confirmation still surfaces on any page.
+      const describe = options?.describe;
+      const registryId = describe
+        ? trackPendingTx({
+            kind: describe.kind,
+            label: describe.label,
+            signature: "",
+            endpoint: RPC_ENDPOINT,
+            successLine: describe.successLine ?? null,
+            actionHref: describe.actionHref ?? null,
+            actionLabel: describe.actionLabel ?? null,
+          })
+        : null;
+      if (registryId) setState((s) => ({ ...s, pendingTxId: registryId }));
 
       // Live progress line while the shared retry loop waits out a throttle —
       // one short sentence; the technical attempt/wait details live in the
@@ -203,13 +248,14 @@ export function useTransactionFlow() {
 
       // ---- 0. optional preparation (e.g. wallet-signed lookup table) ----
       if (prepare) {
-        setState({ ...INITIAL, status: "preparing-alt" });
+        setState({ ...INITIAL, pendingTxId: registryId, status: "preparing-alt" });
         try {
           await prepare();
         } catch (err) {
           const reason = describeWalletError(
             err as { name?: string; message?: string } | null,
           );
+          if (registryId) removePendingTx(registryId); // never sent
           fail({
             status: "failed",
             failedStage: "prepare",
@@ -226,7 +272,7 @@ export function useTransactionFlow() {
       const approvedAlt = Boolean(prepare);
 
       // ---- 1. build + simulate (exactly ONE simulation before the send) ----
-      setState({ ...INITIAL, status: "simulating" });
+      setState({ ...INITIAL, pendingTxId: registryId, status: "simulating" });
       let legacy: Transaction | null = null;
       let prepared: PreparedTransaction | null = null;
       try {
@@ -246,6 +292,7 @@ export function useTransactionFlow() {
           prepared = built;
         }
       } catch (err) {
+        if (registryId) removePendingTx(registryId); // never sent
         fail({
           status: "failed",
           failedStage: "build",
@@ -272,6 +319,7 @@ export function useTransactionFlow() {
               { label: "simulation", onRetry: onRetryEvent },
             );
       } catch (err) {
+        if (registryId) removePendingTx(registryId); // never sent
         fail({
           status: "failed",
           failedStage: "simulate",
@@ -283,6 +331,7 @@ export function useTransactionFlow() {
       }
       if (simulation.value.err) {
         const decoded = decodeProgramError(simulation.value.err);
+        if (registryId) removePendingTx(registryId); // never sent
         fail({
           status: "failed",
           failedStage: "simulate",
@@ -320,6 +369,7 @@ export function useTransactionFlow() {
         const rejected =
           message.includes("rejected") ||
           (err instanceof Error && err.name === "WalletSignTransactionError");
+        if (registryId) removePendingTx(registryId); // never sent
         fail({
           status: rejected ? "rejected" : "failed",
           failedStage: "sign",
@@ -339,6 +389,10 @@ export function useTransactionFlow() {
       // success bar for the devnet UX. If the budget runs out, resolve to the
       // neutral "submitted" state: not an error, the tx usually still lands.
       setState((s) => ({ ...s, status: "confirming", progress: null, signature }));
+      // The pre-armed registry entry becomes a real, sent transaction: from
+      // here on it is on-cluster and unstoppable — if the user hides the
+      // modal, the outcome still surfaces on any page (owner's #1 complaint).
+      if (registryId) updatePendingTx(registryId, { signature });
       const deadline = Date.now() + CONFIRM_BUDGET_MS;
       let exhaustionRounds = 0;
       for (;;) {
@@ -362,6 +416,7 @@ export function useTransactionFlow() {
         const status = statuses?.value?.[0] ?? null;
         if (status?.err) {
           const decoded = decodeProgramError(status.err);
+          if (registryId) updatePendingTx(registryId, { status: "failed" });
           fail({
             status: "failed",
             failedStage: "confirm",
@@ -381,8 +436,10 @@ export function useTransactionFlow() {
           (status.confirmationStatus === "confirmed" ||
             status.confirmationStatus === "finalized")
         ) {
+          if (registryId) updatePendingTx(registryId, { status: "confirmed" });
           setState({
             ...INITIAL,
+            pendingTxId: registryId,
             status: "confirmed",
             signature,
           });
@@ -397,8 +454,10 @@ export function useTransactionFlow() {
       }
 
       // Budget spent without a terminal status — submitted, NOT failed.
+      if (registryId) updatePendingTx(registryId, { status: "submitted" });
       setState({
         ...INITIAL,
+        pendingTxId: registryId,
         status: "submitted",
         signature,
       });

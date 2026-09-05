@@ -4,6 +4,7 @@ import { Cinzel, Geist, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 import { SiteHeader } from "@/components/shell/site-header";
+import { PendingTxBanner } from "@/components/feedback/pending-tx-banner";
 import { AppProviders } from "./providers";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -52,6 +53,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
               {children}
             </main>
+            {/* Sent-while-hidden safety net: confirmation outcomes surface on
+                any page (components/feedback/pending-tx.ts registry). */}
+            <PendingTxBanner />
           </div>
         </AppProviders>
       </body>

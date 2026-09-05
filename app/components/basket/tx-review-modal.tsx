@@ -7,23 +7,31 @@ import { Button } from "@/components/ui/button";
 import { truncateAddress } from "@/lib/format";
 import type { ExpectedAccount } from "@/lib/transactions";
 import { explorerTxUrl } from "@/lib/transactions";
+import { hidePendingTx } from "@/components/feedback/pending-tx";
 import type { TransactionFlowState } from "@/components/basket/use-transaction-flow";
 import type { SetupProgress } from "@/components/basket/use-alt-prewarm";
 
+/** Shown on every close affordance AFTER the transaction has been sent. */
+const HIDE_TOOLTIP = "Transaction already sent — closing won't stop it";
+
 /**
- * Transaction review modal: summary slot + a compact 3-state result card.
+ * Transaction review modal: human-language summary + a compact 3-state result
+ * card. ONE primary action per state.
  *
  * Copy contract (≤ 2 sentences per state, no walls of text):
- *  - PENDING   spinner + one line ("Sending your transaction…"); lookup-table
- *              setup is labelled as such in the header ("Setup 1/2").
+ *  - PENDING   spinner + one line ("Confirming…"); lookup-table setup is
+ *              labelled as such in the header ("Setup 1/2").
  *  - SENT      big ✓ pending style + ONE explorer link + one "few seconds"
  *              reassurance line. Never an error, never a paragraph.
- *  - SUCCESS   "🎉 Done — +X shares of <BASKET>" (or −X / "Basket created")
+ *  - SUCCESS   "🎉 Done — +X shares of <BASKET>" (or −X / "Basket created!")
  *              + [View Portfolio] [View on Explorer].
  *  - FAILURE   one plain sentence + Retry; the technical log hides behind a
  *              collapsed "Details" disclosure.
- * The rate-limit line is one short sentence. Escape closes while idle only —
- * closing is disabled mid-flight so the outcome state is always visible.
+ * Close semantics: BEFORE the wallet signs → "Cancel" aborts truly (local
+ * state resets, nothing is on-chain). AFTER the tx is sent → every close
+ * affordance becomes "Hide" (tooltip: "Transaction already sent — closing
+ * won't stop it"); the confirmation keeps running and the page-level banner
+ * (components/feedback) reports the outcome.
  */
 export function TxReviewModal({
   open,
@@ -41,6 +49,7 @@ export function TxReviewModal({
   successLine,
   portfolioHref = "/portfolio",
   setupProgress = null,
+  pendingTxId = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -63,15 +72,29 @@ export function TxReviewModal({
   portfolioHref?: string;
   /** Live lookup-table setup progress → "Setup 1/2" badge in the header. */
   setupProgress?: SetupProgress | null;
+  /** Registry id from use-transaction-flow — enables the "Hide" semantics. */
+  pendingTxId?: string | null;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // After a signature exists the tx is unstoppable: closing only hides the UI,
+  // and the still-running confirmation surfaces via the page-level banner.
+  const sent = flowState.signature !== null && !isIdle(flowState.status);
+  const flowAlive = !isIdle(flowState.status) && !isTerminal(flowState.status);
+  const handleClose = () => {
+    // Pre-send (wallet prompt open) → hiding arms the banner so a late
+    // approval still reports; post-send → the banner takes over immediately.
+    if (pendingTxId && (sent || flowAlive)) hidePendingTx(pendingTxId);
+    onClose();
+  };
 
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isIdle(flowState.status)) onClose();
+      // Escape mirrors the ✕: Cancel while idle, Hide once the tx is sent.
+      if (event.key === "Escape") handleClose();
       // Focus trap: with aria-modal set, Tab must cycle inside the dialog.
       if (event.key === "Tab" && panelRef.current) {
         const focusables = panelRef.current.querySelectorAll<HTMLElement>(
@@ -98,11 +121,12 @@ export function TxReviewModal({
       document.removeEventListener("keydown", onKeyDown);
       previous?.focus();
     };
-  }, [open, onClose, flowState.status]);
+    // handleClose is a plain closure over (sent, pendingTxId, onClose).
+  }, [open, sent, pendingTxId, onClose, flowState.status]);
 
   if (!open) return null;
 
-  const inFlight = !isIdle(flowState.status) && !isTerminal(flowState.status);
+  const inFlight = flowAlive;
   const terminal = isTerminal(flowState.status);
   const explorerHref = flowState.signature
     ? explorerTxUrl(flowState.signature, endpoint)
@@ -142,9 +166,10 @@ export function TxReviewModal({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Close review"
-            onClick={onClose}
-            disabled={inFlight}
+            aria-label={sent ? "Hide" : "Cancel"}
+            title={sent ? HIDE_TOOLTIP : "Cancel"}
+            data-testid="tx-close"
+            onClick={handleClose}
           >
             ×
           </Button>
@@ -172,21 +197,36 @@ export function TxReviewModal({
 
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           {canRetry ? <Button variant="outline" onClick={onRetry}>Retry</Button> : null}
-          <Button variant="outline" onClick={onClose} disabled={inFlight}>
-            {terminal ? "Close" : "Cancel"}
+          {/* One close affordance, two honest verbs: Cancel (before the wallet
+              signs — aborts truly) / Hide (after send — the banner takes over). */}
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            title={sent ? HIDE_TOOLTIP : undefined}
+            data-testid="tx-hide"
+          >
+            {sent ? "Hide" : "Cancel"}
           </Button>
           <Button
             onClick={onConfirm}
             disabled={inFlight || terminal || !isIdle(flowState.status)}
+            data-testid="tx-confirm"
           >
-            {inFlight ? statusLabel(flowState.status) : confirmLabel}
+            {inFlight ? (
+              <>
+                <Spinner />
+                {statusLabel(flowState.status)}
+              </>
+            ) : (
+              confirmLabel
+            )}
           </Button>
         </div>
 
         {accounts.length > 0 ? (
           <details className="mt-4 border-t border-border/60 pt-3 text-xs text-muted-foreground">
             <summary className="cursor-pointer select-none">
-              Accounts this transaction touches ({accounts.length})
+              Advanced details — accounts this transaction touches ({accounts.length})
             </summary>
             <ul className="mt-2 divide-y divide-border overflow-hidden rounded-md border border-border">
               {accounts.map((account) => (
@@ -234,7 +274,9 @@ function statusLabel(status: TransactionFlowState["status"]): string {
     case "preparing-alt":
       return "Setup in wallet…";
     case "simulating":
-      return "Simulating…";
+      // Auto pre-flight: the user never pressed "Simulate" — say what the
+      // machine is doing in plain words, not engineer words.
+      return "Checking on-chain…";
     case "awaiting-signature":
       return "Approve in wallet…";
     case "confirming":
@@ -278,7 +320,7 @@ function StatusCard({
     case "idle":
       return (
         <p className="text-xs text-muted-foreground">
-          Simulated before signing — nothing is sent without your approval.
+          Checked on-chain before signing — nothing is sent without your approval.
         </p>
       );
 

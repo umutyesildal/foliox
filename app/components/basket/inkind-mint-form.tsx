@@ -11,6 +11,13 @@ import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
 import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import {
+  bpsToPct,
+  feesLine,
+  grouped,
+  SummaryRow,
+  TxSummaryCard,
+} from "@/components/basket/summary-card";
+import {
   checkGrossShares,
   entryFeeOf,
   formatRawShares6,
@@ -57,11 +64,14 @@ function basketName(detail: BasketDetail): string | null {
 export function InKindMintForm({
   detail,
   vaultBalances,
+  tickers,
   onSuccess,
 }: {
   detail: BasketDetail;
   /** Raw vault balance per constituent (null when the holding is not indexed). */
   vaultBalances: (bigint | null)[];
+  /** Mint → ticker map (page API data) for the human-language review card. */
+  tickers?: Map<string, string>;
   /** Called after a confirmed mint so the page can refetch detail/holdings. */
   onSuccess?: () => void;
 }) {
@@ -169,6 +179,38 @@ export function InKindMintForm({
   const entryFee = gross !== null ? entryFeeOf(gross, detail.entry_fee_bps) : null;
   const net = gross !== null && entryFee !== null ? gross - entryFee : null;
 
+  // Plain-language review-card helpers: pretty tickers (page API data, short
+  // mint prefix fallback) and whole-token amounts — never raw base units.
+  const name = basketName(detail);
+  const tickerOf = (mint: string): string =>
+    tickers?.get(mint) ?? truncateAddress(mint, 4, 4);
+  const successLineText =
+    net !== null
+      ? `🎉 Done — +${grouped(formatRawShares6(net))} shares${name ? ` of ${name}` : ""}`
+      : "🎉 Done";
+  const depositLine = check?.ok
+    ? (amounts as bigint[])
+        .map((amount, i) => {
+          const holding = holdings[i];
+          const scaled = scaledFromRaw(
+            amount,
+            Number(holding?.multiplier ?? 1),
+            holding?.decimals ?? 6,
+          );
+          return `${tickerOf(detail.constituents[i])} ${grouped(scaled)}`;
+        })
+        .join(" · ")
+    : null;
+
+  // After a successful buy the form resets — the next buy starts clean (the
+  // balance refresh itself is hooked into the flow's onComplete above).
+  const justConfirmed = flow.state.status === "confirmed";
+  useEffect(() => {
+    if (!justConfirmed) return;
+    setInputs(detail.constituents.map(() => ""));
+    setFillNote(null);
+  }, [justConfirmed, detail.constituents]);
+
   const offTolerance = check?.ok ? offToleranceLegs(check.perLeg) : [];
   const weightError = !check?.ok && check ? check.error : null;
 
@@ -210,7 +252,9 @@ export function InKindMintForm({
 
   const close = () => {
     setOpen(false);
-    flow.reset();
+    // Once a signature exists the tx is sent — closing only hides the UI; the
+    // confirmation keeps running and the page-level banner reports the outcome.
+    if (!flow.state.signature) flow.reset();
   };
 
   /**
@@ -253,6 +297,13 @@ export function InKindMintForm({
         onComplete: () => {
           void refreshBalances();
           onSuccess?.();
+        },
+        describe: {
+          kind: "buy",
+          label: "buy",
+          successLine: successLineText,
+          actionHref: "/portfolio",
+          actionLabel: "View Portfolio",
         },
       },
     );
@@ -500,11 +551,11 @@ export function InKindMintForm({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={openReview} disabled={!canReview}>
-            Review &amp; mint
+          <Button onClick={openReview} disabled={!canReview} data-testid="buy-trigger">
+            Buy shares
           </Button>
           {!connected ? (
-            <span className="text-xs text-muted-foreground">Connect a wallet to mint.</span>
+            <span className="text-xs text-muted-foreground">Connect a wallet to buy.</span>
           ) : null}
         </div>
 
@@ -536,43 +587,38 @@ export function InKindMintForm({
         <TxReviewModal
           open={open}
           onClose={close}
-          title="Review in-kind mint"
-          description="mint_in_kind — the entry fee splits 90/10 to creator/treasury; net shares mint to your wallet."
+          title={`Buy ${name ?? "basket"}`}
+          description="One press: we check the transaction on-chain first, then your wallet opens for a single approval."
           accounts={[...(createAccounts ?? []), ...(expectedAccounts ?? [])]}
           summary={
-            <dl className="grid gap-1 font-mono text-xs tabular-nums">
-              {detail.constituents.map((mint, i) => (
-                <div key={mint} className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">
-                    deposit[{i}] {truncateAddress(mint, 4, 4)}
-                  </dt>
-                  <dd>{amounts[i]?.toString() ?? "—"}</dd>
-                </div>
-              ))}
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">gross shares</dt>
-                <dd>{gross !== null ? `${gross} raw` : "—"}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">entry fee ({detail.entry_fee_bps} bps)</dt>
-                <dd>{entryFee !== null ? `${entryFee} raw` : "—"}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">net shares</dt>
-                <dd>{net !== null ? `${net} raw` : "—"}</dd>
-              </div>
-            </dl>
+            <TxSummaryCard>
+              <SummaryRow
+                label="You deposit"
+                value={depositLine ?? "—"}
+              />
+              <SummaryRow
+                label="You receive"
+                emphasis
+                value={
+                  net !== null
+                    ? `≈${grouped(formatRawShares6(net))} shares (after ${bpsToPct(detail.entry_fee_bps)} entry fee)`
+                    : "—"
+                }
+              />
+              <SummaryRow
+                label="Fees"
+                muted
+                value={`${feesLine(detail.entry_fee_bps, detail.exit_fee_bps, detail.management_fee_bps)} (90% supports the creator)`}
+              />
+            </TxSummaryCard>
           }
           flowState={flow.state}
           onConfirm={startMint}
           onRetry={startMint}
-          confirmLabel="Simulate & sign"
+          confirmLabel="Buy shares"
           endpoint={RPC_ENDPOINT}
-          successLine={
-            net !== null
-              ? `🎉 Done — +${formatRawShares6(net)} shares${basketName(detail) ? ` of ${basketName(detail)}` : ""}`
-              : "🎉 Done"
-          }
+          pendingTxId={flow.state.pendingTxId}
+          successLine={successLineText}
           setupProgress={prewarm.setupProgress}
           errorSlot={
             flow.state.mintPaused ? (

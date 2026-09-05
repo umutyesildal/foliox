@@ -17,6 +17,12 @@ import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
 import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import { AccrueCrankButton } from "@/components/basket/accrue-crank";
+import {
+  bpsToPct,
+  grouped,
+  SummaryRow,
+  TxSummaryCard,
+} from "@/components/basket/summary-card";
 import { computeRedeemPreview, formatRawShares6, parseRawInput } from "@/components/basket/basket-math";
 import {
   ApiError,
@@ -227,7 +233,9 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
 
   const close = () => {
     setOpen(false);
-    flow.reset();
+    // Once a signature exists the tx is sent — closing only hides the UI; the
+    // confirmation keeps running and the page-level banner reports the outcome.
+    if (!flow.state.signature) flow.reset();
   };
 
   /**
@@ -262,6 +270,16 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
         onComplete: () => {
           void refreshShareBalance();
           retry(); // refetch detail → holdings/NAV update without a manual refresh
+        },
+        describe: {
+          kind: "redeem",
+          label: "redeem",
+          successLine:
+            preview !== null
+              ? `🎉 Done — −${grouped(formatRawShares6(preview.burn))} shares${name ? ` of ${name}` : ""}`
+              : "🎉 Done",
+          actionHref: "/portfolio",
+          actionLabel: "View Portfolio",
         },
       },
     );
@@ -497,8 +515,9 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
                 sharesExceedBalance ||
                 preview === null
               }
+              data-testid="redeem-trigger"
             >
-              Review &amp; redeem
+              Redeem shares
             </Button>
             {!connected ? (
               <span className="text-xs text-muted-foreground">Connect a wallet to redeem.</span>
@@ -538,39 +557,50 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
           <TxReviewModal
             open={open}
             onClose={close}
-            title="Review redeem"
-            description="Burns your shares, returns the pro-rata underlying. Irreversible once confirmed."
+            title={`Redeem ${name ?? "basket"}`}
+            description="One press: we check the transaction on-chain first, then your wallet opens for a single approval."
             accounts={expectedAccounts ?? []}
             summary={
-              preview ? (
-                <dl className="grid gap-1 font-mono text-xs tabular-nums">
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">shares burned</dt>
-                    <dd>{shares?.toString() ?? "—"}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">exit fee ({detail.exit_fee_bps} bps)</dt>
-                    <dd>{preview.exitFee.toString()}</dd>
-                  </div>
-                  {detail.constituents.map((mint, i) => (
-                    <div key={mint} className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">
-                        out[{i}] {truncateAddress(mint, 4, 4)}
-                      </dt>
-                      <dd>{(preview.outs[i] ?? 0n).toString()} raw</dd>
-                    </div>
-                  ))}
-                </dl>
+              preview && detail ? (
+                <TxSummaryCard>
+                  <SummaryRow
+                    label="You burn"
+                    emphasis
+                    value={`${grouped(formatRawShares6(preview.burn))} shares → your proportional slice of every stock`}
+                  />
+                  <SummaryRow
+                    label="You receive"
+                    value={detail.constituents
+                      .map((mint, i) => {
+                        const holding = holdingsAligned[i];
+                        const scaled = scaledFromRaw(
+                          preview.outs[i] ?? 0n,
+                          Number(holding?.multiplier ?? 1),
+                          holding?.decimals ?? 6,
+                        );
+                        const ticker =
+                          mintTickers.get(mint) ?? truncateAddress(mint, 4, 4);
+                        return `${ticker} ${grouped(scaled)}`;
+                      })
+                      .join(" · ")}
+                  />
+                  <SummaryRow
+                    label="Fees"
+                    muted
+                    value={`${bpsToPct(detail.exit_fee_bps)} exit`}
+                  />
+                </TxSummaryCard>
               ) : undefined
             }
             flowState={flow.state}
             onConfirm={startRedeem}
             onRetry={startRedeem}
-            confirmLabel="Simulate & sign"
+            confirmLabel="Redeem shares"
             endpoint={RPC_ENDPOINT}
+            pendingTxId={flow.state.pendingTxId}
             successLine={
               preview !== null
-                ? `🎉 Done — −${formatRawShares6(preview.burn)} shares${headline ? ` of ${headline}` : ""}`
+                ? `🎉 Done — −${grouped(formatRawShares6(preview.burn))} shares${name ? ` of ${name}` : ""}`
                 : "🎉 Done"
             }
             setupProgress={prewarm.setupProgress}

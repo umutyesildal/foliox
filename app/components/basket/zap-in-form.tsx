@@ -10,6 +10,13 @@ import { EmptyState, ErrorState, FreshnessBadge } from "@/components/states";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
 import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
+import {
+  bpsToPct,
+  feesLine,
+  grouped,
+  SummaryRow,
+  TxSummaryCard,
+} from "@/components/basket/summary-card";
 import { formatRawShares6 } from "@/components/basket/basket-math";
 import {
   fetchZapInQuote,
@@ -24,12 +31,27 @@ import {
   type BasketCoreKeys,
   type ExpectedAccount,
 } from "@/lib/transactions";
-import { truncateAddress } from "@/lib/format";
+import { scaledFromRaw, truncateAddress } from "@/lib/format";
 import { withRetry, withRetryOnce } from "@/lib/rpc-retry";
 import { RPC_ENDPOINT, describeRpcError, describeWalletError } from "@/lib/wallet";
 
 const JUPITER_SWAP_URL = "https://quote-api.jup.ag/v6/swap";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // backend default (quotes.ts)
+
+/** Basket display name out of the metadata JSON (null when unparseable). */
+function basketName(detail: BasketDetail): string | null {
+  const mj = detail.metadata_json;
+  let obj: unknown = mj;
+  if (typeof mj === "string") {
+    try {
+      obj = JSON.parse(mj);
+    } catch {
+      return null;
+    }
+  }
+  const n = obj && typeof obj === "object" ? (obj as Record<string, unknown>).name : null;
+  return typeof n === "string" && n.trim() ? n.trim() : null;
+}
 
 type LegStatus = "idle" | "sending" | "confirmed" | "failed";
 type Phase = "idle" | "quoting" | "quoted" | "swapping" | "ready-to-mint" | "done";
@@ -43,10 +65,13 @@ type Phase = "idle" | "quoting" | "quoted" | "swapping" | "ready-to-mint" | "don
 export function ZapInForm({
   detail,
   vaultBalances,
+  tickers,
   onSuccess,
 }: {
   detail: BasketDetail;
   vaultBalances: (bigint | null)[];
+  /** Mint → ticker map (page API data) for the human-language review card. */
+  tickers?: Map<string, string>;
   /** Called after a confirmed closing mint so the page can refetch detail. */
   onSuccess?: () => void;
 }) {
@@ -272,7 +297,9 @@ export function ZapInForm({
 
   const close = () => {
     setOpen(false);
-    flow.reset();
+    // Once a signature exists the tx is sent — closing only hides the UI; the
+    // confirmation keeps running and the page-level banner reports the outcome.
+    if (!flow.state.signature) flow.reset();
   };
 
   /**
@@ -305,6 +332,16 @@ export function ZapInForm({
       needsAlt ? () => prewarm.ensureAlt() : undefined,
       {
         onComplete: () => onSuccess?.(),
+        describe: {
+          kind: "buy",
+          label: "buy",
+          successLine:
+            quote && /^\d+$/.test(quote.expectedShares?.trim() ?? "")
+              ? `🎉 Done — +${grouped(formatRawShares6(BigInt(quote.expectedShares!.trim())))} shares`
+              : "🎉 Done",
+          actionHref: "/portfolio",
+          actionLabel: "View Portfolio",
+        },
       },
     );
   };
@@ -461,7 +498,7 @@ export function ZapInForm({
                 disabled={phase !== "ready-to-mint" || !legsDone}
                 variant="outline"
               >
-                Mint with received tokens
+                Buy with received tokens
               </Button>
             </div>
             {connected && !signTransaction ? (
@@ -475,29 +512,52 @@ export function ZapInForm({
         <TxReviewModal
           open={open}
           onClose={close}
-          title="Review mint after zap"
-          description="mint_in_kind with the amounts that actually arrived — not the quoted amounts. The entry fee splits 90/10 to creator/treasury."
+          title={`Buy ${basketName(detail) ?? "basket"} with USDC`}
+          description="One press: we check the mint on-chain first, then your wallet opens for a single approval."
           accounts={expectedAccounts ?? []}
           summary={
-            <dl className="grid gap-1 font-mono text-xs tabular-nums">
-              {detail.constituents.map((mint, i) => (
-                <div key={mint} className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">
-                    deposit[{i}] {truncateAddress(mint, 4, 4)}
-                  </dt>
-                  <dd>{mintAmounts ? `${mintAmounts[i]} raw` : "—"}</dd>
-                </div>
-              ))}
-            </dl>
+            <TxSummaryCard>
+              <SummaryRow
+                label="You deposit"
+                value={
+                  mintAmounts
+                    ? detail.constituents
+                        .map((mint, i) => {
+                          const holding = detail.holdings.find((h) => h.mint === mint);
+                          const scaled = scaledFromRaw(
+                            mintAmounts[i] ?? 0n,
+                            Number(holding?.multiplier ?? 1),
+                            holding?.decimals ?? 6,
+                          );
+                          return `${tickers?.get(mint) ?? truncateAddress(mint, 4, 4)} ${grouped(scaled)}`;
+                        })
+                        .join(" · ")
+                    : "—"
+                }
+              />
+              {quote?.expectedShares && /^\d+$/.test(quote.expectedShares.trim()) ? (
+                <SummaryRow
+                  label="You receive"
+                  emphasis
+                  value={`≈${grouped(formatRawShares6(BigInt(quote.expectedShares.trim())))} shares (after ${bpsToPct(detail.entry_fee_bps)} entry fee)`}
+                />
+              ) : null}
+              <SummaryRow
+                label="Fees"
+                muted
+                value={`${feesLine(detail.entry_fee_bps, detail.exit_fee_bps, detail.management_fee_bps)} (90% supports the creator)`}
+              />
+            </TxSummaryCard>
           }
           flowState={flow.state}
           onConfirm={startMint}
           onRetry={startMint}
-          confirmLabel="Simulate & sign"
+          confirmLabel="Buy shares"
           endpoint={RPC_ENDPOINT}
+          pendingTxId={flow.state.pendingTxId}
           successLine={
             quote && /^\d+$/.test(quote.expectedShares?.trim() ?? "")
-              ? `🎉 Done — +${formatRawShares6(BigInt(quote.expectedShares!.trim()))} shares`
+              ? `🎉 Done — +${grouped(formatRawShares6(BigInt(quote.expectedShares!.trim())))} shares`
               : "🎉 Done"
           }
           setupProgress={prewarm.setupProgress}

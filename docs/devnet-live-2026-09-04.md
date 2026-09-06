@@ -293,3 +293,36 @@ node scripts/.e2e-devnet/collect-evidence.mjs
 ```
 
 Programs are already deployed at the declared IDs; a from-scratch redeploy uses `solana program deploy target/deploy/<name>.so --program-id target/deploy/<name>-keypair.json --url devnet` (×3) and a fresh `solana transfer <user2> 1.5 --url devnet`.
+
+## Public demo deployment (2026-09-06)
+
+The jury-facing frontend is on Vercel; the backend stays on this Mac and is exposed through a Cloudflare quick tunnel.
+
+- **Frontend (Vercel):** https://foliox-app-coral.vercel.app (project `foliox-app`, account `yesildaladam`; per-deploy URLs like `https://foliox-<hash>-yesildaladams-projects.vercel.app` are also valid)
+- **Backend (quick tunnel):** https://delight-closes-harley-driving.trycloudflare.com → `http://localhost:3001`
+- Tunnel health at deploy time: `{"ok":true,"version":"0.1.0",...,"db":{"connected":true,"basketCount":3,...}}`
+- End-to-end verified with headless Chrome: the deployed /explore page fetches `/api/v1/baskets?limit=100`, `/whitelist`, `/market/overview` from the tunnel origin and renders all 3 baskets; the buy page (`/basket/<pubkey>/buy`) also calls the tunnel origin.
+
+### After a Mac reboot (tunnel URL CHANGES)
+
+Quick-tunnel URLs are ephemeral — every restart produces a new `*.trycloudflare.com` host, and the Vercel env must be updated to match. Three commands:
+
+```bash
+# 1. start the stack (backend :3001 + frontend :3100, health-checked)
+bash scripts/devnet-up.sh
+
+# 2. start a fresh quick tunnel and read the new URL from the log
+nohup cloudflared tunnel --url http://localhost:3001 > /tmp/foliox-tunnel.log 2>&1 &
+grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' /tmp/foliox-tunnel.log | head -1 | tee /tmp/foliox-tunnel-url
+
+# 3. push the new URL into Vercel and redeploy (NEXT_PUBLIC_* are build-time)
+NEW_URL=$(cat /tmp/foliox-tunnel-url)
+cd app
+printf "$NEW_URL" | npx vercel env rm NEXT_PUBLIC_API production --yes 2>/dev/null; printf "$NEW_URL" | npx vercel env add NEXT_PUBLIC_API production
+printf "$NEW_URL" | npx vercel env rm NEXT_PUBLIC_API development --yes 2>/dev/null; printf "$NEW_URL" | npx vercel env add NEXT_PUBLIC_API development
+npx vercel --prod --yes
+```
+
+**Follow-up:** a named Cloudflare tunnel (or any static domain in front of the Mac) would pin the URL and remove the redeploy step. `cloudflared` is installed via Homebrew (`brew services start cloudflared` can run it at login once a named tunnel is configured).
+
+Deploy note: Vercel rejects builds on Next.js versions it flags as vulnerable; `app/` was upgraded next `15.1.0 → 15.5.25` on 2026-09-06 to pass that gate.

@@ -13,6 +13,8 @@ coverage
 # Keys
 keys/
 **/id.json
+scripts/.e2e/
+backend/.env.devnet
 !backend/.env.example
 !app/.env.example
 

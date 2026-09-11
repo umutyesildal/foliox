@@ -184,3 +184,25 @@ export function formatAsOf(input: Date | number | string): string {
   const iso = date.toISOString();
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
 }
+
+/**
+ * Coarse relative time for social timestamps ("just now", "5m ago", "3h ago",
+ * "12d ago"); older than 30 days falls back to the UTC date. Client-side only
+ * (social feeds are client components), `now` injectable for tests.
+ */
+export function formatRelativeTime(
+  input: Date | number | string,
+  now: Date = new Date(),
+): string {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return NOT_A_NUMBER_LABEL;
+  const seconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+  if (seconds < 45) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toISOString().slice(0, 10);
+}

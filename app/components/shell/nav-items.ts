@@ -11,6 +11,8 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: "/stocks", label: "Stocks" },
   { href: "/etfs", label: "ETFs" },
   { href: "/explore", label: "Baskets" },
+  { href: "/feed", label: "Feed" },
+  { href: "/leaderboard", label: "Leaderboard" },
 ];
 
 export const CONTEXT_ACTIONS: NavItem[] = [

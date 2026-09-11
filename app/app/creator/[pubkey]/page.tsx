@@ -6,10 +6,25 @@ import { useParams } from "next/navigation";
 import { PublicKey } from "@solana/web3.js";
 
 import { EmptyState, ErrorState, FreshnessBadge, Skeleton } from "@/components/states";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatAsOf, formatUsd, truncateAddress } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatAsOf, formatRelativeTime, formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
 import { apiFetch } from "@/lib/api-client";
 import { LegalReviewTag } from "@/components/create";
+import {
+  followWallet,
+  fetchEquityCurve,
+  fetchHistory,
+  fetchProfile,
+  unfollowWallet,
+  type EquityPoint,
+  type ProfilePayload,
+  type TradeHistoryItem,
+} from "@/lib/social-api";
+import { useSocialAuth } from "@/lib/social-auth";
+import { ProfileEditorModal } from "@/components/social/profile-editor";
+import { SocialAvatar } from "@/components/social/avatar";
+import { EquityCurveChart } from "@/components/social/equity-curve-chart";
 
 interface CreatorStats {
   basket_count?: string | number | null;
@@ -44,11 +59,14 @@ function numeric(value: string | number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const HISTORY_PAGE = 20;
+
 /**
- * Creator profile — GET /api/v1/creators/:pubkey. Renders identity, basket
- * count, AUM and fee totals only when the indexer actually has them; until
- * then the page is an explicit placeholder, never fabricated numbers
- * (plan.md §5 Creator acceptance).
+ * Trader profile = social identity (avatar/handle/bio, follow, equity curve,
+ * trade history) over the existing indexer-fed creator section (stats +
+ * baskets), which is kept verbatim. Everything degrades honestly: a wallet
+ * with no social profile renders identicon + truncated address; a private
+ * profile renders a minimal state while the indexer baskets stay visible.
  */
 export default function CreatorPage() {
   const params = useParams<{ pubkey: string }>();
@@ -63,6 +81,7 @@ export default function CreatorPage() {
     }
   })();
 
+  // ---- existing creator (indexer) state — unchanged behavior ----
   const [status, setStatus] = useState<"loading" | "ready" | "not-indexed" | "error" | "invalid">(
     validKey ? "loading" : "invalid",
   );
@@ -114,26 +133,288 @@ export default function CreatorPage() {
     void load();
   }, [load, reloadToken]);
 
-  const stats = payload?.stats ?? null;
+  // ---- social layer state ----
+  const social = useSocialAuth();
+  const isOwner =
+    !!social.authWallet &&
+    !!pubkeyParam &&
+    social.authWallet.toLowerCase() === pubkeyParam.toLowerCase();
+
+  const [profileStatus, setProfileStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [profilePayload, setProfilePayload] = useState<ProfilePayload | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const [curve, setCurve] = useState<EquityPoint[] | null>(null);
+  const [curveFailed, setCurveFailed] = useState(false);
+
+  const [history, setHistory] = useState<TradeHistoryItem[] | null>(null);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyFailed, setHistoryFailed] = useState(false);
+
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followError, setFollowError] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  const profile = profilePayload?.profile ?? null;
+  const isPrivate = profile?.isPublic === false && !isOwner;
+
+  const loadProfile = useCallback(async () => {
+    if (!validKey) return;
+    setProfileStatus("loading");
+    setProfileError(null);
+    try {
+      const payload = await fetchProfile(pubkeyParam);
+      setProfilePayload(payload);
+      setProfileStatus("ready");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setProfileError(err instanceof Error ? err.message : "Could not load the social profile.");
+      setProfileStatus("error");
+    }
+  }, [pubkeyParam, validKey]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  // Equity curve + first history page — public profiles only.
+  useEffect(() => {
+    if (!validKey || isPrivate) return;
+    const controller = new AbortController();
+    setCurve(null);
+    setHistory(null);
+    setCurveFailed(false);
+    setHistoryFailed(false);
+    void (async () => {
+      try {
+        const res = await fetchEquityCurve(pubkeyParam, { days: 30 }, controller.signal);
+        setCurve(res.points);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setCurve([]);
+        setCurveFailed(true);
+      }
+    })();
+    void (async () => {
+      try {
+        const res = await fetchHistory(pubkeyParam, { limit: HISTORY_PAGE }, controller.signal);
+        setHistory(res.items);
+        setHistoryCursor(res.nextCursor);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setHistory([]);
+        setHistoryFailed(true);
+      }
+    })();
+    return () => controller.abort();
+  }, [pubkeyParam, validKey, isPrivate]);
+
+  const loadMoreHistory = async () => {
+    if (!historyCursor || historyLoadingMore) return;
+    setHistoryLoadingMore(true);
+    try {
+      const res = await fetchHistory(pubkeyParam, {
+        limit: HISTORY_PAGE,
+        cursor: historyCursor,
+      });
+      setHistory((prev) => [...(prev ?? []), ...res.items]);
+      setHistoryCursor(res.nextCursor);
+    } catch {
+      // keep the current list; cursor stays so the user can retry
+    } finally {
+      setHistoryLoadingMore(false);
+    }
+  };
+
+  const onFollow = async () => {
+    if (followBusy || !profilePayload) return;
+    setFollowBusy(true);
+    setFollowError(null);
+    const wasFollowing = profilePayload.viewer?.isFollowing ?? false;
+    // Optimistic flip; reverted on any failure.
+    setProfilePayload({
+      ...profilePayload,
+      viewer: { isFollowing: !wasFollowing },
+      stats: {
+        ...profilePayload.stats,
+        followers: profilePayload.stats.followers + (wasFollowing ? -1 : 1),
+      },
+    });
+    try {
+      const token = await social.ensureAuth();
+      const result = wasFollowing
+        ? await unfollowWallet(token, pubkeyParam)
+        : await followWallet(token, pubkeyParam);
+      setProfilePayload((prev) =>
+        prev
+          ? {
+              ...prev,
+              viewer: { isFollowing: result.following },
+              stats: { ...prev.stats, followers: result.followerCount },
+            }
+          : prev,
+      );
+    } catch (err) {
+      setProfilePayload((prev) =>
+        prev
+          ? {
+              ...prev,
+              viewer: { isFollowing: wasFollowing },
+              stats: {
+                ...prev.stats,
+                followers: prev.stats.followers + (wasFollowing ? 1 : -1),
+              },
+            }
+          : prev,
+      );
+      setFollowError(
+        err instanceof Error ? err.message : "The follow request failed — try again.",
+      );
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
+  const statsRow = profilePayload?.stats;
+  const creatorStats = payload?.stats ?? null;
   const baskets = payload?.baskets ?? [];
-  const basketCount = numeric(stats?.basket_count);
+  const basketCount = numeric(creatorStats?.basket_count);
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <header className="pb-10">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Creator{" "}
-          <span
-            className="font-mono text-2xl tabular-nums text-muted-foreground"
-            title={validKey ? pubkeyParam : undefined}
-          >
-            {validKey ? truncateAddress(pubkeyParam, 4, 4) : "invalid address"}
-          </span>
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Baskets deployed by this wallet — stats stay empty until the indexer tracks activity.
-        </p>
-      </header>
+      {/* ---- social identity header ---- */}
+      {validKey ? (
+        <header className="pb-8">
+          {profileStatus === "loading" ? (
+            <div className="flex items-center gap-4" role="status" aria-label="Loading profile">
+              <span className="sr-only">Loading profile</span>
+              <Skeleton className="h-14 w-14 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+            </div>
+          ) : profileStatus === "error" ? (
+            <p className="text-sm text-muted-foreground">
+              Social profile unavailable — {profileError}
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-4">
+                <SocialAvatar
+                  wallet={pubkeyParam}
+                  handle={profile?.handle}
+                  displayName={profile?.displayName}
+                  avatarUrl={profile?.avatarUrl}
+                  size="md"
+                />
+                <div className="min-w-0">
+                  <h1 className="text-3xl font-semibold tracking-tight">
+                    {isPrivate ? (
+                      <span
+                        className="font-mono text-2xl tabular-nums"
+                        title={pubkeyParam}
+                      >
+                        {truncateAddress(pubkeyParam, 4, 4)}
+                      </span>
+                    ) : profile ? (
+                      profile.displayName?.trim() || `@${profile.handle}`
+                    ) : (
+                      <span
+                        className="font-mono text-2xl tabular-nums text-muted-foreground"
+                        title={pubkeyParam}
+                      >
+                        {truncateAddress(pubkeyParam, 4, 4)}
+                      </span>
+                    )}
+                  </h1>
+                  {profile && !isPrivate ? (
+                    <p className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                      @{profile.handle} · {truncateAddress(pubkeyParam, 4, 4)}
+                    </p>
+                  ) : null}
+                  {profile && !isPrivate && profile.bio ? (
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                      {profile.bio}
+                    </p>
+                  ) : null}
+                  {isPrivate ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      This profile is private.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {isOwner ? (
+                  <Button variant="outline" size="sm" onClick={() => setEditorOpen(true)}>
+                    Edit profile
+                  </Button>
+                ) : profile && !isPrivate ? (
+                  <Button
+                    variant={profilePayload?.viewer?.isFollowing ? "outline" : "default"}
+                    size="sm"
+                    onClick={() => void onFollow()}
+                    disabled={followBusy}
+                  >
+                    {followBusy
+                      ? "…"
+                      : profilePayload?.viewer?.isFollowing
+                        ? "Following"
+                        : "Follow"}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {followError ? (
+            <p role="alert" className="mt-3 text-sm text-foreground">
+              {followError}
+            </p>
+          ) : null}
+
+          {/* stats row — hidden for private profiles */}
+          {!isPrivate && statsRow ? (
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+              <span className="font-mono tabular-nums">
+                <span className="font-medium text-foreground">{statsRow.followers}</span>{" "}
+                <span className="text-muted-foreground">followers</span>
+              </span>
+              <span className="font-mono tabular-nums">
+                <span className="font-medium text-foreground">{statsRow.following}</span>{" "}
+                <span className="text-muted-foreground">following</span>
+              </span>
+              <span className="font-mono tabular-nums">
+                <span className="font-medium text-foreground">{statsRow.tradeCount}</span>{" "}
+                <span className="text-muted-foreground">trades</span>
+              </span>
+              {profile?.createdAt ? (
+                <span className="font-mono tabular-nums text-muted-foreground">
+                  trader since {formatRelativeTime(profile.createdAt)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </header>
+      ) : (
+        <header className="pb-10">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Creator{" "}
+            <span
+              className="font-mono text-2xl tabular-nums text-muted-foreground"
+              title={validKey ? pubkeyParam : undefined}
+            >
+              {validKey ? truncateAddress(pubkeyParam, 4, 4) : "invalid address"}
+            </span>
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Baskets deployed by this wallet — stats stay empty until the indexer tracks activity.
+          </p>
+        </header>
+      )}
 
       {!validKey && (
         <ErrorState
@@ -143,8 +424,117 @@ export default function CreatorPage() {
         />
       )}
 
+      {/* ---- equity curve + trade history (public profiles only) ---- */}
+      {validKey && !isPrivate ? (
+        <section aria-label="Trading activity" className="border-t border-border py-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 pb-4">
+            <h2 className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+              Equity curve (30d)
+            </h2>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              estimated from on-chain snapshots · not advice
+            </p>
+          </div>
+          <div className="rounded-xl bg-card shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+            <div className="p-5">
+              {curve === null ? (
+                <div role="status" aria-label="Loading equity curve" className="flex h-[280px] items-end gap-2 p-4">
+                  <span className="sr-only">Loading equity curve</span>
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <Skeleton key={i} className="flex-1" style={{ height: `${25 + i * 10}%` }} />
+                  ))}
+                </div>
+              ) : (
+                <EquityCurveChart points={curve} />
+              )}
+            </div>
+          </div>
+          {curveFailed ? (
+            <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+              Snapshot series unavailable right now.
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap items-baseline justify-between gap-2 pb-4 pt-10">
+            <h2 className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+              Trade history
+            </h2>
+          </div>
+          {history === null ? (
+            <div className="space-y-2" role="status" aria-label="Loading trade history">
+              <span className="sr-only">Loading trade history</span>
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="ml-auto h-4 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : historyFailed ? (
+            <p className="font-mono text-[11px] text-muted-foreground">
+              Trade history unavailable right now.
+            </p>
+          ) : history.length === 0 ? (
+            <EmptyState
+              chip="EMPTY"
+              title="No trades indexed yet"
+              description="Mints and redeems on public baskets by this wallet appear here."
+            />
+          ) : (
+            <>
+              <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+                {history.map((item, index) => {
+                  const minted = item.type === "Minted";
+                  return (
+                    <li
+                      key={`${item.sig}-${index}`}
+                      className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3"
+                    >
+                      <span
+                        className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
+                          minted
+                            ? "border-[hsl(var(--chart-1)/40)] bg-[hsl(var(--chart-1)/10)] text-[hsl(var(--chart-1))]"
+                            : "border-[hsl(var(--chart-2)/40)] bg-[hsl(var(--chart-2)/10)] text-[hsl(var(--chart-2))]"
+                        }`}
+                      >
+                        {item.type}
+                      </span>
+                      <Link
+                        href={`/basket/${item.basket}`}
+                        title={item.basket}
+                        className="min-w-0 truncate text-sm font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      >
+                        {item.basketName ?? truncateAddress(item.basket, 6, 4)}
+                      </Link>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {formatTokenAmount(item.shares, { maximumFractionDigits: 2 })} shares
+                      </span>
+                      <span className="ml-auto font-mono text-xs tabular-nums text-foreground">
+                        {item.usdValue !== null ? formatUsd(item.usdValue) : "—"}
+                      </span>
+                      <span className="w-20 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {formatRelativeTime(item.ts)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {historyCursor ? (
+                <div className="flex justify-center pt-4">
+                  <Button variant="outline" size="sm" onClick={() => void loadMoreHistory()} disabled={historyLoadingMore}>
+                    {historyLoadingMore ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
+      ) : null}
+
+      {/* ---- existing indexer-fed creator section (unchanged behavior) ---- */}
       {status === "loading" && (
-        <div className="mt-2" role="status" aria-label="Loading creator profile">
+        <div className="mt-2 border-t border-border py-8" role="status" aria-label="Loading creator profile">
           <span className="sr-only">Loading creator profile</span>
           <div className="grid gap-3 sm:grid-cols-3">
             {Array.from({ length: 3 }, (_, i) => (
@@ -166,24 +556,26 @@ export default function CreatorPage() {
       )}
 
       {status === "not-indexed" && (
-        <EmptyState
-          className="mt-8"
-          chip="NOT INDEXED"
-          title="Creator stats appear once the indexer tracks activity"
-          description={`No baskets or fee history are indexed for ${truncateAddress(pubkeyParam, 6, 6)} yet — deploy a basket with this wallet and the profile fills in from BasketCreated events.`}
-          action={
-            <Link
-              href="/create"
-              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-            >
-              Open the create wizard
-            </Link>
-          }
-        />
+        <div className="border-t border-border py-8">
+          <EmptyState
+            className="mt-4"
+            chip="NOT INDEXED"
+            title="Creator stats appear once the indexer tracks activity"
+            description={`No baskets or fee history are indexed for ${truncateAddress(pubkeyParam, 6, 6)} yet — deploy a basket with this wallet and the profile fills in from BasketCreated events.`}
+            action={
+              <Link
+                href="/create"
+                className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                Open the create wizard
+              </Link>
+            }
+          />
+        </div>
       )}
 
       {status === "error" && (
-        <div className="mt-8">
+        <div className="border-t border-border py-8">
           <ErrorState
             title="Creator data unavailable"
             message={error ?? "The creators API did not respond."}
@@ -199,7 +591,7 @@ export default function CreatorPage() {
       {status === "ready" && payload && (
         <>
           {/* metric strip — same tile language as the basket-detail page */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 border-t border-border py-8 sm:grid-cols-3">
             <Card className="h-full">
               <CardHeader className="pb-2">
                 <CardDescription>Baskets created</CardDescription>
@@ -212,8 +604,8 @@ export default function CreatorPage() {
               <CardHeader className="pb-2">
                 <CardDescription>Total AUM (indexed)</CardDescription>
                 <CardTitle className="font-mono text-2xl tabular-nums">
-                  {stats ? (() => {
-                    const aum = numeric(stats.total_aum);
+                  {creatorStats ? (() => {
+                    const aum = numeric(creatorStats.total_aum);
                     return aum === null ? "—" : formatUsd(aum);
                   })() : "—"}
                 </CardTitle>
@@ -223,8 +615,8 @@ export default function CreatorPage() {
               <CardHeader className="pb-2">
                 <CardDescription>Fees earned (indexed)</CardDescription>
                 <CardTitle className="font-mono text-2xl tabular-nums">
-                  {stats ? (() => {
-                    const fees = numeric(stats.total_fees_earned);
+                  {creatorStats ? (() => {
+                    const fees = numeric(creatorStats.total_fees_earned);
                     return fees === null ? "—" : formatUsd(fees);
                   })() : "—"}
                 </CardTitle>
@@ -232,7 +624,7 @@ export default function CreatorPage() {
             </Card>
           </div>
 
-          <section aria-labelledby="creator-baskets" className="border-t border-border py-8">
+          <section aria-labelledby="creator-baskets" className="pb-8">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
               <h2 id="creator-baskets" className="text-sm font-medium tracking-tight">
                 Baskets
@@ -310,6 +702,16 @@ export default function CreatorPage() {
         </>
       )}
 
+      {isOwner ? (
+        <ProfileEditorModal
+          open={editorOpen}
+          onClose={() => setEditorOpen(false)}
+          onSaved={() => {
+            void loadProfile();
+            setEditorOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

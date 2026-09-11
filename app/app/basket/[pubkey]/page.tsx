@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { ThesisComposerModal } from "@/components/social/thesis-composer";
 
 import {
   EmptyState,
@@ -80,8 +83,10 @@ export default function BasketDetailPage({
 }) {
   const { pubkey: rawPubkey } = use(params);
   const pubkey = decodeURIComponent(rawPubkey);
+  const router = useRouter();
 
   const [detail, setDetail] = useState<BasketDetail | null>(null);
+  const [thesisOpen, setThesisOpen] = useState(false);
   const [navRows, setNavRows] = useState<NavHistoryRow[] | null>(null);
   const [navSource, setNavSource] = useState<string | null>(null);
   const [navFailed, setNavFailed] = useState(false);
@@ -286,6 +291,16 @@ export default function BasketDetailPage({
               <Button render={<Link href={`/basket/${pubkey}/buy`} />}>Buy shares</Button>
               <Button render={<Link href={`/basket/${pubkey}/redeem`} />} variant="outline">
                 Redeem shares
+              </Button>
+              <Button variant="ghost" onClick={() => setThesisOpen(true)}>
+                Write thesis
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => router.push(`/create?clone=${encodeURIComponent(pubkey)}`)}
+                title="Start the create wizard pre-filled with this basket's constituents, weights and fees"
+              >
+                Clone this basket
               </Button>
               <div className="border-t border-border pt-2">
                 <AccrueCrankButton
@@ -515,6 +530,12 @@ export default function BasketDetailPage({
         </>
       ) : null}
 
+      <ThesisComposerModal
+        open={thesisOpen}
+        onClose={() => setThesisOpen(false)}
+        basket={detail?.pubkey ?? null}
+        basketLabel={name ?? undefined}
+      />
     </div>
   );
 }

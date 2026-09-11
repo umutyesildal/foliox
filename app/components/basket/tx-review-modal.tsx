@@ -47,6 +47,7 @@ export function TxReviewModal({
   endpoint,
   errorSlot,
   successLine,
+  successExtra,
   portfolioHref = "/portfolio",
   setupProgress = null,
   pendingTxId = null,
@@ -68,6 +69,8 @@ export function TxReviewModal({
   errorSlot?: ReactNode;
   /** SUCCESS headline, e.g. "🎉 Done — +12.5 shares of ROMAN" (or null for default). */
   successLine?: ReactNode;
+  /** Extra content inside the SUCCESS card (e.g. the "Share your thesis" CTA). */
+  successExtra?: ReactNode;
   /** Where "View Portfolio" points (create flows may link elsewhere). */
   portfolioHref?: string;
   /** Live lookup-table setup progress → "Setup 1/2" badge in the header. */
@@ -191,6 +194,7 @@ export function TxReviewModal({
             state={flowState}
             explorerHref={explorerHref}
             successLine={successLine}
+            successExtra={successExtra}
             portfolioHref={portfolioHref}
           />
         </div>
@@ -309,11 +313,13 @@ function StatusCard({
   state,
   explorerHref,
   successLine,
+  successExtra,
   portfolioHref,
 }: {
   state: TransactionFlowState;
   explorerHref: string | null;
   successLine?: ReactNode;
+  successExtra?: ReactNode;
   portfolioHref: string;
 }) {
   switch (state.status) {
@@ -370,6 +376,9 @@ function StatusCard({
               </a>
             ) : null}
           </div>
+          {successExtra ? (
+            <div className="mt-3 border-t border-border/60 pt-3">{successExtra}</div>
+          ) : null}
         </div>
       );
 

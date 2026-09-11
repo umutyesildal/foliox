@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
+import { ThesisShareCta } from "@/components/social/thesis-share-cta";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
 import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import { AccrueCrankButton } from "@/components/basket/accrue-crank";
@@ -602,6 +603,11 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
               preview !== null
                 ? `🎉 Done — −${grouped(formatRawShares6(preview.burn))} shares${name ? ` of ${name}` : ""}`
                 : "🎉 Done"
+            }
+            successExtra={
+              flow.state.status === "confirmed" && detail ? (
+                <ThesisShareCta basket={detail.pubkey} basketName={name} />
+              ) : undefined
             }
             setupProgress={prewarm.setupProgress}
           />

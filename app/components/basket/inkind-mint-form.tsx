@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/states";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
+import { ThesisShareCta } from "@/components/social/thesis-share-cta";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
 import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import {
@@ -619,6 +620,11 @@ export function InKindMintForm({
           endpoint={RPC_ENDPOINT}
           pendingTxId={flow.state.pendingTxId}
           successLine={successLineText}
+          successExtra={
+            flow.state.status === "confirmed" ? (
+              <ThesisShareCta basket={detail.pubkey} basketName={name} />
+            ) : undefined
+          }
           setupProgress={prewarm.setupProgress}
           errorSlot={
             flow.state.mintPaused ? (

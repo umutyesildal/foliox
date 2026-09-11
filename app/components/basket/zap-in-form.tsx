@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorState, FreshnessBadge } from "@/components/states";
 import { TxReviewModal } from "@/components/basket/tx-review-modal";
+import { ThesisShareCta } from "@/components/social/thesis-share-cta";
 import { useTransactionFlow } from "@/components/basket/use-transaction-flow";
 import { useAltPrewarm } from "@/components/basket/use-alt-prewarm";
 import {
@@ -559,6 +560,11 @@ export function ZapInForm({
             quote && /^\d+$/.test(quote.expectedShares?.trim() ?? "")
               ? `🎉 Done — +${grouped(formatRawShares6(BigInt(quote.expectedShares!.trim())))} shares`
               : "🎉 Done"
+          }
+          successExtra={
+            flow.state.status === "confirmed" ? (
+              <ThesisShareCta basket={detail.pubkey} basketName={basketName(detail)} />
+            ) : undefined
           }
           setupProgress={prewarm.setupProgress}
           errorSlot={

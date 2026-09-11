@@ -68,6 +68,16 @@ Owner-approved information architecture (2026-09-03):
 
 Design language: **monochrome UI chrome** (classic shadcn dark/light) + **ethereal chart data palette** (sage/rose/blue/sand/lavender, benchmark gray dashed — user decision 2026-09-03). No site footer; LEGAL_REVIEW_REQUIRED chips removed from the UI (review backlog — the wizard's legal-checkbox step stays functional). Charts are verified-official Bklit components (Brush = documented local adapter).
 
+## Social trading (V0.2 — fomo.family-inspired, not a clone)
+
+Every basket trade already settles on-chain, so the feed shows **verified activity, not claims**: the indexer's per-wallet `events` ledger (Minted/Redeemed) now backs `/feed` (All / Following / Theses tabs), per-wallet trade history, and an estimated-ROI leaderboard (7d/30d/All; anti-sybil eligibility — ≥2 mints, first trade ≥7 days old, live value > 0, public profile). On top of the "what":
+
+- **Thesis posts** — trade-linked reasoning attached to a basket; the on-chain outcome stays attached for free
+- **Social profiles** — optional handle/avatar/bio over a wallet pubkey (`profiles`), follow/unfollow, per-wallet equity curve (`user_value_snapshots`, ~5m snapshotter)
+- **Privacy** — trades are public by default (the chain is public anyway); `is_public=false` hides a wallet from feed + leaderboard
+- **Auth** — wallet-signature only (SIWS-lite: `POST /auth/nonce` → sign → `/auth/verify` → bearer token); it gates **social writes only** — the backend remains read-only/non-custodial for everything else and still never signs transactions
+- **No auto-copy** (deliberate) — copying is "Clone this basket" into the create wizard (regulatory + latency reasons); feed refreshes by 30s polling
+
 ## Security
 
 See spec §11. Key invariants (all evidenced in `plan.md` §6 gate table): `redeem_in_kind` never gated (no whitelist/oracle/pauser account in its context; structural test), no `admin_withdraw`, RAW-only transfers, fee caps + 90/10 split, genesis 1M inflation-attack protection. Run `cargo test` + `cso` + `review-and-iterate` before devnet/mainnet.

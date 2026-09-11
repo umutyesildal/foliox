@@ -785,3 +785,21 @@ The gaps listed above have been closed in an orchestrated implementation wave (d
 - §4 multiplier reads: the installed `spl-token` 0.4.15 encodes `ScaledUiAmountConfig.multiplier` as **f64** (not the u64 fixed-point sketch in §4.3); the indexer reads f64 with fallback 1.0.
 - §7-8 backend: normative schema live-applied, event decoding, holdings sync, exact BigInt fixed-point NAV, and all §8 routes serve real indexed data with `source`/`asOf` markers; empty/unavailable states are explicit, never fabricated. The backend builds unsigned fee-crank transactions only — it never signs (§2 constraint 5).
 - Tests at amendment time: 178 Rust + 373 backend TS (+1 root legacy). CPI execution paths remain unverified on a live validator until the SBF toolchain blocker (edition2024 platform-tools) is resolved — see `plan.md` §8 localnet E2E status. This supersedes none of the normative constraints; §11 P0/P1 evidence is recorded in the `plan.md` §6 gate table.
+
+### Amendment 3 — 2026-09-11 (V0.2 Social Trading Layer)
+
+Adds a social trading surface (fomo.family-inspired, deliberately not a clone) on top of the existing on-chain-verified data. Branch `feat/social-trading`. Normative additions:
+
+**Principle.** Every basket trade already settles on-chain, so the social feed shows *verified activity, not claims* — exactly the property that makes fomo's feed trustworthy. The "what" (trades) comes from the indexer's per-wallet `events` ledger; the "why" is user-authored **thesis posts** linked to a basket. No auto-copy: copying = "Clone this basket" prefilled into the create wizard (auto-copy is both the regulatory flashpoint — ESMA/MiCA/ASIC treat it as a potential investment service — and latency-broken in practice).
+
+**New backend surface** (normative shapes in `backend/src/api/social.ts`, route map in `backend/src/api/routes.ts`):
+
+- Tables: `profiles`, `follows`, `posts(kind='thesis')`, `post_likes`, `comments`, `user_value_snapshots`, expression index `events((data->>'user'), ts DESC)` — all idempotent additions to `schema.sql`.
+- Auth: SIWS-lite (`POST /auth/nonce` → wallet signs exact message `FolioX Social\nWallet: <wallet>\nNonce: <nonce>` → `/auth/verify` verifies ed25519 → HMAC bearer token, 7d, secret `SOCIAL_AUTH_SECRET`). **Auth gates social writes only**; §2 constraint 5 (backend never signs) is unaffected.
+- Reads: `/users/:wallet/profile|history|equity-curve|followers|following`, `/feed?scope&type`, `/leaderboard?window`. Writes: `PUT /me/profile`, follow/unfollow, thesis posts, likes, comments.
+- Privacy: `profiles.is_public=false` excludes a wallet from feed + leaderboard (default is public — the on-chain ledger is public regardless; the toggle governs platform discovery surfaces only).
+- Leaderboard honesty: ROI is *estimated* (cost basis derives from NAV reference pricing, not fill prices) and anti-sybil gated (≥2 mints, first trade ≥7d, live value > 0). 7d/30d windows require `user_value_snapshots` history (worker `workers/userSnapshot.ts`, ~5m) — empty until accumulated, never backfilled with synthetic data.
+
+**Frontend:** `/feed`, `/leaderboard`, social profile on `/creator/[pubkey]` (equity curve, history, follow, edit/privacy), thesis composer (basket page + post-trade CTA), clone prefill `/create?clone=<pubkey>`. 30s polling; no realtime infrastructure added in V0.2.
+
+**Deliberately out of scope (V0.2):** auto-copy execution, push notifications, websockets, per-trade PnL realization accounting, EVM.

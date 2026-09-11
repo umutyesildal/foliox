@@ -206,6 +206,7 @@ Example: `S=10M`, `V_TSLA=550M`, `B=1M`, `exit 50bps → fee 5k, burn 995k, out=
 * `nav_snapshots(id BIGSERIAL, basket, ts, nav, supply, share_price, price_source JSONB)` index `(basket,ts DESC)` — every 1m
 * `events(sig PK, slot, basket, type BasketCreated|Minted|Redeemed|FeeAccrued, data JSONB, ts)` index `(basket,ts)`
 * `creator_stats(creator PK, basket_count, total_aum, total_fees_earned)` + `user_positions(user,basket PK, share_balance, cost_basis)`
+* **Social (V0.2)**: `profiles(wallet PK, handle UNIQUE, display_name, avatar_url, bio, is_public DEFAULT true)`, `follows(follower, followee PK, CHECK ≠)`, `posts(id BIGSERIAL, wallet, kind 'thesis', basket?, title, body_md)`, `post_likes(post_id, wallet PK)`, `comments(id, post_id, wallet, body)`, `user_value_snapshots(wallet, ts PK, value_usd, cost_basis)` (written ~5m by `workers/userSnapshot.ts`), expression index `events((data->>'user'), ts DESC)` for per-wallet history/feed lookups
 * View `basket_latest_nav` + Redis `nav:{basket}`, `quote:zap-in:{basket}:{amount}`, `rankings`; BullMQ queues `holdings_sync 30s`, `nav_snapshot 60s`, `price_fetch 30s`, `fee_accrue_crank 1h`
 
 **API** `backend/src/api/server.ts:1` base `/api/v1`:
@@ -219,12 +220,23 @@ Example: `S=10M`, `V_TSLA=550M`, `B=1M`, `exit 50bps → fee 5k, burn 995k, out=
 | GET | `/baskets/:pubkey/performance` | 24h/7d/30d/inception from snapshots |
 | GET | `/creators/:pubkey` | `creator_stats` |
 | GET | `/users/:pubkey/portfolio` | `user_positions` + nav |
+| GET | `/users/:pubkey/profile` | `profiles` + `follows` + events trade count |
+| GET | `/users/:pubkey/history` | **events ledger** (first per-wallet read; basket name + at-or-before share price; usdValue null when no NAV yet) |
+| GET | `/users/:pubkey/equity-curve?days=` | `user_value_snapshots` |
+| GET | `/users/:pubkey/followers\|following` | `follows` |
+| GET | `/feed?scope=all\|following&type=all\|trades\|theses` | events ∪ posts, is_public=false wallets excluded |
+| GET | `/leaderboard?window=7d\|30d\|all` | user_positions × share_price × cost_basis (est. ROI; anti-sybil: ≥2 mints, first trade ≥7d, live value>0); 7d/30d via `user_value_snapshots` window |
+| POST | `/auth/nonce`, `/auth/verify` | ed25519 wallet signature (SIWS-lite) → HMAC bearer token (`api/auth.ts`; HMAC secret supplied via the `SOCIAL_AUTH_SECRET` env var — set it from your secret manager, never commit or log the value, and never include it in any external upload/report) |
+| PUT | `/me/profile` | **auth** — upsert profiles (handle 3-20 `[a-z0-9_]`, 409 HANDLE_TAKEN) |
+| POST\|DELETE | `/users/:wallet/follow` | **auth** — target must have claimed profile |
+| POST | `/posts {kind:'thesis', title, body, basket?}` | **auth** — requires claimed profile |
+| GET\|DELETE | `/posts/:id`, `/posts/:id/like`, `/posts/:id/comments` | posts/post_likes/comments (DELETE + like + comment are **auth**) |
 | GET | `/whitelist` | `whitelisted_mints` |
 | POST | `/quotes/zap-in {basket, amountUSDC, slippageBps}` | Jupiter `quote` + `swap` → legs, `warning: sequential` |
 | POST | `/quotes/zap-out` | symmetric |
 | GET | `/health` | `{"ok":true,"version":"0.1.0"}` |
 
-Backend never signs — if indexer dies, `redeem_in_kind` still works via RPC direct.
+Backend never signs — if indexer dies, `redeem_in_kind` still works via RPC direct. **Social-write auth caveat (V0.2):** the ONLY authenticated surface is social writes (profile/follow/post/like/comment); `Authorization: Bearer` tokens gate nothing else, and auth touches no funds — the non-custodial invariant stands.
 
 ---
 

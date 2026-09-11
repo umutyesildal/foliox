@@ -19,6 +19,7 @@ import { connectFromEnv, isPgLike, type PgLike } from "../db/client.js";
 import { computeDriftExact, computePerformanceFromBaselines, type KeyValueCache } from "../workers/navEngine.js";
 import { DEVNET_FLAGSHIP_BASKET, MOCK_XSTOCKS } from "../catalog/mockStocks.js";
 import { handleZapIn, handleZapOut, type QuoteContext } from "./quotes.js";
+import { tryHandleSocialRoute } from "./social.js";
 
 export const API_VERSION = "0.1.0";
 
@@ -27,6 +28,7 @@ export interface SubsystemStatus {
   indexer: { enabled: boolean; running: boolean };
   navEngine: { enabled: boolean; running: boolean };
   feeCrank: { enabled: boolean; running: boolean };
+  userSnapshot: { enabled: boolean; running: boolean };
 }
 
 export interface ApiContext {
@@ -739,9 +741,20 @@ export function createHandler(ctx: ApiContext = { db: null }) {
     const pathname = url.pathname;
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.statusCode = 204; res.end(); return; }
+
+    // --- Social layer (profiles / follows / posts / feed / leaderboard /
+    // wallet-signature auth). Falls through for non-social paths. ---
+    if (await tryHandleSocialRoute(
+      { getDb: () => resolveDb(ctx), readJsonBody },
+      req,
+      res,
+      url,
+    )) {
+      return;
+    }
 
     // --- Health ---
     if (pathname === "/api/v1/health" && req.method === "GET") {
@@ -1011,6 +1024,7 @@ function defaultStatus(): SubsystemStatus {
     indexer: { enabled: false, running: false },
     navEngine: { enabled: false, running: false },
     feeCrank: { enabled: false, running: false },
+    userSnapshot: { enabled: false, running: false },
   };
 }
 

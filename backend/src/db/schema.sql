@@ -227,4 +227,80 @@ CREATE TABLE IF NOT EXISTS index_snapshots (
 );
 CREATE INDEX IF NOT EXISTS index_snapshots_symbol_ts_idx ON index_snapshots(symbol, ts DESC);
 
+-- ---------------------------------------------------------------------------
+-- V0.2 social trading layer — profiles, follows, thesis posts, equity curve.
+-- Identity stays wallet-native: a profiles row is an OPTIONAL display layer
+-- (handle/avatar/privacy) over a pubkey. Wallets without a row are treated
+-- as public; is_public=false hides the wallet from the feed and leaderboard.
+-- Social WRITES are the backend's only authenticated surface (ed25519 wallet
+-- signature — api/auth.ts); the backend still never signs transactions.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS profiles (
+  wallet TEXT PRIMARY KEY,                -- Solana pubkey (base58)
+  handle TEXT UNIQUE,                     -- 3-20 chars [a-z0-9_], null until claimed
+  display_name TEXT,
+  avatar_url TEXT,
+  bio TEXT,
+  is_public BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS follows (
+  follower TEXT NOT NULL REFERENCES profiles(wallet) ON DELETE CASCADE,
+  followee TEXT NOT NULL REFERENCES profiles(wallet) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (follower, followee),
+  CHECK (follower <> followee)
+);
+CREATE INDEX IF NOT EXISTS follows_followee_idx ON follows(followee);
+
+-- Thesis posts — trade-linked reasoning (fomo-style: the "why" layer over the
+-- verified on-chain "what"). kind is an allowlist so future post types are a
+-- migration, not a surprise.
+CREATE TABLE IF NOT EXISTS posts (
+  id BIGSERIAL PRIMARY KEY,
+  wallet TEXT NOT NULL REFERENCES profiles(wallet) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('thesis')),
+  basket TEXT REFERENCES baskets(pubkey) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  body_md TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS posts_wallet_ts_idx ON posts(wallet, created_at DESC);
+CREATE INDEX IF NOT EXISTS posts_ts_idx ON posts(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS post_likes (
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  wallet TEXT NOT NULL REFERENCES profiles(wallet) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (post_id, wallet)
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  wallet TEXT NOT NULL REFERENCES profiles(wallet) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS comments_post_idx ON comments(post_id, created_at);
+
+-- Per-wallet equity curve, written by workers/userSnapshot.ts (~5m) from
+-- user_positions × latest nav share_price. Feeds profile charts and the
+-- windowed leaderboard. Same integer-safety rules as nav_snapshots.
+CREATE TABLE IF NOT EXISTS user_value_snapshots (
+  wallet TEXT NOT NULL,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  value_usd NUMERIC NOT NULL,
+  cost_basis NUMERIC,
+  PRIMARY KEY (wallet, ts)
+);
+CREATE INDEX IF NOT EXISTS user_value_snapshots_ts_idx ON user_value_snapshots(wallet, ts DESC);
+
+-- Per-wallet trade history/feed lookups over the existing events ledger —
+-- the indexer already attributes Minted/Redeemed to data->>'user'.
+CREATE INDEX IF NOT EXISTS events_user_ts_idx ON events ((data->>'user'), ts DESC);
+
 COMMIT;

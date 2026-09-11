@@ -18,6 +18,7 @@ import { applySchema } from "./db/init.js";
 import { createIndexerFromEnv } from "./indexer/listener.js";
 import { createNavEngineFromEnv, createCacheFromEnv, type KeyValueCache } from "./workers/navEngine.js";
 import { createFeeCrankFromEnv } from "./workers/feeCrank.js";
+import { createUserSnapshotterFromEnv } from "./workers/userSnapshot.js";
 import { createHandler, API_VERSION, type SubsystemStatus } from "./api/server.js";
 
 const PORT = Number(process.env.PORT || 3001);
@@ -55,12 +56,17 @@ async function main(): Promise<void> {
   const feeCrank = createFeeCrankFromEnv({ db });
   if (feeCrank) feeCrank.start();
 
+  // 5b. User snapshotter — per-wallet equity curve for profiles + leaderboard.
+  const userSnapshotter = createUserSnapshotterFromEnv(db);
+  if (userSnapshotter) userSnapshotter.start();
+
   // 6. API — always listening.
   const status = (): SubsystemStatus => ({
     db: { connected: db !== null, schemaApplied },
     indexer: { enabled: indexer !== null, running: indexer?.isRunning ?? false },
     navEngine: { enabled: navEngine !== null, running: navEngine?.isRunning ?? false },
     feeCrank: { enabled: feeCrank !== null, running: feeCrank?.isRunning ?? false },
+    userSnapshot: { enabled: userSnapshotter !== null, running: userSnapshotter?.isRunning ?? false },
   });
   const server = http.createServer(createHandler({ db, cache, status }));
   await new Promise<void>((resolve) => server.listen(PORT, resolve));
@@ -71,11 +77,14 @@ async function main(): Promise<void> {
  console.log(` - GET  /api/v1/whitelist | /creators/:p | /users/:p/portfolio | /health`);
  console.log(` - GET  /api/v1/positions?wallet=:p  (chain-reconciled user positions + NAV price)`);
  console.log(` - POST /api/v1/quotes/zap-in|zap-out (Jupiter quote legs — quotes only, backend never signs)`);
-  console.log(
-    ` subsystems: db=${db ? "on" : "off"} indexer=${indexer ? "on" : "off"} ` +
-      `navEngine=${navEngine ? "on" : "off"} feeCrank=${feeCrank ? "on" : "off"} ` +
-      `cache=${process.env.REDIS_URL ? "redis" : "in-memory"}`,
-  );
+ console.log(` - GET  /api/v1/feed | /leaderboard | /users/:w/profile|history   (social — on-chain verified)`);
+ console.log(` - POST /api/v1/auth/nonce|verify   (wallet-signature auth for SOCIAL WRITES only)`);
+ console.log(
+   ` subsystems: db=${db ? "on" : "off"} indexer=${indexer ? "on" : "off"} ` +
+     `navEngine=${navEngine ? "on" : "off"} feeCrank=${feeCrank ? "on" : "off"} ` +
+     `userSnapshot=${userSnapshotter ? "on" : "off"} ` +
+     `cache=${process.env.REDIS_URL ? "redis" : "in-memory"}`,
+ );
 
   // Graceful shutdown — stop loops, close server, close DB.
   let shuttingDown = false;
@@ -83,9 +92,10 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`[shutdown] ${signal} received — stopping subsystems`);
-    indexer?.stop();
-    navEngine?.stop();
-    feeCrank?.stop();
+  indexer?.stop();
+  navEngine?.stop();
+  feeCrank?.stop();
+  userSnapshotter?.stop();
     server.close(() => {
       void disconnectFromEnv().finally(() => process.exit(0));
     });

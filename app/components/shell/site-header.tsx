@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 import { NetworkIndicator } from "@/components/shell/network-indicator";
 import { WalletButton } from "@/components/shell/wallet-button";
 import { CONTEXT_ACTIONS, PRIMARY_NAV, isRouteActive } from "@/components/shell/nav-items";
+import { useHandleFlags, writeHandleClaimed } from "@/components/social/handle-onboarding";
+import { ProfileEditorModal } from "@/components/social/profile-editor";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +73,49 @@ function LogoMark({ size = 21 }: { size?: number }) {
         <rect x="8" y="15.8" width="4.6" height="2.1" />
       </g>
     </svg>
+  );
+}
+
+/**
+ * Persistent "Claim handle" chip for a connected wallet that has not claimed
+ * one yet. Flag-based (foliox:handle-claimed:<wallet> in localStorage — the
+ * editor modal itself does the real profile check on open). Yellow accent
+ * wash mirroring the followed chip on creator pages: the Create button keeps
+ * the solid-yellow slot.
+ */
+function ClaimHandleChip() {
+  const { publicKey, connected } = useWallet();
+  const wallet = useMemo(() => publicKey?.toBase58() ?? null, [publicKey]);
+  const { claimed } = useHandleFlags(wallet);
+  const [open, setOpen] = useState(false);
+
+  if (!connected || !wallet || claimed) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className={cn(
+          buttonVariants({ variant: "outline", size: "sm" }),
+          // Hidden below sm like the network indicator — the connected
+          // address + menu button already fill a phone header.
+          "hidden border-primary/50 bg-accent text-accent-foreground hover:bg-accent/80 sm:inline-flex",
+        )}
+        onClick={() => setOpen(true)}
+      >
+        Claim handle
+      </button>
+      <ProfileEditorModal
+        open={open}
+        onClose={() => setOpen(false)}
+        onSaved={() => {
+          if (wallet) writeHandleClaimed(wallet);
+          setOpen(false);
+        }}
+        title="Claim your handle"
+        submitLabel="Claim handle"
+      />
+    </>
   );
 }
 
@@ -143,6 +189,7 @@ export function SiteHeader() {
             ))}
           </div>
 
+          <ClaimHandleChip />
           <NetworkIndicator className="hidden sm:inline-flex" />
           <WalletButton />
 

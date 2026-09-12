@@ -27,6 +27,7 @@ import {
   addComment,
   createPost,
   deletePost,
+  getBasketLeaderboard,
   getFeed,
   getLeaderboard,
   getPost,
@@ -380,6 +381,85 @@ describe("getLeaderboard", () => {
     const db = fakeDb([{ match: "FROM win w", rows: [] }]);
     await getLeaderboard(db, "7d");
     expect(db.calls[0].values).toEqual([7]);
+  });
+});
+
+describe("getBasketLeaderboard", () => {
+  // Unique to the current-snapshot lateral in the baskets-leaderboard SQL
+  // (baseline laterals select nav only) — no other route's fake matches it.
+  const BASKET_LB_MATCH = "SELECT nav, ts FROM nav_snapshots";
+
+  it("maps windowed NAV ROI to returnPct and preserves the payload shape", async () => {
+    const db = fakeDb([
+      {
+        match: BASKET_LB_MATCH,
+        rows: [
+          {
+            pubkey: "Bk1",
+            basket_name: "Tech Duo",
+            symbol: "TD",
+            nav: "104.2100",
+            mint_count: "12",
+            cur_ts: new Date("2026-09-12T00:00:00Z"),
+            base_nav: "100",
+            roi: "0.0421",
+            holders: 7,
+          },
+        ],
+      },
+    ]);
+    const out = await getBasketLeaderboard(db, "7d");
+    const payload = out.payload as { window: string; items: Array<Record<string, unknown>>; note: string };
+    expect(out.status).toBe(200);
+    expect(payload.window).toBe("7d");
+    expect(payload.items[0]).toMatchObject({
+      basket: "Bk1",
+      basketName: "Tech Duo",
+      symbol: "TD",
+      returnPct: 4.21, // (104.21 - 100) / 100 × 100, rounded 2dp
+      nav: "104.21", // decimal string, trailing zeros trimmed
+      aum: "104.21", // contract: aum mirrors the NAV value
+      holders: 7,
+      mintCount: 12,
+    });
+    expect(payload.items[0].asOf).toBe("2026-09-12T00:00:00.000Z");
+    expect(typeof payload.note).toBe("string");
+  });
+
+  it("rejects invalid windows with 400 INVALID_WINDOW", async () => {
+    const out = await getBasketLeaderboard(fakeDb(), "2h");
+    expect(out.status).toBe(400);
+    expect((out.payload as { error: { code: string } }).error.code).toBe("INVALID_WINDOW");
+  });
+
+  it("picks a fully static per-window literal (no bound params, no interpolation)", async () => {
+    const mk = () => fakeDb([{ match: BASKET_LB_MATCH, rows: [] }]);
+    const db7 = mk();
+    await getBasketLeaderboard(db7, "7d");
+    expect(db7.calls[0].values).toEqual([]);
+    expect(db7.calls[0].sql).toContain("interval '7 days'");
+
+    const db30 = mk();
+    await getBasketLeaderboard(db30, "30d");
+    expect(db30.calls[0].sql).toContain("interval '30 days'");
+
+    const dbAll = mk();
+    await getBasketLeaderboard(dbAll, "all");
+    expect(dbAll.calls[0].sql).toContain("ORDER BY ts ASC LIMIT 1"); // all-time baseline = first snapshot
+  });
+
+  it("serves GET /leaderboard/baskets through the dispatcher (public read)", async () => {
+    const db = fakeDb([{ match: BASKET_LB_MATCH, rows: [] }]);
+    const { res, state } = fakeRes();
+    const handled = await tryHandleSocialRoute(
+      TEST_DEPS(db),
+      fakeReq("GET", "/api/v1/leaderboard/baskets?window=30d"),
+      res,
+      new URL("http://x/api/v1/leaderboard/baskets?window=30d"),
+    );
+    expect(handled).toBe(true);
+    expect(state.statusCode).toBe(200);
+    expect(jsonBody(state)).toMatchObject({ window: "30d", items: [] });
   });
 });
 

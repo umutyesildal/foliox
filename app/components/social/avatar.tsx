@@ -75,12 +75,16 @@ export function ActorLine({
   displayName,
   avatarUrl,
   className,
+  emphasis = false,
 }: {
   wallet: string;
   handle?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
   className?: string;
+  /** Feed mode: regular-case, bolder label so the chosen username is what
+   *  reads — default keeps the quiet terminal whisper for other surfaces. */
+  emphasis?: boolean;
 }) {
   const label = displayName?.trim() || (handle ? `@${handle}` : truncateAddress(wallet, 4, 4));
   return (
@@ -92,7 +96,12 @@ export function ActorLine({
         avatarUrl={avatarUrl}
       />
       <span
-        className="truncate font-mono text-xs uppercase tracking-widest text-foreground"
+        className={cn(
+          "truncate",
+          emphasis
+            ? "text-sm font-medium normal-case tracking-normal text-foreground"
+            : "font-mono text-xs uppercase tracking-widest text-foreground",
+        )}
         title={wallet}
       >
         {label}

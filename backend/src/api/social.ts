@@ -1,7 +1,7 @@
 /**
  * api/social.ts — the social trading surface (V0.2): profiles, follows,
  * thesis posts, likes, comments, the unified trade+thesis feed, per-wallet
- * trade history / equity curve, and the leaderboard.
+ * trade history / equity curve, and the leaderboards (users and baskets).
  *
  * Design rules carried over from server.ts:
  *   * every handler is `(db, …) → {status, payload}` and is exported for
@@ -661,6 +661,142 @@ export async function getLeaderboard(db: PgLike, window: string): Promise<{ stat
   };
 }
 
+// --- baskets leaderboard ---------------------------------------------------------
+
+/**
+ * GET /leaderboard/baskets SQL — one FULLY STATIC literal per window variant
+ * (same discipline as NAV_HISTORY_* in server.ts): the validated `window` key
+ * selects the literal and nothing is ever interpolated into it. Baselines:
+ * 7d/30d = latest snapshot at-or-before NOW() minus the window; `all` = first
+ * snapshot ever. The INNER LATERAL joins exclude baskets with no current or
+ * baseline snapshot — a missing baseline is an honest exclusion, never a
+ * fabricated 0%.
+ */
+const BASKET_LEADERBOARD_7D_SQL = `
+  SELECT r.pubkey,
+         b.metadata_json->>'name' AS basket_name,
+         b.metadata_json->>'symbol' AS symbol,
+         r.nav::text AS nav,
+         r.mint_count,
+         cur.ts AS cur_ts,
+         base.nav::text AS base_nav,
+         ((cur.nav - base.nav) / NULLIF(base.nav, 0))::text AS roi,
+         COALESCE(h.holders, 0) AS holders
+  FROM basket_rankings r
+  JOIN baskets b ON b.pubkey = r.pubkey
+  JOIN LATERAL (
+    SELECT nav, ts FROM nav_snapshots WHERE basket = r.pubkey ORDER BY ts DESC LIMIT 1
+  ) cur ON true
+  JOIN LATERAL (
+    SELECT nav FROM nav_snapshots WHERE basket = r.pubkey
+      AND ts <= NOW() - interval '7 days' ORDER BY ts DESC LIMIT 1
+  ) base ON true
+  LEFT JOIN (
+    SELECT basket, COUNT(*)::int AS holders FROM user_positions GROUP BY basket
+  ) h ON h.basket = r.pubkey
+  ORDER BY roi DESC NULLS LAST
+  LIMIT 50`;
+
+const BASKET_LEADERBOARD_30D_SQL = `
+  SELECT r.pubkey,
+         b.metadata_json->>'name' AS basket_name,
+         b.metadata_json->>'symbol' AS symbol,
+         r.nav::text AS nav,
+         r.mint_count,
+         cur.ts AS cur_ts,
+         base.nav::text AS base_nav,
+         ((cur.nav - base.nav) / NULLIF(base.nav, 0))::text AS roi,
+         COALESCE(h.holders, 0) AS holders
+  FROM basket_rankings r
+  JOIN baskets b ON b.pubkey = r.pubkey
+  JOIN LATERAL (
+    SELECT nav, ts FROM nav_snapshots WHERE basket = r.pubkey ORDER BY ts DESC LIMIT 1
+  ) cur ON true
+  JOIN LATERAL (
+    SELECT nav FROM nav_snapshots WHERE basket = r.pubkey
+      AND ts <= NOW() - interval '30 days' ORDER BY ts DESC LIMIT 1
+  ) base ON true
+  LEFT JOIN (
+    SELECT basket, COUNT(*)::int AS holders FROM user_positions GROUP BY basket
+  ) h ON h.basket = r.pubkey
+  ORDER BY roi DESC NULLS LAST
+  LIMIT 50`;
+
+const BASKET_LEADERBOARD_ALL_SQL = `
+  SELECT r.pubkey,
+         b.metadata_json->>'name' AS basket_name,
+         b.metadata_json->>'symbol' AS symbol,
+         r.nav::text AS nav,
+         r.mint_count,
+         cur.ts AS cur_ts,
+         base.nav::text AS base_nav,
+         ((cur.nav - base.nav) / NULLIF(base.nav, 0))::text AS roi,
+         COALESCE(h.holders, 0) AS holders
+  FROM basket_rankings r
+  JOIN baskets b ON b.pubkey = r.pubkey
+  JOIN LATERAL (
+    SELECT nav, ts FROM nav_snapshots WHERE basket = r.pubkey ORDER BY ts DESC LIMIT 1
+  ) cur ON true
+  JOIN LATERAL (
+    SELECT nav FROM nav_snapshots WHERE basket = r.pubkey ORDER BY ts ASC LIMIT 1
+  ) base ON true
+  LEFT JOIN (
+    SELECT basket, COUNT(*)::int AS holders FROM user_positions GROUP BY basket
+  ) h ON h.basket = r.pubkey
+  ORDER BY roi DESC NULLS LAST
+  LIMIT 50`;
+
+/**
+ * GET /leaderboard/baskets?window=7d|30d|all — public read ranking baskets by
+ * windowed NAV return. ROI is computed in SQL NUMERIC and mapped to a percent
+ * (×100, 2dp) in JS; nav/aum stay decimal strings (aum mirrors the current
+ * NAV value per the API contract); holders counts distinct user_positions;
+ * asOf is the current snapshot's ts. Empty while the snapshotter has no
+ * history is honest, not broken.
+ */
+export async function getBasketLeaderboard(db: PgLike, window: string): Promise<{ status: number; payload: unknown }> {
+  if (window !== "7d" && window !== "30d" && window !== "all") {
+    return {
+      status: 400,
+      payload: { error: { code: "INVALID_WINDOW", message: "window must be one of 7d|30d|all" } },
+    };
+  }
+  const sql =
+    window === "7d"
+      ? BASKET_LEADERBOARD_7D_SQL
+      : window === "30d"
+        ? BASKET_LEADERBOARD_30D_SQL
+        : BASKET_LEADERBOARD_ALL_SQL;
+  const res = await db.query(sql, []); // no params — the window selected the literal
+  const rows = res.rows as Array<Record<string, unknown>>;
+  const items = rows.map((r) => {
+    // NB: not usdNumber() — the raw ratio needs full precision; ×100 + 2dp
+    // rounding happens here, after the conversion (contract: 0.0421 → 4.21).
+    const roiText = r.roi as string | null;
+    const ratio = roiText === null ? null : Number(roiText);
+    const navText = trimDecimals(r.nav as string);
+    return {
+      basket: r.pubkey as string,
+      basketName: (r.basket_name as string | null) ?? null,
+      symbol: (r.symbol as string | null) ?? null,
+      returnPct: ratio === null || !Number.isFinite(ratio) ? null : Math.round(ratio * 10000) / 100,
+      nav: navText,
+      aum: navText, // contract: aum === the current NAV value
+      holders: Number(r.holders ?? 0),
+      mintCount: Number(r.mint_count ?? 0),
+      asOf: new Date(r.cur_ts as string).toISOString(),
+    };
+  });
+  return {
+    status: 200,
+    payload: {
+      window,
+      items,
+      note: "Basket returns come from on-chain NAV snapshots (current vs window baseline; all-time = first snapshot) — never fabricated. Baskets without a baseline for the window are excluded.",
+    },
+  };
+}
+
 // --- follows ----------------------------------------------------------------------
 
 const FOLLOWERS_SQL = `
@@ -1006,6 +1142,7 @@ export async function tryHandleSocialRoute(
     pathname.startsWith("/api/v1/users/") ||
     pathname === "/api/v1/feed" ||
     pathname === "/api/v1/leaderboard" ||
+    pathname === "/api/v1/leaderboard/baskets" ||
     pathname === "/api/v1/me/profile" ||
     pathname.startsWith("/api/v1/posts") ||
     pathname.startsWith("/api/v1/auth/");
@@ -1070,6 +1207,23 @@ export async function tryHandleSocialRoute(
       sendJson(res, out.status, out.payload);
     } catch (err) {
       sendError(res, 503, "DB_UNAVAILABLE", err instanceof Error ? err.message : "feed query failed");
+    }
+    return true;
+  }
+  // Exact equality only — /api/v1/baskets must keep falling through to
+  // server.ts, which owns the generic basket routes.
+  if (pathname === "/api/v1/leaderboard/baskets" && method === "GET") {
+    const db = await deps.getDb();
+    if (!db) {
+      const out = dbGuardPayload();
+      sendJson(res, out.status, out.payload);
+      return true;
+    }
+    try {
+      const out = await getBasketLeaderboard(db, url.searchParams.get("window") ?? "all");
+      sendJson(res, out.status, out.payload);
+    } catch (err) {
+      sendError(res, 503, "DB_UNAVAILABLE", err instanceof Error ? err.message : "baskets leaderboard query failed");
     }
     return true;
   }

@@ -16,6 +16,7 @@ import type { WalletError } from "@solana/wallet-adapter-base";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 
+import { HandleOnboarding } from "@/components/social/handle-onboarding";
 import { RPC_ENDPOINT, describeWalletError } from "@/lib/wallet";
 
 /**
@@ -54,6 +55,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
       >
         <WalletFeedbackProvider sinkRef={feedbackSinkRef}>
           {children}
+          {/* Non-modal handle-claim nudge — needs the wallet context above. */}
+          <HandleOnboarding />
         </WalletFeedbackProvider>
       </WalletProvider>
     </ConnectionProvider>

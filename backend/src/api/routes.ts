@@ -23,6 +23,7 @@ export const routes = {
   "POST|DELETE /users/:wallet/follow": "auth: follow/unfollow (requires claimed target profile)",
   "GET /feed": "Unified trade + thesis feed; scope=all|following, type=all|trades|theses",
   "GET /leaderboard": "Estimated ROI ranking; window=7d|30d|all (anti-sybil eligibility)",
+  "GET /leaderboard/baskets": "Baskets ranked by windowed NAV return; window=7d|30d|all (returnPct, NAV/AUM strings, holders, mintCount)",
   "POST /posts": "auth: create thesis post {title, body, basket?}",
   "GET|DELETE /posts/:id": "Fetch full post / auth: author delete",
   "POST|DELETE /posts/:id/like": "auth: like/unlike",

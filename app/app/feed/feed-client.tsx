@@ -262,7 +262,9 @@ function FeedSkeleton() {
 function TradeCard({ item }: { item: Extract<FeedItem, { kind: "trade" }> }) {
   const minted = item.type === "Minted";
   return (
-    <li className="py-4">
+    // Borderless divider list → the row earns a 2px yellow left accent on
+    // hover only (thesis rows keep a quiet static one) — never full borders.
+    <li className="border-l-2 border-l-primary/0 py-4 pl-4 transition-colors hover:border-l-primary/60">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <Link
@@ -270,6 +272,7 @@ function TradeCard({ item }: { item: Extract<FeedItem, { kind: "trade" }> }) {
             className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <ActorLine
+              emphasis
               wallet={item.wallet}
               handle={item.handle}
               displayName={item.displayName}
@@ -286,9 +289,20 @@ function TradeCard({ item }: { item: Extract<FeedItem, { kind: "trade" }> }) {
             {item.type}
           </span>
         </div>
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-          {formatRelativeTime(item.ts)}
-        </span>
+        <div className="flex shrink-0 items-baseline gap-x-3">
+          {/* USD is the headline number (sentence below no longer repeats it). */}
+          <span className="text-right leading-tight">
+            <span className="block font-mono text-sm font-semibold tabular-nums text-foreground">
+              {item.usdValue !== null ? formatUsd(item.usdValue) : "—"}
+            </span>
+            <span className="mt-0.5 block font-mono text-[11px] tabular-nums text-muted-foreground">
+              {formatTokenAmount(item.shares, { maximumFractionDigits: 2 })} shares
+            </span>
+          </span>
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+            {formatRelativeTime(item.ts)}
+          </span>
+        </div>
       </div>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         {minted ? "Bought" : "Sold"}{" "}
@@ -302,11 +316,7 @@ function TradeCard({ item }: { item: Extract<FeedItem, { kind: "trade" }> }) {
           title={item.basket}
         >
           {item.basketName ?? truncateAddress(item.basket, 6, 4)}
-        </Link>{" "}
-        for{" "}
-        <span className="font-mono tabular-nums text-foreground">
-          {item.usdValue !== null ? formatUsd(item.usdValue) : "—"}
-        </span>
+        </Link>
       </p>
     </li>
   );
@@ -379,13 +389,16 @@ function ThesisCard({
   };
 
   return (
-    <li className="py-4">
+    // Quiet static left accent — thesis rows are content, not hover targets
+    // for the whole row, so the accent never turns yellow here.
+    <li className="border-l-2 border-l-border/60 py-4 pl-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <Link
           href={`/creator/${item.wallet}`}
           className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <ActorLine
+            emphasis
             wallet={item.wallet}
             handle={item.handle}
             displayName={item.displayName}
@@ -403,7 +416,7 @@ function ThesisCard({
         aria-expanded={expanded}
         className="mt-2 block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        <span className="block text-sm font-semibold text-foreground">{item.title}</span>
+        <span className="block text-[15px] font-semibold text-foreground">{item.title}</span>
         <span className="mt-1 block whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
           {expanded && full ? full.body : item.body}
           {expanded && !full ? "" : item.bodyTruncated && !expanded ? "…" : ""}
@@ -491,8 +504,11 @@ function ThesisCard({
                         href={`/creator/${comment.wallet}`}
                         className="font-medium text-foreground hover:underline underline-offset-4"
                       >
-                        {comment.displayName?.trim() ||
-                          (comment.handle ? `@${comment.handle}` : truncateAddress(comment.wallet, 4, 4))}
+                        {/* Handle first — comment rows reinforce usernames. */}
+                        {comment.handle
+                          ? `@${comment.handle}`
+                          : comment.displayName?.trim() ||
+                            truncateAddress(comment.wallet, 4, 4)}
                       </Link>
                       <span className="ml-2 font-mono text-[10px] tabular-nums text-muted-foreground">
                         {formatRelativeTime(comment.ts)}

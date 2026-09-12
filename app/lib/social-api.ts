@@ -158,6 +158,35 @@ export interface LeaderboardPayload {
   note?: string | null;
 }
 
+/**
+ * Baskets leaderboard (GET /leaderboard/baskets) shares the users window
+ * vocabulary — the same 7d/30d/all switcher drives both tabs.
+ */
+export type BasketLeaderboardWindow = LeaderboardWindow;
+
+export interface BasketLeaderboardEntry {
+  basket: string;
+  basketName: string | null;
+  /** Ticker chip; null hides the chip (basket renders by name only). */
+  symbol: string | null;
+  /** Window return in percent — ranked DESC server-side. */
+  returnPct: number;
+  /** Current NAV per share — BigInt-safe string, parsed at display time. */
+  nav: string;
+  /** Basket AUM — BigInt-safe string. */
+  aum: string;
+  holders: number;
+  mintCount: number;
+  /** Freshness stamp of the NAV snapshot behind returnPct. */
+  asOf: string;
+}
+
+export interface BasketLeaderboardPayload {
+  window: BasketLeaderboardWindow;
+  items: BasketLeaderboardEntry[];
+  note: string;
+}
+
 export interface FullPost {
   id: string;
   wallet: string;
@@ -400,6 +429,17 @@ export function fetchLeaderboard(
   signal?: AbortSignal,
 ): Promise<LeaderboardPayload> {
   return socialGetQuery<LeaderboardPayload>("/api/v1/leaderboard", { window: win }, signal);
+}
+
+export function fetchBasketLeaderboard(
+  win: BasketLeaderboardWindow,
+  signal?: AbortSignal,
+): Promise<BasketLeaderboardPayload> {
+  return socialGetQuery<BasketLeaderboardPayload>(
+    "/api/v1/leaderboard/baskets",
+    { window: win },
+    signal,
+  );
 }
 
 export function fetchPost(id: string, signal?: AbortSignal): Promise<PostPayload> {

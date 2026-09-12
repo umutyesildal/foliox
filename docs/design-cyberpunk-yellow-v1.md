@@ -1,4 +1,4 @@
-# FolioX "NEON FOUNDRY" — Cyberpunk-Yellow Design Spec (v1)
+# Basalt "NEON FOUNDRY" — Cyberpunk-Yellow Design Spec (v1)
 
 > Owner direction 2026-09-12: explore a cyberpunk-leaning identity built on
 > **electric yellow**, with typography re-tuned to match. This branch
@@ -153,7 +153,7 @@ abstractly as an angular F. Geometry (viewBox `0 0 24 24`, stroke
   (stroke-width 1.7, fill none).
 - Bars (FILLED rects, no stroke): y=8.1 h=2.1 x=8→16.6; y=11.95 h=2.1
   x=8→14.6; y=15.8 h=2.1 x=8→12.6 (descending widths = weights).
-- Header wordmark: mark + "FolioX" text where the **X renders in
+- Header wordmark: mark + "Basalt" text where the **X renders in
   `text-primary`** (yellow accent); rest stays foreground.
 - Favicon (`icon.svg`): same geometry, yellow #FCEE0A strokes/bars on a
   near-black #0A0A0B square (sharpen rx to 4).

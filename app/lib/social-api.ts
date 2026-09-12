@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Typed client for the FolioX social layer (feed / profiles / theses).
+ * Typed client for the Basalt social layer (feed / profiles / theses).
  *
  * Same discipline as components/basket/basket-api.ts: every fetch goes through
  * the validated `apiFetch`/`apiQuery` pair (lib/api-client.ts), paths are

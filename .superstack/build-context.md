@@ -1,4 +1,4 @@
-# FolioX — Build Context (pitch-deck input)
+# Basalt — Build Context (pitch-deck input)
 
 > 2026-09-03. Companion to `idea-context.md`. Sources: AGENTS.md, plan.md §6/§8c, verified worker reports.
 

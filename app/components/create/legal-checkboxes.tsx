@@ -14,7 +14,7 @@ const ACKNOWLEDGMENTS: AcknowledgmentSpec[] = [
     key: "notAdvice",
     statement: "Creating and deploying this basket is not investment advice.",
     detail:
-      "FolioX provides tooling, not recommendations. Nothing here evaluates whether these constituents, weights, or fees suit any person. Weight selection, fee selection, and deployment are entirely the creator's decisions.",
+      "Basalt provides tooling, not recommendations. Nothing here evaluates whether these constituents, weights, or fees suit any person. Weight selection, fee selection, and deployment are entirely the creator's decisions.",
   },
   {
     key: "jurisdiction",

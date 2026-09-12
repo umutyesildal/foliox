@@ -309,9 +309,9 @@ export default function CreateClient() {
   // Metadata JSON — hashed with sha256 (IPFS upload is out of scope for V0).
   const metadataJson = useMemo(() => {
     const blob = {
-      name: name.trim() || "Untitled FolioX basket",
+      name: name.trim() || "Untitled Basalt basket",
       description: description.trim(),
-      version: "foliox-v0",
+      version: "basalt-v0",
       genesisShares: 1_000_000,
       constituents: constituents.map((c) => ({
         ticker: c.ticker,

@@ -15,8 +15,8 @@ const SECTIONS: Section[] = [
     title: "Not investment advice",
     toc: "Not advice",
     body: [
-      "FolioX is software for creating, holding, and redeeming tokenized strategy baskets. Nothing on this site is investment advice, a recommendation, or an offer to buy or sell any asset. Constituents, weights, and fee schedules are chosen entirely by basket creators, and FolioX does not evaluate whether any basket suits any person.",
-      "Deploying a basket does not make the deploying wallet an adviser or asset manager. Unless a creator is separately licensed, no licensed relationship exists between creators, depositors, or FolioX.",
+      "Basalt is software for creating, holding, and redeeming tokenized strategy baskets. Nothing on this site is investment advice, a recommendation, or an offer to buy or sell any asset. Constituents, weights, and fee schedules are chosen entirely by basket creators, and Basalt does not evaluate whether any basket suits any person.",
+      "Deploying a basket does not make the deploying wallet an adviser or asset manager. Unless a creator is separately licensed, no licensed relationship exists between creators, depositors, or Basalt.",
     ],
   },
   {
@@ -47,7 +47,7 @@ const SECTIONS: Section[] = [
     title: "Self-custody and permissionless redemption",
     toc: "Self-custody",
     body: [
-      "FolioX and the indexer never custody user assets and never hold signing keys. Basket vaults are on-chain program-owned accounts. Redemption (redeem_in_kind) is permissionless and oracle-free: it computes pro-rata vault entitlements, floored to the raw token unit, and cannot be paused by FolioX, the creator, or any authority.",
+      "Basalt and the indexer never custody user assets and never hold signing keys. Basket vaults are on-chain program-owned accounts. Redemption (redeem_in_kind) is permissionless and oracle-free: it computes pro-rata vault entitlements, floored to the raw token unit, and cannot be paused by Basalt, the creator, or any authority.",
       "If the indexer or this website is offline, redemption still works by interacting with the on-chain program directly through any Solana RPC.",
     ],
   },
@@ -83,7 +83,7 @@ const SECTIONS: Section[] = [
     title: "Language",
     toc: "Language",
     body: [
-      "Baskets on FolioX are described only as strategy baskets, index baskets, onchain equity baskets, or xStocks-backed strategy tokens. They are not registered investment companies, not ETFs, and not funds, and nothing here projects returns or implies safety of principal. Smart-contract risk, issuer risk, market risk, and depeg risk all apply.",
+      "Baskets on Basalt are described only as strategy baskets, index baskets, onchain equity baskets, or xStocks-backed strategy tokens. They are not registered investment companies, not ETFs, and not funds, and nothing here projects returns or implies safety of principal. Smart-contract risk, issuer risk, market risk, and depeg risk all apply.",
     ],
   },
 ];
@@ -94,7 +94,7 @@ export default function LegalPage() {
       <header className="space-y-1.5">
         <h1 className="font-display text-3xl font-semibold">Risks &amp; Disclosures</h1>
         <p className="text-sm leading-6 text-muted-foreground">
-          Placeholder disclosure copy for FolioX baskets — an engineering draft, not
+          Placeholder disclosure copy for Basalt baskets — an engineering draft, not
           counsel-approved legal text.
         </p>
       </header>

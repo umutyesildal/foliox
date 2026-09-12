@@ -1,5 +1,5 @@
 /**
- * catalog/mockStocks.ts — the FolioX mock xStock universe (devnet demo).
+ * catalog/mockStocks.ts — the Basalt mock xStock universe (devnet demo).
  *
  * Single source of truth for the 12 mock xStocks the backend knows about.
  * Each entry carries:

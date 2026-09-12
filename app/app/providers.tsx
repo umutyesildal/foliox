@@ -51,7 +51,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         wallets={wallets}
         autoConnect={false}
         onError={handleWalletError}
-        localStorageKey="foliox:wallet"
+        localStorageKey="basalt:wallet"
       >
         <WalletFeedbackProvider sinkRef={feedbackSinkRef}>
           {children}

@@ -122,7 +122,7 @@ export default function FeedClient() {
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">Feed</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Trades and theses from public FolioX baskets — self-reported, not advice.
+            Trades and theses from public Basalt baskets — self-reported, not advice.
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -1,5 +1,5 @@
 /**
- * index.ts — FolioX backend entrypoint (PORT=3001).
+ * index.ts — Basalt backend entrypoint (PORT=3001).
  *
  * Env-gated subsystem startup, every subsystem logs enabled/disabled:
  *   * Postgres   — DATABASE_URL          → applySchema (db/init.ts)
@@ -24,7 +24,7 @@ import { createHandler, API_VERSION, type SubsystemStatus } from "./api/server.j
 const PORT = Number(process.env.PORT || 3001);
 
 async function main(): Promise<void> {
-  console.log(`FolioX backend v${API_VERSION} starting (port ${PORT})`);
+  console.log(`Basalt backend v${API_VERSION} starting (port ${PORT})`);
 
   // 1. Postgres + normative spec §7 schema (both degrade honestly when unset).
   const db = await connectFromEnv();
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
   });
   const server = http.createServer(createHandler({ db, cache, status }));
   await new Promise<void>((resolve) => server.listen(PORT, resolve));
-  console.log(`FolioX backend listening on :${PORT}`);
+  console.log(`Basalt backend listening on :${PORT}`);
   console.log(` - GET  /api/v1/baskets            (basket_rankings, source: onchain-indexed)`);
   console.log(` - GET  /api/v1/baskets/:pubkey    (detail + NAV + holdings + drift)`);
   console.log(` - GET  /api/v1/baskets/:pubkey/holdings | /nav/history | /performance`);

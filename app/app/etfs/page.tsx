@@ -11,8 +11,8 @@ import {
 import { apiFetch, apiQuery } from "@/lib/api-client";
 
 export const metadata: Metadata = {
-  title: "Tokenized ETFs — FolioX",
-  description: "The tokenized ETF tickers listed on FolioX today.",
+  title: "Tokenized ETFs — Basalt",
+  description: "The tokenized ETF tickers listed on Basalt today.",
 };
 
 /**
@@ -116,7 +116,7 @@ async function EtfListing() {
       <div className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <h2 id="tokenized-etfs" className="font-display text-sm font-medium">
-            Tokenized ETFs on FolioX
+            Tokenized ETFs on Basalt
           </h2>
           <FreshnessBadge source="dev catalog · mock prices (not live)" />
         </div>
@@ -208,7 +208,7 @@ async function EtfListing() {
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <h2 id="tokenized-etfs" className="font-display text-sm font-medium">
-          Tokenized ETFs on FolioX
+          Tokenized ETFs on Basalt
         </h2>
         <FreshnessBadge source="Jupiter · Yahoo Finance" asOf={asOf} />
       </div>
@@ -227,13 +227,13 @@ export default function EtfsPage() {
       <header className="pb-8">
         <h1 className="font-display text-3xl font-semibold">Tokenized ETFs</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          The tokenized ETF tickers FolioX lists today.
+          The tokenized ETF tickers Basalt lists today.
         </p>
       </header>
 
       {/* Live listing, right under the intro; streams after the fetches resolve.
           The Traditional vs tokenized comparison lives on the home landing now. */}
-      <section aria-label="Tokenized ETFs on FolioX" className="border-t border-border py-8">
+      <section aria-label="Tokenized ETFs on Basalt" className="border-t border-border py-8">
         <Suspense fallback={<EtfGridSkeleton />}>
           <EtfListing />
         </Suspense>

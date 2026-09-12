@@ -5,7 +5,7 @@
 export interface YahooCandle { ts: number; open: number; high: number; low: number; close: number; volume: number; }
 export interface YahooSeries { symbol: string; candles: YahooCandle[]; }
 
-const UA = "Mozilla/5.0 (compatible; FolioX/0.1)";
+const UA = "Mozilla/5.0 (compatible; Basalt/0.1)";
 
 /**
  * Yahoo symbol allowlist: plain ticker characters only (e.g. TSLA, BRK-B,

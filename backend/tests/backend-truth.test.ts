@@ -135,7 +135,7 @@ describe("indexer/events — discriminator matcher", () => {
     }
   });
 
-  it("matches each of the four FolioX events by prefix", () => {
+  it("matches each of the four Basalt events by prefix", () => {
     for (const type of ["BasketCreated", "Minted", "Redeemed", "FeeAccrued"] as const) {
       const payload = Buffer.concat([ANCHOR_EVENT_DISCRIMINATORS[type], Buffer.alloc(48)]);
       expect(matchAnchorEvent(payload)).toBe(type);

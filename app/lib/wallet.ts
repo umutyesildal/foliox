@@ -1,5 +1,5 @@
 /**
- * Wallet / RPC helpers for FolioX.
+ * Wallet / RPC helpers for Basalt.
  *
  * Cluster wiring (both env vars are inlined by Next at build time, safe in
  * client and server bundles):

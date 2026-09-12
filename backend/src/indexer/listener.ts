@@ -1,5 +1,5 @@
 /**
- * indexer/listener.ts — read-only event indexer for the three FolioX programs.
+ * indexer/listener.ts — read-only event indexer for the three Basalt programs.
  *
  * Polls `getSignaturesForAddress` per program ID (env: PROGRAM_WHITELIST,
  * PROGRAM_FACTORY, PROGRAM_BASKET), fetches each transaction, decodes the four

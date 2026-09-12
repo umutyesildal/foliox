@@ -16,7 +16,7 @@ import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Data providers — FolioX",
+  title: "Data providers — Basalt",
   description:
     "Source registry: Backed Finance (xStocks issuer), Jupiter, Yahoo Finance, and the Nasdaq benchmark, with status and freshness.",
 };

@@ -1,22 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- FolioX favicon (NEON FOUNDRY de-Rome pass, 2026-09-12): the FOUNDRY MARK
-       on a near-black rounded square — hexagon outline + three descending
-       weight bars in electric-yellow #FCEE0A on #0A0A0B, corner radius
-       sharpened to 4 per spec §7. Same 24x24 relative geometry as LogoMark in
-       components/shell/site-header.tsx, centered (mark bbox center 12,12) and
-       scaled 1.2x so the mark fills the 32px frame while the stroke renders
-       at ~1px at a 16px tab size. Same mark also in apple-icon.tsx and
-       opengraph-image.tsx. -->
+  <!-- Basalt favicon (design-basalt-v1 §3): the BASALT MARK — three
+       hexagonal columns of descending height on a shared baseline — filled
+       electric-yellow #FCEE0A on a near-black #0A0A0B rounded square (rx 4).
+       Same 24x24 relative geometry as LogoMark in
+       components/shell/site-header.tsx, centered (mark bbox center 12,12)
+       and scaled 1.2x so the columns fill the 32px frame; solid fills read
+       cleanly down to the 16px tab size. Same mark also in apple-icon.tsx
+       and opengraph-image.tsx (those add the hexagonal cap-facet seam). -->
   <rect width="32" height="32" rx="4" fill="#0A0A0B"/>
-  <g transform="translate(16 16) scale(1.2) translate(-12 -12)">
-    <!-- hexagon container, sharp miter joins -->
-    <path d="M12 2.5 L20.2 7.25 V16.75 L12 21.5 L3.8 16.75 V7.25 Z"
-          fill="none" stroke="#FCEE0A" stroke-width="1.7" stroke-linejoin="miter"/>
-    <!-- three descending weight bars (filled rects, no stroke) -->
-    <g fill="#FCEE0A">
-      <rect x="8" y="8.1" width="8.6" height="2.1"/>
-      <rect x="8" y="11.95" width="6.6" height="2.1"/>
-      <rect x="8" y="15.8" width="4.6" height="2.1"/>
-    </g>
+  <g transform="translate(16 16) scale(1.2) translate(-12 -12)" fill="#FCEE0A">
+    <path d="M4.3 3.7 L6.5 2.5 L8.7 3.7 L8.7 21.5 L4.3 21.5 Z"/>
+    <path d="M9.8 10.7 L12 9.5 L14.2 10.7 L14.2 21.5 L9.8 21.5 Z"/>
+    <path d="M15.3 15.7 L17.5 14.5 L19.7 15.7 L19.7 21.5 L15.3 21.5 Z"/>
   </g>
 </svg>

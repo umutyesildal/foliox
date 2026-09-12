@@ -1,5 +1,5 @@
 /**
- * indexer/events.ts — Anchor event decoding for the FolioX programs.
+ * indexer/events.ts — Anchor event decoding for the Basalt programs.
  *
  * Anchor emits CPI events as `Program data: <base64>` log lines. The first 8
  * bytes are the event discriminator = sha256("event:<EventName>")[0..8]; the
@@ -23,7 +23,7 @@ import bs58 from "bs58";
 
 export type FolioxEventType = "BasketCreated" | "Minted" | "Redeemed" | "FeeAccrued";
 
-export const FOLIOX_EVENT_TYPES: readonly FolioxEventType[] = [
+export const BASALT_EVENT_TYPES: readonly FolioxEventType[] = [
   "BasketCreated",
   "Minted",
   "Redeemed",
@@ -174,7 +174,7 @@ export function extractProgramDataLogs(logMessages: string[]): Buffer[] {
 /** Match an event payload's 8-byte discriminator, or null when unknown. */
 export function matchAnchorEvent(payload: Buffer): FolioxEventType | null {
   if (payload.length < 8) return null;
-  for (const type of FOLIOX_EVENT_TYPES) {
+  for (const type of BASALT_EVENT_TYPES) {
     if (payload.subarray(0, 8).equals(ANCHOR_EVENT_DISCRIMINATORS[type])) return type;
   }
   return null;

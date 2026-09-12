@@ -1030,5 +1030,5 @@ function defaultStatus(): SubsystemStatus {
 
 if (process.argv[1]?.endsWith("server.ts")) {
   const handler = createHandler();
-  http.createServer(handler).listen(3001, () => console.log("FolioX API on :3001 (DB-backed + providers + price compare)"));
+  http.createServer(handler).listen(3001, () => console.log("Basalt API on :3001 (DB-backed + providers + price compare)"));
 }

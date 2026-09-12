@@ -1,4 +1,4 @@
-# xStocks Provider Envanteri — FolioX V0.1 Minimal
+# xStocks Provider Envanteri — Basalt V0.1 Minimal
 
 > Tek kaynaktan beslenen fiyat değil, **karşılaştırmalı** fiyat. Her ticker 3′lü: `xStock (Jupiter/on-chain) vs Gerçek Hisse (Yahoo) vs Endeks (Nasdaq/QQQ)`
 

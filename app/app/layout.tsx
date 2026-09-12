@@ -18,23 +18,23 @@ export const metadata: Metadata = {
   // TODO(roman-empire): swap for the production domain before launch.
   metadataBase: new URL("http://localhost:3000"),
   title: {
-    default: "FolioX — Strategy Baskets on Solana",
-    template: "%s · FolioX",
+    default: "Basalt — Strategy Baskets on Solana",
+    template: "%s · Basalt",
   },
   description:
-    "FolioX lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
+    "Basalt lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
   openGraph: {
-    title: "FolioX — Strategy Baskets on Solana",
+    title: "Basalt — Strategy Baskets on Solana",
     description:
-      "FolioX lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
+      "Basalt lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
     type: "website",
-    siteName: "FolioX",
+    siteName: "Basalt",
   },
   twitter: {
     card: "summary",
-    title: "FolioX — Strategy Baskets on Solana",
+    title: "Basalt — Strategy Baskets on Solana",
     description:
-      "FolioX lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
+      "Basalt lets you create and manage onchain strategy baskets built from tokenized xStocks on Solana.",
   },
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {

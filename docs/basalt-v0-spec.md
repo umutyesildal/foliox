@@ -1,7 +1,7 @@
-# FolioX V0 — Implementation-Ready Spec
+# Basalt V0 — Implementation-Ready Spec
 
-> Status: **Draft V0 — READY FOR CODE** | Stack: Anchor + Next.js + TypeScript Backend | Date: 2026-09-01 | Author: FolioX Architect
-> Source: `foliox_build_prompt.md` (xStocks strategy baskets, Solana-first, no-ETF language)
+> Status: **Draft V0 — READY FOR CODE** | Stack: Anchor + Next.js + TypeScript Backend | Date: 2026-09-01 | Author: Basalt Architect
+> Source: `basalt_build_prompt.md` (xStocks strategy baskets, Solana-first, no-ETF language)
 
 ---
 
@@ -638,7 +638,7 @@ brand.md                  // written by brand-design skill
 
 ```ts
 // scaffold uses Anchor TS + LiteSVM
-describe("foliox basket", () => {
+describe("basalt basket", () => {
   it("create_basket atomically seeds and validates", ...)
   it("mint_in_kind perfect weights → net shares", ...)
   it("mint_in_kind off-weights reverts WeightMismatch", ...)
@@ -733,7 +733,7 @@ Copy placeholders to be replaced after counsel review — do not ship to mainnet
 | Phase | Days | Deliverable | Owner(s) | Exit Criteria |
 |-------|------|-------------|----------|---------------|
 | **P0 Spec** | 1–3 | This doc approved, architecture diagram signed off | architect + security reviewer | All §1–12 reviewed, `LEGAL_REVIEW_REQUIRED` items triaged |
-| **P1 Scaffold** | 4–8 | `anchor init foliox` with 3 programs (`whitelist`, `basket_factory`, `basket`), `Anchor.toml`, `Cargo.toml`, `lib.rs` shells, PDA constants, error enums, events, minimal CI (`cargo test`, `anchor build`) | Anchor lead | `anchor build` passes, PDAs tested on localnet |
+| **P1 Scaffold** | 4–8 | `anchor init basalt` with 3 programs (`whitelist`, `basket_factory`, `basket`), `Anchor.toml`, `Cargo.toml`, `lib.rs` shells, PDA constants, error enums, events, minimal CI (`cargo test`, `anchor build`) | Anchor lead | `anchor build` passes, PDAs tested on localnet |
 | **P2 Whitelist** | 9–14 | `whitelist` program + TS scripts `scripts/initWhitelist.ts`, `addMint.ts` with Helius fixture mints (mock xStocks Token-2022), unit tests for pause not blocking redeem | Anchor | Unit + LiteSVM pause test green |
 | **P3 Factory Create** | 15–22 | `basket_factory::create_basket` with full validation (weights, caps, whitelist, atomic seed), vault ATAs, share mint, genesis shares; script `createBasket.ts` | Anchor | E2E `create_basket` on localnet with 3 xStocks, weights sum 10k, seed atomic verified |
 | **P4 Core Mint/Redeem** | 23–36 | `basket::mint_in_kind`, `redeem_in_kind`, `accrue_management_fee` with raw math & fee split, no oracle/pauser | Anchor | Fuzz properties 1-3 green, full redeem empty vault test green |
@@ -765,7 +765,7 @@ Post-90: mainnet-beta with capped TVL, bug bounty, formal verification via QEDGe
 
 - `~/.agents/skills/data/solana-knowledge/03-contract-level.md` (PDAs, Anchor)
 - `~/.agents/skills/data/guides/security-checklist.md` (P0/P1 audit)
-- `foliox_build_prompt.md` (thesis, constraints, required outputs)
+- `basalt_build_prompt.md` (thesis, constraints, required outputs)
 - Backed xStocks Token-2022 docs (Scaled UI Amount extension)
 - Jupiter Price/Swap APIs
 
@@ -795,7 +795,7 @@ Adds a social trading surface (fomo.family-inspired, deliberately not a clone) o
 **New backend surface** (normative shapes in `backend/src/api/social.ts`, route map in `backend/src/api/routes.ts`):
 
 - Tables: `profiles`, `follows`, `posts(kind='thesis')`, `post_likes`, `comments`, `user_value_snapshots`, expression index `events((data->>'user'), ts DESC)` — all idempotent additions to `schema.sql`.
-- Auth: SIWS-lite (`POST /auth/nonce` → wallet signs exact message `FolioX Social\nWallet: <wallet>\nNonce: <nonce>` → `/auth/verify` verifies ed25519 → HMAC bearer token, 7d, secret `SOCIAL_AUTH_SECRET`). **Auth gates social writes only**; §2 constraint 5 (backend never signs) is unaffected.
+- Auth: SIWS-lite (`POST /auth/nonce` → wallet signs exact message `Basalt Social\nWallet: <wallet>\nNonce: <nonce>` → `/auth/verify` verifies ed25519 → HMAC bearer token, 7d, secret `SOCIAL_AUTH_SECRET`). **Auth gates social writes only**; §2 constraint 5 (backend never signs) is unaffected.
 - Reads: `/users/:wallet/profile|history|equity-curve|followers|following`, `/feed?scope&type`, `/leaderboard?window`. Writes: `PUT /me/profile`, follow/unfollow, thesis posts, likes, comments.
 - Privacy: `profiles.is_public=false` excludes a wallet from feed + leaderboard (default is public — the on-chain ledger is public regardless; the toggle governs platform discovery surfaces only).
 - Leaderboard honesty: ROI is *estimated* (cost basis derives from NAV reference pricing, not fill prices) and anti-sybil gated (≥2 mints, first trade ≥7d, live value > 0). 7d/30d windows require `user_value_snapshots` history (worker `workers/userSnapshot.ts`, ~5m) — empty until accumulated, never backfilled with synthetic data.

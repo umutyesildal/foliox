@@ -30,7 +30,7 @@ import { withRpcBackoff, createPacer } from "../rpc/backoff.js";
 
 // ---------------------------------------------------------------------------
 // Legacy numeric API — kept byte-for-byte compatible (existing vitest suite
-// pins exact Number math incl. foliox/mega/super tests). New code should use
+// pins exact Number math incl. basalt/mega/super tests). New code should use
 // the exact string-math layer below.
 // ---------------------------------------------------------------------------
 

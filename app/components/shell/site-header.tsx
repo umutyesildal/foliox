@@ -41,11 +41,12 @@ function NavLink({ href, label }: { href: string; label: string }) {
 }
 
 /**
- * FolioX mark — the FOUNDRY MARK (spec §7, de-Rome pass 2026-09-12): a
- * hexagon outline containing three descending filled bars — reads as index
- * weights in a container and abstractly as an angular F. The canonical
- * geometry lives here (viewBox 0 0 24 24, stroke-width 1.7, miter joins) and
- * is reused verbatim in app/icon.svg, apple-icon.tsx and
+ * Basalt mark — the BASALT MARK (design-basalt-v1 §2): three hexagonal
+ * columns of descending height standing on a shared baseline. Reads as
+ * basalt columns (the Giant's Causeway), as index weights rendered as
+ * column heights, and abstractly as an ascending stack. The canonical
+ * geometry lives here (viewBox 0 0 24 24, stroke-width 1.7, miter joins)
+ * and is reused verbatim in app/icon.svg, apple-icon.tsx and
  * opengraph-image.tsx (same relative geometry, different scale/colors).
  * currentColor throughout; decorative only.
  */
@@ -61,24 +62,17 @@ function LogoMark({ size = 21 }: { size?: number }) {
       strokeLinejoin="miter"
       className="mr-2 shrink-0"
     >
-      {/* hexagon container, sharp miter joins */}
-      <path
-        d="M12 2.5 L20.2 7.25 V16.75 L12 21.5 L3.8 16.75 V7.25 Z"
-        strokeWidth="1.7"
-      />
-      {/* three descending weight bars (filled rects, no stroke) */}
-      <g fill="currentColor" stroke="none">
-        <rect x="8" y="8.1" width="8.6" height="2.1" />
-        <rect x="8" y="11.95" width="6.6" height="2.1" />
-        <rect x="8" y="15.8" width="4.6" height="2.1" />
-      </g>
+      {/* three basalt columns, descending heights, shared flat baseline */}
+      <path strokeWidth="1.7" d="M4.3 3.7 L6.5 2.5 L8.7 3.7 L8.7 21.5 L4.3 21.5 Z" />
+      <path strokeWidth="1.7" d="M9.8 10.7 L12 9.5 L14.2 10.7 L14.2 21.5 L9.8 21.5 Z" />
+      <path strokeWidth="1.7" d="M15.3 15.7 L17.5 14.5 L19.7 15.7 L19.7 21.5 L15.3 21.5 Z" />
     </svg>
   );
 }
 
 /**
  * Persistent "Claim handle" chip for a connected wallet that has not claimed
- * one yet. Flag-based (foliox:handle-claimed:<wallet> in localStorage — the
+ * one yet. Flag-based (basalt:handle-claimed:<wallet> in localStorage — the
  * editor modal itself does the real profile check on open). Yellow accent
  * wash mirroring the followed chip on creator pages: the Create button keeps
  * the solid-yellow slot.
@@ -120,11 +114,11 @@ function ClaimHandleChip() {
 }
 
 /**
- * Site header: FolioX wordmark (FOUNDRY MARK + display-face text — Chakra
- * Petch under NEON FOUNDRY, with the trailing X in text-primary as the yellow
- * accent; the suffix stays Geist), primary nav (Stocks/ETFs/Baskets),
- * contextual actions (Create/Portfolio), network indicator, wallet button,
- * and a no-dependency mobile disclosure nav.
+ * Site header: Basalt wordmark (BASALT MARK + display-face text — Chakra
+ * Petch, with the leading B in text-primary as the yellow accent; the rest
+ * stays Geist), primary nav (Stocks/ETFs/Baskets), contextual actions
+ * (Create/Portfolio), network indicator, wallet button, and a
+ * no-dependency mobile disclosure nav.
  */
 export function SiteHeader() {
   const pathname = usePathname();
@@ -158,7 +152,7 @@ export function SiteHeader() {
           className="flex items-center rounded-sm font-display font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <LogoMark />
-          Folio<span className="text-primary">X</span>
+          <span className="text-primary">B</span>asalt
           <span className="hidden font-sans font-normal text-muted-foreground sm:inline">
             {" "}
             · xStocks baskets
@@ -204,7 +198,7 @@ export function SiteHeader() {
               "md:hidden",
             )}
             aria-expanded={mobileOpen}
-            aria-controls="foliox-mobile-nav"
+            aria-controls="basalt-mobile-nav"
             onClick={() => setMobileOpen((v) => !v)}
           >
             {mobileOpen ? "Close" : "Menu"}
@@ -214,7 +208,7 @@ export function SiteHeader() {
 
       {mobileOpen && (
         <nav
-          id="foliox-mobile-nav"
+          id="basalt-mobile-nav"
           aria-label="Primary mobile"
           className="border-t border-border bg-background dark:border-border/40 md:hidden"
         >

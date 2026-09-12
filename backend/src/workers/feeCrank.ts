@@ -296,7 +296,7 @@ export class FeeCrank {
         : null;
 
     const note =
-      "UNSIGNED accrue_management_fee tx built by the FolioX backend for a " +
+      "UNSIGNED accrue_management_fee tx built by the Basalt backend for a " +
       "permissionless keeper. The backend never custodies, never signs and " +
       "never submits (AGENTS.md §2 #5): decode the base64 as a " +
       "VersionedTransaction, sign with the keeper wallet (feePayer) and submit. " +

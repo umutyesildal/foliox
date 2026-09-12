@@ -8,7 +8,7 @@
  *
  *   1. client POST /auth/nonce {wallet}          → single-use nonce (5 min TTL)
  *   2. client signs the EXACT message (wallet adapter signMessage):
- *        FolioX Social\nWallet: <wallet>\nNonce: <nonce>
+ *        Basalt Social\nWallet: <wallet>\nNonce: <nonce>
  *   3. client POST /auth/verify {wallet, nonce, signature(base58 ed25519)}
  *      → HMAC token `v1.<b64url payload>.<b64url hmac>` (7 days)
  *   4. later writes carry `Authorization: Bearer <token>`
@@ -20,11 +20,11 @@ import crypto from "node:crypto";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
 
-export const AUTH_MESSAGE_PREFIX = "FolioX Social";
+export const AUTH_MESSAGE_PREFIX = "Basalt Social";
 export const TOKEN_TTL_SECONDS = 7 * 24 * 3600;
 export const NONCE_TTL_MS = 5 * 60 * 1000;
 
-const DEV_FALLBACK_SECRET = "foliox-dev-social-secret-do-not-use-in-prod";
+const DEV_FALLBACK_SECRET = "basalt-dev-social-secret-do-not-use-in-prod";
 
 export function socialAuthSecret(): string {
   const secret = process.env.SOCIAL_AUTH_SECRET;

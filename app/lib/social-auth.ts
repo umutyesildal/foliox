@@ -2,10 +2,10 @@
 
 /**
  * Wallet-sign-in for the social layer: nonce → signMessage → verify → bearer
- * token, cached in localStorage under `foliox:social-token`.
+ * token, cached in localStorage under `basalt:social-token`.
  *
  * Contract (social backend): the signature is base58 ed25519 over EXACTLY
- * `FolioX Social\nWallet: ${wallet}\nNonce: ${nonce}` (UTF-8 bytes). The
+ * `Basalt Social\nWallet: ${wallet}\nNonce: ${nonce}` (UTF-8 bytes). The
  * connected wallet adapter produces the signature; `bs58` encodes it.
  *
  * Usage: `const social = useSocialAuth()` → `social.ensureAuth()` resolves the
@@ -24,7 +24,7 @@ import { SocialApiError } from "@/lib/social-api";
 import { apiFetch } from "@/lib/api-client";
 import { describeWalletError } from "@/lib/wallet";
 
-const STORAGE_KEY = "foliox:social-token";
+const STORAGE_KEY = "basalt:social-token";
 
 interface StoredAuth {
   token: string;
@@ -35,7 +35,7 @@ interface StoredAuth {
 
 /** The exact message bytes the backend verifies — do not reword. */
 export function socialSignMessage(wallet: string, nonce: string): string {
-  return `FolioX Social\nWallet: ${wallet}\nNonce: ${nonce}`;
+  return `Basalt Social\nWallet: ${wallet}\nNonce: ${nonce}`;
 }
 
 function readStoredAuth(): StoredAuth | null {

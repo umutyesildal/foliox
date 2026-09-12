@@ -709,7 +709,7 @@ describe(".env.devnet — profile parses with the exact env names from code", ()
     expect(parsed.PRICE_FALLBACK).toBeUndefined();
   });
 
-  it("points at devnet RPC, the final program IDs, and a separate foliox_devnet DB", () => {
+  it("points at devnet RPC, the final program IDs, and a separate foliox_devnet DB (pre-rename local DB name, kept stable)", () => {
     expect(parsed.RPC_URL).toBe("https://api.devnet.solana.com");
     expect(parsed.PROGRAM_WHITELIST).toBe("FRavMcYQb2FVAHbbG6fGieQHdKk1UrQqgKsAAXTPRQeS");
     expect(parsed.PROGRAM_FACTORY).toBe("3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF");

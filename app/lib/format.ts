@@ -1,5 +1,5 @@
 /**
- * FolioX display formatting helpers.
+ * Basalt display formatting helpers.
  *
  * Pure functions only (no DOM, no React, no process) so they can be unit-tested
  * with vitest as-is. Crypto display conventions:

@@ -1,7 +1,7 @@
-# FolioX — xStocks Strategy Baskets on Solana
+# Basalt — xStocks Strategy Baskets on Solana
 
 > "Create an index. Own your thesis." — Onchain strategy baskets powered by xStocks.
-> V0 spec: `docs/foliox-v0-spec.md` (normative product constraints). Execution plan: `plan.md`. Brand: `brand.md`.
+> V0 spec: `docs/basalt-v0-spec.md` (normative product constraints). Execution plan: `plan.md`. Brand: `brand.md`.
 > Current state: **LIVE ON DEVNET (2026-09-04) — 3 programs deployed at declared IDs, 12 mock xStocks whitelisted, one basket live with mint/redeem/fee verified on-chain (38 confirmed txs; redeem_in_kind proven permissionless under a paused constituent). Backend indexer/NAV/fee-crank live against devnet. 599 tests (178 Rust + 442 backend TS).** Not yet mainnet. Evidence: `docs/devnet-live-2026-09-04.md`.
 
 ## Tests (all green)
@@ -44,7 +44,7 @@ Full evidence pack — signature tables, address tables, reconciliation, reprodu
 | `basket_factory` | `3hzoPep9JKgTmzLT6CNW5x3EN7WNYDevM6KHVM7pLgMF` | Real; full §3.2 validations, atomic seed, genesis mint, real `vault_bump` |
 | `basket` | `6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k` | Real; `mint_in_kind` (4n remaining-accounts contract, pause-gated), `redeem_in_kind` (3n, never gated), `accrue_management_fee` |
 
-See `docs/foliox-v0-spec.md` §2-6 for account model, instruction args, mint/redeem math, fee math. Client instruction builders live in `app/lib/transactions.ts` + `app/lib/create-basket.ts` (mirrored from program source, discriminators cross-verified).
+See `docs/basalt-v0-spec.md` §2-6 for account model, instruction args, mint/redeem math, fee math. Client instruction builders live in `app/lib/transactions.ts` + `app/lib/create-basket.ts` (mirrored from program source, discriminators cross-verified).
 
 ## Token-2022 Accounting
 
@@ -84,7 +84,7 @@ See spec §11. Key invariants (all evidenced in `plan.md` §6 gate table): `rede
 
 ## Legal Placeholders
 
-UI chips were removed at the owner's request (2026-09-03); the review items live in the backlog and the wizard's legal-checkbox step + `/legal` page remain. Never describe FolioX as an ETF/fund; voice rules in `brand.md`. Counsel review required before mainnet.
+UI chips were removed at the owner's request (2026-09-03); the review items live in the backlog and the wizard's legal-checkbox step + `/legal` page remain. Never describe Basalt as an ETF/fund; voice rules in `brand.md`. Counsel review required before mainnet.
 
 ## Local dev demo data
 
@@ -97,8 +97,8 @@ Execution state in `plan.md` §7-8. G0 brand superseded by the owner's **monochr
 ## Scripts
 
 - `scripts/e2e.sh` — deterministic localnet flow (validator → whitelist → basket → mint/redeem → fee crank)
-- Devnet E2E — the same four scripts (`scripts/createWhitelist.ts` → `createBasket.ts` → `mintAndRedeem.ts` → `accrueFee.ts`) run against devnet via `FOLIOX_E2E_*` env vars; state + logs + evidence collector in `scripts/.e2e-devnet/` (reproduction commands in `docs/devnet-live-2026-09-04.md` §8)
+- Devnet E2E — the same four scripts (`scripts/createWhitelist.ts` → `createBasket.ts` → `mintAndRedeem.ts` → `accrueFee.ts`) run against devnet via `BASALT_E2E_*` env vars; state + logs + evidence collector in `scripts/.e2e-devnet/` (reproduction commands in `docs/devnet-live-2026-09-04.md` §8)
 
 ---
 
-Generated from `foliox_build_prompt.md` via solana.new superstack skills (`scaffold-project`, `build-defi-protocol`, `cso`, `brand-design`) + orchestrated implementation waves (2026-09-01).
+Generated from `basalt_build_prompt.md` via solana.new superstack skills (`scaffold-project`, `build-defi-protocol`, `cso`, `brand-design`) + orchestrated implementation waves (2026-09-01).

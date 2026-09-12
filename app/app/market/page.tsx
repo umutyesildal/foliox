@@ -10,7 +10,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { apiQuery } from "@/lib/api-client";
 
 export const metadata: Metadata = {
-  title: "Market overview — FolioX",
+  title: "Market overview — Basalt",
   description:
     "QQQ, SPY, DIA and the Nasdaq Composite normalized to 100, with a 30-candle benchmark volume view.",
 };

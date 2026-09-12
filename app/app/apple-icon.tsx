@@ -4,15 +4,16 @@ export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
 /**
- * Apple touch icon (NEON FOUNDRY de-Rome pass, 2026-09-12): Next ignores
- * apple-icon.svg (raster-only convention), so this renders the FOUNDRY MARK
- * via ImageResponse instead — hexagon outline + three descending weight bars
- * (spec §7). Full-bleed square, iOS applies its own corner mask. Near-black
- * cool canvas with the mark in the electric-yellow accent. Exact 24x24
- * relative geometry of LogoMark in components/shell/site-header.tsx
- * (stroke-width 1.7), rendered at 128px so the mark fills most of the frame;
- * the yellow-on-near-black contrast keeps the 1.7-unit stroke legible after
- * the rasterizer.
+ * Apple touch icon (design-basalt-v1 §3): Next ignores apple-icon.svg
+ * (raster-only convention), so this renders the BASALT MARK via
+ * ImageResponse instead — three hexagonal columns of descending height on a
+ * shared baseline, filled in the electric-yellow accent. At this size the
+ * hexagonal cap facets are separated from the column bodies with a
+ * near-black seam (0.55-unit line at each bevel base) — the "cut stone"
+ * detail that reads at 180px but is omitted from the 32px favicon.
+ * Full-bleed square, iOS applies its own corner mask. Exact 24x24 relative
+ * geometry of LogoMark in components/shell/site-header.tsx, rendered at
+ * 128px so the columns fill most of the frame.
  */
 export default function AppleIcon() {
   return new ImageResponse(
@@ -27,24 +28,18 @@ export default function AppleIcon() {
           backgroundColor: "#0A0A0B",
         }}
       >
-        <svg
-          width="128"
-          height="128"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#FCEE0A"
-          strokeLinejoin="miter"
-        >
-          {/* hexagon container, sharp miter joins */}
-          <path
-            d="M12 2.5 L20.2 7.25 V16.75 L12 21.5 L3.8 16.75 V7.25 Z"
-            strokeWidth="1.7"
-          />
-          {/* three descending weight bars (filled rects, no stroke) */}
-          <g fill="#FCEE0A" stroke="none">
-            <rect x="8" y="8.1" width="8.6" height="2.1" />
-            <rect x="8" y="11.95" width="6.6" height="2.1" />
-            <rect x="8" y="15.8" width="4.6" height="2.1" />
+        <svg width="128" height="128" viewBox="0 0 24 24">
+          {/* three basalt columns, descending heights, shared flat baseline */}
+          <g fill="#FCEE0A">
+            <path d="M4.3 3.7 L6.5 2.5 L8.7 3.7 L8.7 21.5 L4.3 21.5 Z" />
+            <path d="M9.8 10.7 L12 9.5 L14.2 10.7 L14.2 21.5 L9.8 21.5 Z" />
+            <path d="M15.3 15.7 L17.5 14.5 L19.7 15.7 L19.7 21.5 L15.3 21.5 Z" />
+          </g>
+          {/* hexagonal cap-facet seams — near-black lines at each bevel base */}
+          <g stroke="#0A0A0B" strokeWidth="0.55">
+            <line x1="4.3" y1="3.7" x2="8.7" y2="3.7" />
+            <line x1="9.8" y1="10.7" x2="14.2" y2="10.7" />
+            <line x1="15.3" y1="15.7" x2="19.7" y2="15.7" />
           </g>
         </svg>
       </div>

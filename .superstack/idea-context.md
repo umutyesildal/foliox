@@ -1,10 +1,10 @@
-# FolioX — Idea Context (pitch-deck input)
+# Basalt — Idea Context (pitch-deck input)
 
-> Prepared 2026-09-03 for the `create-pitch-deck` skill. Sources: `foliox_build_prompt.md`, `AGENTS.md`, `docs/foliox-v0-spec.md`, owner decisions.
+> Prepared 2026-09-03 for the `create-pitch-deck` skill. Sources: `basalt_build_prompt.md`, `AGENTS.md`, `docs/basalt-v0-spec.md`, owner decisions.
 
 ## Product
 
-**FolioX** — a Solana dApp where anyone can create and hold tokenized strategy baskets ("custom ETFs", never called ETFs in product copy) built from **xStocks** — Backed Finance's Token-2022 wrapped equities/ETFs (TSLAx, AAPLx, NVDAx, SPYx…).
+**Basalt** — a Solana dApp where anyone can create and hold tokenized strategy baskets ("custom ETFs", never called ETFs in product copy) built from **xStocks** — Backed Finance's Token-2022 wrapped equities/ETFs (TSLAx, AAPLx, NVDAx, SPYx…).
 
 **Tagline:** "Create an index. Own your thesis."
 

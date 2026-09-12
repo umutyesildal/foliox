@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { StocksGrid } from "@/components/stocks/stocks-grid";
 
 export const metadata: Metadata = {
-  title: "Stocks — FolioX",
+  title: "Stocks — Basalt",
   description:
     "The mock xStock dev catalog — 12 tokenized stocks with dev-catalog prices, the building blocks for custom baskets.",
 };

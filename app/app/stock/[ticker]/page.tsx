@@ -87,7 +87,7 @@ export async function generateMetadata({
   const { ticker: rawTicker } = await params;
   const ticker = decodeURIComponent(rawTicker);
   return {
-    title: `${ticker} — xStock vs real equity — FolioX`,
+    title: `${ticker} — xStock vs real equity — Basalt`,
     description: `Normalized price comparison for ${ticker}: xStock token vs the real equity vs the Nasdaq benchmark, plus volume.`,
   };
 }

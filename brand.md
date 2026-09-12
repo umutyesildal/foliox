@@ -1,24 +1,25 @@
-# Brand — FolioX
+# Brand — Basalt
 
 Onchain strategy baskets powered by xStocks. "Create an index. Own your thesis."
 
-_Last updated 2026-09-12 (NEON FOUNDRY identity layer on branch `design/cyberpunk-yellow` — see "NEON FOUNDRY layer" below; it retires the 2026-09-03 Roman layer **on that branch only**). Supersedes Mineral Desk (2026-09-01). Telemetry: **off**._
+_Last updated 2026-09-12 (project renamed **FolioX → Basalt**; identity is the **BASALT MARK** — hexagonal basalt columns, per `docs/design-basalt-v1.md`, which supersedes the FOUNDRY MARK of the NEON FOUNDRY pass and completes the retirement of the 2026-09-03 Roman layer). Token system inherited unchanged from `docs/design-cyberpunk-yellow-v1.md` §2–4. Supersedes Mineral Desk (2026-09-01). Telemetry: **off**._
 
-## NEON FOUNDRY layer (branch `design/cyberpunk-yellow`, owner experiment)
+## BASALT identity (owner decision 2026-09-12)
 
-Layered ON TOP of the base system, minimally — the laurel/Pantheon/roman-numeral identity is retired on this branch:
+The laurel/Pantheon/roman-numeral identity is fully retired; the FOUNDRY MARK is superseded. The product name is **Basalt** — basalt cools into hexagonal columns locked side by side (the Giant's Causeway); a basket locks real xStocks into one immutable formation held as a single token. Columns = constituents, column heights = weights, one formation = one token.
 
-- **Canvas + one loud color**: dark industrial near-black with **electric yellow** (`--primary`, #FCEE0A) used with discipline — primary buttons, focus rings, key CTAs, hero accents. Neon cyan/magenta/green/violet live **only inside data** (charts, deltas, avatars), never on chrome.
-- **Display font: Chakra Petch** (weights 500/600/700, `next/font/google` as `--font-display`, `.font-display`/`.text-display` utilities) — wordmark, page/section headings, hero stat numerals. Cinzel is gone.
-- **Geist Mono terminal labels**: every uppercase micro-label, eyebrow, numeral and price is mono — tracked, quiet, terminal-style. Zero-padded numerals `01`–`06` replace roman numerals everywhere.
-- **FOUNDRY MARK (the logo)**: a hexagon outline containing three descending horizontal bars — reads as "index weights in a container" and abstractly as an angular F. Same mark on the header wordmark (the X in the wordmark renders yellow), favicon and OG/apple icons. No laurel geometry anywhere.
-- **Motifs**: line-art terminal geometry only — stacked weight-bars, hexagon + plus, `//` chip decorations, terminal-prompt window, faint inline-SVG circuit-blueprint hero watermark. No photos, no engravings.
+- **Canvas + one loud color** (inherited, unchanged): dark industrial near-black with **electric yellow** (`--primary`, #FCEE0A) used with discipline — primary buttons, focus rings, key CTAs, hero accents. Neon cyan/magenta/green/violet live **only inside data** (charts, deltas, avatars), never on chrome.
+- **Display font: Chakra Petch** (weights 500/600/700, `next/font/google` as `--font-display`, `.font-display`/`.text-display` utilities) — wordmark, page/section headings, hero stat numerals.
+- **Geist Mono terminal labels**: every uppercase micro-label, eyebrow, numeral and price is mono — tracked, quiet, terminal-style. Zero-padded numerals `01`–`06`.
+- **BASALT MARK (the logo)** — canonical geometry in `site-header.tsx` `LogoMark`, spec `docs/design-basalt-v1.md` §2: three hexagonal columns of descending height on a shared baseline (viewBox 0 0 24 24, stroke-width 1.7, miter). Reads as basalt columns, as index weights rendered as column heights, and as an ascending stack. Filled `#FCEE0A` renditions (favicon / apple-icon / OG) add cap-facet seams at ≥100px sizes.
+- **Wordmark rule**: mark + `B` in `text-primary`, `asalt` in foreground, Chakra Petch; the `· xStocks baskets` suffix stays Geist Mono-adjacent quiet.
+- **Motifs**: line-art terminal geometry — the hero watermark is a **causeway tessellation** (seven-hexagon honeycomb = columns seen top-down, `page.tsx`), plus stacked weight-bars, hexagon + plus, `//` chip decorations, terminal-prompt window. No photos, no engravings, no laurel geometry.
 - **Home order ("proof beats process", 2026-09-12)**: hero → live proof band (verified trades + top baskets previews) → CREATE · MINT · SHARE steps → SAME EXPOSURE rails ledger → intent cards (Browse baskets / Follow top traders / Open the feed / Build your own).
-- **Rule**: the NEON FOUNDRY layer appears on Home + wordmark + stepper numerals; utility pages follow the base system. Baskets are never called "ETFs" in product copy.
+- **Rule**: the BASALT identity appears on Home + wordmark + stepper numerals; utility pages follow the base system. Baskets are never called "ETFs" in product copy.
 
 ## Direction
 
-**Monochrome** (base system; on branch `design/cyberpunk-yellow` the NEON FOUNDRY layer above supersedes it — near-black + electric yellow). Classic shadcn look: near-black canvas, white primary button, grayscale everything — with ONE exception: chart DATA may use the ethereal palette below. No decorative gradients, no accent hue on UI chrome, no site footer, minimal prose everywhere.
+**Monochrome base + electric yellow layer.** Classic shadcn look: near-black canvas, grayscale everything — with the yellow accent layer and ONE exception: chart DATA may use the neon palette. No decorative gradients, no site footer, minimal prose everywhere.
 
 ## Palette (applied in `app/app/globals.css`)
 

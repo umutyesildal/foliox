@@ -1,5 +1,5 @@
 /**
- * Client-side Anchor instruction builders for the FolioX basket program.
+ * Client-side Anchor instruction builders for the Basalt basket program.
  *
  * NO IDL dependency — the account order, arg encoding and PDA seeds below are
  * mirrored by hand from the protocol source of truth:
@@ -714,7 +714,7 @@ export async function buildCreateBasketTransaction(params: {
   const sizeBytes = transaction.message.serialize().length + transaction.signatures.length * 64;
   // Log the real wire size before the wallet is ever asked to sign.
   console.info(
-    `[foliox] create_basket wire size: ${sizeBytes}B / ${PACKET_LIMIT}B limit ` +
+    `[basalt] create_basket wire size: ${sizeBytes}B / ${PACKET_LIMIT}B limit ` +
       `(constituents: ${args.constituents.length}, lookup table: ${needsAlt ? `${tables.length} table(s)` : "none"})`,
   );
   if (sizeBytes > PACKET_LIMIT) {

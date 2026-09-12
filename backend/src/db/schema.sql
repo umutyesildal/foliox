@@ -1,4 +1,4 @@
--- FolioX PostgreSQL schema — V0 per docs/foliox-v0-spec.md §7 (normative SQL)
+-- Basalt PostgreSQL schema — V0 per docs/basalt-v0-spec.md §7 (normative SQL)
 --
 -- IDEMPOTENT: safe to re-run on an existing database. Every statement uses
 -- CREATE ... IF NOT EXISTS / CREATE OR REPLACE, so db/init.ts can apply it on

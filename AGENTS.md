@@ -1,16 +1,16 @@
-# AGENTS.md — FolioX Project Context for AI Agents
+# AGENTS.md — Basalt Project Context for AI Agents
 
 > **For: Opencode, Claude Code, Codex, Cursor, any LLM agent working in this repo**
-> **Read this first before writing code.** This is the single source of truth for FolioX V0.
-> Spec: `docs/foliox-v0-spec.md` (774 lines, 13 sections) | Prompt: `foliox_build_prompt.md`
-> Brand: **Monochrome + Roman identity layer** (owner decisions 2026-09-02/03: classic shadcn dark/light chrome, ethereal chart data palette, Cinzel display font, laurel monogram logo, Roman numerals, --imperial purple / --pompeian red accents used sparingly; on the `roman-empire` branch — merge pending owner review). Telemetry off. Legal-review chips removed from UI (backlog).
+> **Read this first before writing code.** This is the single source of truth for Basalt V0.
+> Spec: `docs/basalt-v0-spec.md` (774 lines, 13 sections) | Prompt: `foliox_build_prompt.md (historical name)`
+> Brand: **BASALT identity** (owner decision 2026-09-12: project renamed FolioX → Basalt; hexagonal basalt columns mark per `docs/design-basalt-v1.md`, electric-yellow token system per `docs/design-cyberpunk-yellow-v1.md`, Chakra Petch display, Geist Mono labels — Roman layer fully retired). Telemetry off. Legal-review chips removed from UI (backlog).
 > Status: **PROTOCOL LIVE ON DEVNET — 2 live baskets (3-stock + 6-stock MAG SIX via v0 txs + ALTs), 12 mock xStocks whitelisted, 48+ confirmed txs: mint/redeem/fee verified on-chain, redeem_in_kind proven permissionless under a paused constituent. NAV priced from real market data (Yahoo-first, catalog fallback). Backend indexer/NAV/fee-crank live (fee crank builds UNSIGNED txs only). 620 tests green (178 Rust + 442 backend TS). NEXT: owner commit-gate decision + UI Phantom buy/redeem click-through; owner review / merge of `roman-empire`.** Evidence: `docs/devnet-live-2026-09-04.md`.
 
 ---
 
-## 1. What FolioX Is (and Is Not)
+## 1. What Basalt Is (and Is Not)
 
-**FolioX** is a Solana-first dApp for **tokenized strategy baskets** backed by **xStocks** (Backed Finance Token-2022 mints).  
+**Basalt** is a Solana-first dApp for **tokenized strategy baskets** backed by **xStocks** (Backed Finance Token-2022 mints).  
 A creator picks 2–20 xStocks, sets fixed weights (sum 10,000 bps), sets capped fees, seeds the basket atomically, and deploys an immutable vault. The vault holds the real xStocks on-chain and mints a **basket share token** (Token-2022, 6 decimals, 1M genesis). Investors buy with in-kind xStocks or zap USDC via Jupiter, hold one token, redeem **pro-rata oracle-free**.
 
 *Thesis:* “Create an index. Own your thesis.” — “Onchain strategy baskets powered by xStocks.” — “One token for any tokenized equity thesis.”
@@ -70,9 +70,9 @@ basket         = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k" # programs/baske
 ├── Cargo.toml                  # workspace (3 programs) + overflow-checks
 ├── Cargo.lock
 ├── docs/
-│   ├── foliox-v0-spec.md       # 774L implementation-ready spec (§1-13)
+│   ├── basalt-v0-spec.md       # 774L implementation-ready spec (§1-13)
 │   └── AGENT_CONTEXT.md        # (this file's companion) — same context expanded
-├── foliox_build_prompt.md      # original prompt (thesis + constraints)
+├── foliox_build_prompt.md (historical name)      # original prompt (thesis + constraints)
 ├── AGENTS.md                   # this file — agent entrypoint
 ├── CONTEXT.md                  # symlink/copy of this for other agents
 ├── programs/
@@ -88,7 +88,7 @@ basket         = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k" # programs/baske
 │   ├── src/workers/priceFetch.ts # fetchPrices (Jupiter Price v6) + mockPrices
 │   ├── src/api/server.ts       # GET /baskets, /baskets/:pubkey, POST /quotes/zap-in|out, GET /health
 │   ├── src/index.ts            # entrypoint :3001
-│   ├── tests/foliox.test.ts    # 34 tests
+│   ├── tests/basalt.test.ts    # 34 tests
 │   ├── tests/super.integration.test.ts # 22 tests (security invariants)
 │   ├── tests/mega.test.ts      # 230 tests (50 entry/exit/mgmt, 20 split, 20 NAV/drift, 30 redeem)
 │   ├── tsconfig.json
@@ -108,7 +108,7 @@ basket         = "6Q43vFh4aqGxzvtU2vQwJX9PmX3skfYsGWZdA3fwJB9k" # programs/baske
 │   ├── tailwind.config.js
 │   └── package.json
 ├── tests/
-│   └── foliox_math.test.ts     # 1 legacy test (mirrors backend)
+│   └── basalt_math.test.ts     # 1 legacy test (mirrors backend)
 ├── scripts/
 │   └── e2e.sh                  # deterministic localnet flow (validator → whitelist → basket → mint/redeem → fee crank → curl health)
 ├── README.md
@@ -169,7 +169,7 @@ Events: `BasketCreated {basket, creator, num_constituents, share_mint, ts}`, `Mi
 
 * xStocks are Token-2022 with `ScaledUiAmountConfig` extension (multiplier, e.g., `1_000_000` for 1.0 with 6 decimals). `raw` stored in `TokenAccount.amount`, used for `transfer_checked(raw, decimals)` — **programs use raw only** (`// RAW ONLY` comment on all transfers).
 * `scaled = raw * multiplier / 10**decimals` for display/NAV. Indexer `holdingsSync.ts:14` reads mint via `getAccountInfo` + `unpackMint` + `getScaledUiAmountConfig`, fallback `1.0`. Frontend `lib/solana.ts:7` `scaledAmount(raw,mult,dec)`.
-* Tests: mock mints `multiplier 1_000_000 → 2_000_000` (2× split), assert raw unchanged, scaled doubles, redeem still raw-pro-rata (`basket/src/lib.rs:302` `test_scaled_multiplier_invariance`, `backend/tests/foliox.test.ts:35`).
+* Tests: mock mints `multiplier 1_000_000 → 2_000_000` (2× split), assert raw unchanged, scaled doubles, redeem still raw-pro-rata (`basket/src/lib.rs:302` `test_scaled_multiplier_invariance`, `backend/tests/basalt.test.ts:35`).
 
 ---
 
@@ -184,15 +184,15 @@ Events: `BasketCreated {basket, creator, num_constituents, share_mint, ts}`, `Mi
 3. `gross_j = D_j * S / V_j`, `gross = min(gross_j)`, revert if `max-min > 1%*min`
 4. `entry_fee = gross*entry_bps/10000`, `net = gross-fee`
 
-Example: `S=10_000_000`, `V=[500M,300M,200M]`, `D=[50M,30M,20M]` (50/30/20) → `gross=[1M,1M,1M] → 1M`, `entry 100bps → fee 10k, net 990k` (`docs/foliox-v0-spec.md:349`).
+Example: `S=10_000_000`, `V=[500M,300M,200M]`, `D=[50M,30M,20M]` (50/30/20) → `gross=[1M,1M,1M] → 1M`, `entry 100bps → fee 10k, net 990k` (`docs/basalt-v0-spec.md:349`).
 
 Off-weight `D=[60M,30M,10M]` → `gross=[1.2M,1M,0.5M]`, `max-min 700k > 1%*500k` → `WeightMismatch`.
 
 **Redeem:** `exit_fee = B*bps/10000`, `burn = B-fee`, `out_j = V_j * burn / S_before` floor, burn `burn` shares, transfer `fee` shares to creator/treasury `split_fee(fee,9000)`.
 
-Example: `S=10M`, `V_TSLA=550M`, `B=1M`, `exit 50bps → fee 5k, burn 995k, out=550M*995k/10M=54_725_000` (`docs/foliox-v0-spec.md:370`).
+Example: `S=10M`, `V_TSLA=550M`, `B=1M`, `exit 50bps → fee 5k, burn 995k, out=550M*995k/10M=54_725_000` (`docs/basalt-v0-spec.md:370`).
 
-**Mgmt streaming:** `fee = supply * bps * elapsed / (10000*31536000)` (`backend/src/workers/feeMath.ts:10` + `basket/src/lib.rs:46`). Example `supply 10M, 200bps, 30d → 16,438` (`docs/foliox-v0-spec.md:405`). Split `creator = fee*9000/10000, treasury = fee-creator` remainder to treasury.
+**Mgmt streaming:** `fee = supply * bps * elapsed / (10000*31536000)` (`backend/src/workers/feeMath.ts:10` + `basket/src/lib.rs:46`). Example `supply 10M, 200bps, 30d → 16,438` (`docs/basalt-v0-spec.md:405`). Split `creator = fee*9000/10000, treasury = fee-creator` remainder to treasury.
 
 ---
 
@@ -279,7 +279,7 @@ Wizard gates: wallet connected (Next disabled otherwise), `2≤len≤20` Active 
 
 * **P0:** signer on `creator`/`user`/`authority`; owner checks `Token2022` for vault/mint; no `admin_withdraw` (grep `transfer` only in mint/redeem); redeem not pausable (no whitelist/oracle/backend check); oracle-free redeem (`programs/basket/src/lib.rs:103` has no oracle account)
 * **P1:** pro-rata `V*burn/S` floor; genesis `1M` fixed vs inflation attack (factory `seed>0` + weight check); rounding dust favors remaining holders; `transfer_checked` with `decimals` from whitelist; `// RAW ONLY`; ATA substitution `owner==user` + `mint==expected` + `getAssociatedTokenAddress`; PDA seeds `#[account(seeds=[...],bump)]`; fee `≤ cap` + `treasury+creator == fee`
-* **P2:** zap slippage sequential not atomic (`docs/foliox-v0-spec.md:295`); CPI only to Token2022/System/ATA; seed atomic same tx as `create_basket` (no init→seed two-step)
+* **P2:** zap slippage sequential not atomic (`docs/basalt-v0-spec.md:295`); CPI only to Token2022/System/ATA; seed atomic same tx as `create_basket` (no init→seed two-step)
 * Run `cargo audit`, `npm audit`, `cso` skill, `review-and-iterate` skill before `deploy-to-mainnet`.
 
 ---
@@ -315,12 +315,12 @@ Placeholder copy must be replaced by counsel before mainnet.
 
 **TS `vitest run` 373 backend tests**:
 
-* `backend/tests/foliox.test.ts:1` 34 tests (fee 30d 16438, NAV 191k, drift 1000/-1000, weight mismatch, holdings scaled)
+* `backend/tests/basalt.test.ts:1` 34 tests (fee 30d 16438, NAV 191k, drift 1000/-1000, weight mismatch, holdings scaled)
 * `super.integration.test.ts:1` 22 tests (P0/P1/P2 security invariants, factory 2-20/duplicate/metadata, holdings/NAV 20 constituents, 200 random mint/redeem sequences never over-withdraw, fee caps monotonic 1-365d)
 * `mega.test.ts:1` 230 tests (50 entry, 50 exit, 50 mgmt, 20 split, 20 NAV, 20 drift, 30 redeem vault+1M increments)
 * `backend-truth.test.ts` 42 tests (event discriminators + Borsh fixtures, Token-2022 multiplier parse, listener upserts + DB-less degradation, schema idempotency, price cache/fallback)
 * `waveb-nav-api.test.ts` 45 tests (exact BigInt fixed-point NAV, drift/rounding, performance windows, zap quote legs with mocked fetch, unsigned fee-crank tx, API routes via fake PgLike)
-* `tests/foliox_math.test.ts:1` 1 legacy
+* `tests/basalt_math.test.ts:1` 1 legacy
 
 Total **620 tests passing** (`cargo test: 178 + backend vitest: 442`). See `backend/tests/` + `programs/*/src/lib.rs` `#[cfg(test)]`.
 
@@ -370,7 +370,7 @@ curl -fsSL https://www.solana.new/setup.sh | bash -s -- --update  # update super
 **Env (`backend/.env.example:1`):**
 
 ```
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/foliox
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/basalt
 REDIS_URL=redis://localhost:6379
 RPC_URL=https://api.devnet.solana.com
 HELIUS_API_KEY=
@@ -386,7 +386,7 @@ PORT=3001
 
 **DO:**
 
-* Read `docs/foliox-v0-spec.md` first for any math/account question — it has numbers (e.g., `docs/foliox-v0-spec.md:349` mint example).
+* Read `docs/basalt-v0-spec.md` first for any math/account question — it has numbers (e.g., `docs/basalt-v0-spec.md:349` mint example).
 * Use `math::` helpers in `basket` program and `backend/src/workers/feeMath.ts:4` / `navEngine.ts:7` — do not reimplement formulas.
 * Keep `redeem_in_kind` oracle-free and permissionless; if you touch it, ensure no new account is required beyond `basket`, `share_mint`, `user`, `user_share_ata`.
 * Keep `Basket` immutable — never add `update_basket` ix.
@@ -405,7 +405,7 @@ PORT=3001
 * Don't break tests — 620 tests are your safety net; if you add super many more, run `cargo test` + `npx --prefix backend vitest run`.
 * **DON'T use plain HTML / düz `recharts` / `shadcn` chart** — her chart `bklit` (`https://bklit.com/docs/installation`) olmalı. `plain HTML` görünümü yasaktır, her sayfa bklit `Card/Table/Badge` + `AreaChart/BarChart` + `shadcn/tailwind.css` ile yapılmalı.
 
-**When in doubt:** `cargo test -p basket --lib -- tests::test_gross_shares_perfect` and `grep -rn "redeem" docs/foliox-v0-spec.md`.
+**When in doubt:** `cargo test -p basket --lib -- tests::test_gross_shares_perfect` and `grep -rn "redeem" docs/basalt-v0-spec.md`.
 
 ---
 
@@ -445,8 +445,8 @@ Post-90: mainnet-beta capped TVL, bug bounty, QEDGen formal verification if `rev
 
 ## 18. References
 
-* `docs/foliox-v0-spec.md:1` — full 13-section spec with numbers, SQL, API table, page map, test plan, security/legal checklists
-* `foliox_build_prompt.md:1` — original prompt (thesis, 9 constraints, 4 programs, fee caps 300/100/300, 90/10 split, stack)
+* `docs/basalt-v0-spec.md:1` — full 13-section spec with numbers, SQL, API table, page map, test plan, security/legal checklists
+* `foliox_build_prompt.md (historical name):1` — original prompt (thesis, 9 constraints, 4 programs, fee caps 300/100/300, 90/10 split, stack)
 * `~/.agents/skills/data/solana-knowledge/03-contract-level.md:1` — PDAs, Anchor patterns
 * `~/.agents/skills/data/guides/security-checklist.md:1` — P0/P1 audit with `grep` commands
 * Backed xStocks Token-2022 docs (Scaled UI Amount extension)
@@ -454,7 +454,7 @@ Post-90: mainnet-beta capped TVL, bug bounty, QEDGen formal verification if `rev
 
 ---
 
-*Generated for agents by superstack (solana.new) + FolioX architect. Keep this file updated when `docs/foliox-v0-spec.md` changes. Last updated: 2026-09-01 (implementation waves) — **178 Rust + 373 backend TS (+1 legacy) tests passing; protocol/backend/frontend implemented — see plan.md §8**.*
+*Generated for agents by superstack (solana.new) + Basalt architect. Keep this file updated when `docs/basalt-v0-spec.md` changes. Last updated: 2026-09-01 (implementation waves) — **178 Rust + 373 backend TS (+1 legacy) tests passing; protocol/backend/frontend implemented — see plan.md §8**.*
 
 ---
 
@@ -473,7 +473,7 @@ Post-90: mainnet-beta capped TVL, bug bounty, QEDGen formal verification if `rev
 | `backend/src/workers/priceFetch.ts:1` | 30 | `fetchPrices` + `mockPrices` |
 | `backend/src/api/server.ts:1` | 60 | mock handler for 4 routes, CORS |
 | `backend/src/index.ts:1` | 15 | entrypoint `PORT=3001` |
-| `backend/tests/*.ts` | 800+ | 373 tests (foliox 34, super.integration 22, mega 230, backend-truth 42, waveb-nav-api 45) |
+| `backend/tests/*.ts` | 800+ | 373 tests (basalt 34, super.integration 22, mega 230, backend-truth 42, waveb-nav-api 45) |
 | `app/app/*.tsx` | 200+ | 9 pages |
 | `Anchor.toml:1` | 29 | program IDs + cluster |
 | `Cargo.toml:1` | 18 | workspace + overflow-checks |
@@ -500,7 +500,7 @@ Use `read` tool on these before editing — they are authoritative.
 ## 21. FAQ for New Agent Session
 
 **Q: Where do I start if user says "add X feature"?**  
-A: Check `docs/foliox-v0-spec.md:1` for whether X violates V0 constraints (leverage/rebasing/pausing redeem). If not, add instruction with validation + `#[cfg(test)]` + backend `feeMath`/`navEngine` helper + frontend page + `cargo test` + `vitest`.
+A: Check `docs/basalt-v0-spec.md:1` for whether X violates V0 constraints (leverage/rebasing/pausing redeem). If not, add instruction with validation + `#[cfg(test)]` + backend `feeMath`/`navEngine` helper + frontend page + `cargo test` + `vitest`.
 
 **Q: User wants leverage?**  
 A: Refuse per §2 constraint #2; suggest V2 vault wrapper separate program that holds basket shares as collateral, never modify core `basket` program.
@@ -524,7 +524,7 @@ A: `cargo test -p basket --lib -- mega_tests` or `cargo test -p basket -- tests:
 ```bash
 # 1. Read context (you are here)
 cat AGENTS.md
-cat docs/foliox-v0-spec.md | head -n 100
+cat docs/basalt-v0-spec.md | head -n 100
 
 # 2. Verify toolchain
 export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$HOME/.avm/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH"
@@ -549,7 +549,7 @@ curl http://localhost:3001/api/v1/health # {"ok":true}
 npm --prefix app install && npm --prefix app run dev # :3000
 ```
 
-Always keep `AGENTS.md` in sync with `docs/foliox-v0-spec.md` when spec changes.
+Always keep `AGENTS.md` in sync with `docs/basalt-v0-spec.md` when spec changes.
 
 ---
 

@@ -1,26 +1,26 @@
-# FolioX Implementation Plan
+# Basalt Implementation Plan
 
 > Owner: coordinator (Codex) | Workspace: `createyouretf` | Last reviewed: 2026-09-04
 > Current phase: documented discovery complete; implementation is gated on the decisions in G0.
-> Normative product constraints remain in `docs/foliox-v0-spec.md` and `AGENTS.md`.
+> Normative product constraints remain in `docs/basalt-v0-spec.md` and `AGENTS.md`.
 
 ## 0. Purpose and source of truth
 
-This is the execution plan for taking FolioX from a scaffold/prototype to a truthful, testable, polished Solana strategy-basket application. It covers protocol correctness, backend data, wallet flows, bklit UI, legal copy, accessibility, responsive behavior, and Orca worker coordination.
+This is the execution plan for taking Basalt from a scaffold/prototype to a truthful, testable, polished Solana strategy-basket application. It covers protocol correctness, backend data, wallet flows, bklit UI, legal copy, accessibility, responsive behavior, and Orca worker coordination.
 
 Use the documents in this order:
 
 1. `AGENTS.md` — hard constraints and agent workflow.
-2. `docs/foliox-v0-spec.md` — product, account, math, API, security, legal, and milestone specification.
+2. `docs/basalt-v0-spec.md` — product, account, math, API, security, legal, and milestone specification.
 3. `docs/ui-discovery-2026-09-01.md` — verified current-state audit and design direction.
 4. `plan.md` — ordered implementation work, dependencies, acceptance gates, and decision log.
 5. `README.md` and `app/README.md` — operator-facing quick start and status only.
 
-`foliox_build_prompt.md` remains the original product prompt. Do not silently weaken a constraint in the prompt or spec to make a demo easier.
+`basalt_build_prompt.md` remains the original product prompt. Do not silently weaken a constraint in the prompt or spec to make a demo easier.
 
 ## 1. Product guardrails
 
-FolioX is an onchain strategy-basket application backed by Token-2022 xStocks. It is not described as a registered ETF, fund, guaranteed return, safe investment, or financial advice. `LEGAL_REVIEW_REQUIRED` remains visible anywhere legal or risk language appears until counsel replaces the placeholders.
+Basalt is an onchain strategy-basket application backed by Token-2022 xStocks. It is not described as a registered ETF, fund, guaranteed return, safe investment, or financial advice. `LEGAL_REVIEW_REQUIRED` remains visible anywhere legal or risk language appears until counsel replaces the placeholders.
 
 The following are non-negotiable in every phase:
 
@@ -124,7 +124,7 @@ Dependencies: G0 and G1; Phase 2 API contracts for live states.
 Tasks:
 
 1. Establish semantic design tokens in `app/globals.css` and the chosen brand documentation. Remove hardcoded `zinc`/`white`/decorative gradients from product surfaces.
-2. Build a responsive shell: FolioX mark, Explore/Market/Providers navigation, contextual Create/Portfolio actions, network state, freshness state, wallet connection, active route, breadcrumbs, and legal footer.
+2. Build a responsive shell: Basalt mark, Explore/Market/Providers navigation, contextual Create/Portfolio actions, network state, freshness state, wallet connection, active route, breadcrumbs, and legal footer.
 3. Resolve strict Next 15/React 19 typing: Promise route params, component prop mismatches, `asChild` misuse, Slider unions, chart props, React DOM types, and ES2015+ target requirements.
 4. Verify Bklit registry provenance for AreaChart, LineChart, BarChart, Candlestick, Grid, Tooltip, Legend, and Brush. Replace local placeholder adapters or document a justified compatibility wrapper.
 5. Remove the root `recharts` dependency and keep chart primitives scoped to the Bklit contract. Use bklit chart APIs for all requested charts.
@@ -224,7 +224,7 @@ After every phase or material decision:
 - update the phase status and exact verification evidence in this file;
 - update the dated discovery/decision log when the design or architecture changes;
 - keep `AGENTS.md`, `CLAUDE.md`, and `CONTEXT.md` aligned with current reality;
-- keep `docs/foliox-v0-spec.md` normative and append an erratum instead of silently rewriting a constraint;
+- keep `docs/basalt-v0-spec.md` normative and append an erratum instead of silently rewriting a constraint;
 - update README only for operator-facing commands/status, not as a second product specification.
 
 ## 7. Decision log
@@ -259,7 +259,7 @@ After every phase or material decision:
 - **Protocol: LIVE ON DEVNET — 38 confirmed transactions** (all `err: null`; full phase→signature tables in `docs/devnet-live-2026-09-04.md`). 3 programs deployed and verified at declared IDs — whitelist `FRavMcY…`, basket_factory `3hzoPep…`, basket `6Q43vFh…`; **12 mock xStocks** whitelisted (TSLAx…SPYx, Token-2022 ScaledUiAmountConfig ×1.0); basket live at 3 constituents NVDAx/AAPLx/MSFTx 4000/3200/2800 bps, fees 100/50/200 (`9u5eEx1C…`, share mint `7xo7uw13…`).
 - **Mint/redeem/fee verified on-chain**: entry fees split 900/100 and 4,950,000/550,000 (90/10); `redeem_in_kind` succeeded **while NVDAx was paused** (burn 49,500 + 247 exit fee — permissionless exit proven on a live chain); management fee accrued permissionlessly (+4 shares, checkpoint updated). Supply reconciles exactly: 1,000,000 genesis + 100,000 + 550,000,000 − 49,500 + 247 + 4 = **551,050,751 = RPC supply**; the 90/10 split reconciles to the last share across creator/treasury/user2; NAV 145,036,556.6104 USD, share_price 0.263199998089/raw = 263.2 USD per basket-unit = 180×0.40 + 230×0.32 + 420×0.28 exactly, drift 0 bps.
 - **KNOWN LIMIT → RESOLVED (same day)**: `create_basket` at 4+ constituents exceeded the legacy 1232 B transaction wire limit (6→1618 B) — a client/transport limit, not a program error. **v0 transactions + Address Lookup Tables landed**: create_basket n=6 now compiles to 631 B; **MAG SIX (6 constituents, nonce 1) is LIVE on devnet** — basket `CZCHnprMPvBFLCs5jwApLMPj1MEUMGJ4SWr4WWzKXYCo`, share mint `GZzEofuv…`, weights 2500/2000/1500/1500/1250/1250 on-chain, full mint/redeem/accrue flow proven (incl. redeem under a paused constituent; 90/10 split creator 5 / treasury 1). Legacy path kept where it fits (`sendFitting`); ALT create/extend is idempotent and cached. The UI's own client builders (`app/lib/transactions.ts`) compile v0+ALT for n≥4 and were proven live headlessly (mint `5gc6qYru…`, redeem `5MRGfrWT…`); create wizard gained a `preparing-alt` phase.
-- **Backend LIVE against devnet** (indexer + NAV engine + fee crank on `backend/.env.devnet`, pid/log `/tmp/foliox-backend-devnet.log`): 12 `whitelisted_mints` rows, 5 events, 3 `user_positions`, `vault_holdings` + NAV snapshots populated from chain. Fee crank emits **UNSIGNED** txs only (signatures field 0, placeholder feePayer — the backend never signs, AGENTS.md §2 #5). Three real indexer bugs found and fixed during the live run: (1) events inserted before the baskets row (FK) + failed sigs permanently dropped → upsert-first, oldest-first, retry cap 5; (2) WhitelistedMint accounts never synced → new 60 s whitelistSync; (3) holdings sync never wired + `deriveBasketPda` used the basket instead of the factory program id → fixed derivation + 30 s sync pass. Regressions in `backend/tests/livewire.test.ts`.
+- **Backend LIVE against devnet** (indexer + NAV engine + fee crank on `backend/.env.devnet`, pid/log `/tmp/basalt-backend-devnet.log`): 12 `whitelisted_mints` rows, 5 events, 3 `user_positions`, `vault_holdings` + NAV snapshots populated from chain. Fee crank emits **UNSIGNED** txs only (signatures field 0, placeholder feePayer — the backend never signs, AGENTS.md §2 #5). Three real indexer bugs found and fixed during the live run: (1) events inserted before the baskets row (FK) + failed sigs permanently dropped → upsert-first, oldest-first, retry cap 5; (2) WhitelistedMint accounts never synced → new 60 s whitelistSync; (3) holdings sync never wired + `deriveBasketPda` used the basket instead of the factory program id → fixed derivation + 30 s sync pass. Regressions in `backend/tests/livewire.test.ts`.
 - **Tests: 620 green** — 178 Rust + 442 backend TS (realistic-price wave added 21, hardening wave added none net).
 - **Realistic NAV prices LIVE**: `REALISTIC_MOCK_PRICES=1` routes `mock:<slug>` quotes Yahoo-first (real tickers NVDA/AAPL/MSFT/…, 60 s TTL, 150 ms spacing, per-symbol catalog fallback with honest `source` labels `yahoo`/`mock`). Live result: share_price 0.2632 (static) → **0.3346 → 0.3637 (Yahoo, per basket)**, exact arithmetic cross-check; NAV history shows the clean cutover row-by-row (`{mock}` → `{yahoo}`).
 - **Devnet totals now: 2 live baskets** (nonce 0 = 3 constituents 40/32/28; nonce 1 = MAG SIX 6 constituents 25/20/15/15/12.5/12.5), 12 whitelisted mock xStocks, backend index count 2, payer at ~3.31 SOL.

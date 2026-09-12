@@ -1,4 +1,4 @@
-# FolioX App (Next.js 15)
+# Basalt App (Next.js 15)
 
 Current status: **fully implemented frontend** — 13 routes, wallet-wired, brand-applied (Mineral Desk + Geist/Geist Mono per [`../brand.md`](../brand.md)). Gates: `npx tsc --noEmit --incremental false` = 0 errors; `npm run build` = green with no ignored errors (`next.config.js` is empty — no `ignoreBuildErrors`). See the repository-level [implementation plan](../plan.md) and [UI discovery](../docs/ui-discovery-2026-09-01.md).
 

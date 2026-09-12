@@ -107,7 +107,7 @@ beforeEach(() => {
 
 describe("social auth primitives", () => {
   it("builds the exact message a wallet signs", () => {
-    expect(buildAuthMessage("W", "N")).toBe("FolioX Social\nWallet: W\nNonce: N");
+    expect(buildAuthMessage("W", "N")).toBe("Basalt Social\nWallet: W\nNonce: N");
   });
 
   it("issues and single-use consumes nonces", () => {

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import CreateClient from "./create-client";
 
 export const metadata: Metadata = {
-  title: "Create — FolioX",
+  title: "Create — Basalt",
   description:
     "Six-step wizard for deploying an immutable onchain strategy basket from whitelisted xStocks.",
 };

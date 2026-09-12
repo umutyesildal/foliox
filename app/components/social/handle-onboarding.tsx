@@ -4,9 +4,9 @@
  * Handle onboarding ("her cüzdan bir username seçmeli"): a non-modal,
  * fixed bottom-right nudge shown when a connected wallet has not claimed a
  * handle yet. Claiming opens the shared ProfileEditorModal with claim copy;
- * a successful save persists `foliox:handle-claimed:<wallet>` = "1" and hides
+ * a successful save persists `basalt:handle-claimed:<wallet>` = "1" and hides
  * the card. Dismiss hides it for this wallet for the tab session
- * (`foliox:handle-dismissed:<wallet>` in sessionStorage).
+ * (`basalt:handle-dismissed:<wallet>` in sessionStorage).
  *
  * Flags follow the SSR/try-catch guard pattern of social-auth's
  * readStoredAuth/storeAuth: never touch storage on the server, never throw
@@ -23,8 +23,8 @@ import { SocialAvatar } from "@/components/social/avatar";
 import { ProfileEditorModal } from "@/components/social/profile-editor";
 import { Button } from "@/components/ui/button";
 
-const CLAIMED_PREFIX = "foliox:handle-claimed:";
-const DISMISSED_PREFIX = "foliox:handle-dismissed:";
+const CLAIMED_PREFIX = "basalt:handle-claimed:";
+const DISMISSED_PREFIX = "basalt:handle-dismissed:";
 
 /** Module-local change signal so every mounted surface re-reads its flag
  *  after a same-tab claim/dismiss; cross-tab updates arrive via `storage`. */

@@ -1,5 +1,5 @@
 /**
- * Single validated client for the FolioX backend (backend/src/api/server.ts).
+ * Single validated client for the Basalt backend (backend/src/api/server.ts).
  *
  * Every app fetch of the basket API goes through `apiFetch` (or `apiQuery`,
  * its query-string variant) so the request URL is never assembled directly

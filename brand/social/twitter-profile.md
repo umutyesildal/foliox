@@ -55,32 +55,93 @@ Leave empty until one of these is live, then set (first available):
 
 ## Pinned tweet draft (launch, EN — consumer voice, no devnet)
 
-**Recommended (270 chars):**
+**Recommended (239 chars) — two-sided hook:**
+
+```
+Stocks went on-chain. Portfolios didn't.
+
+Now you can buy a top trader's basket — or create your own from tokenized stocks. Either way you hold one token, and every trade settles on-chain.
+
+Receipts, not screenshots. Coming soon on Solana.
+```
+
+**Alternative — "be your own" (234 chars):**
+
+```
+Stocks went on-chain. Portfolios didn't.
+
+Follow top traders, buy their baskets — or be your own and create one from tokenized stocks like TSLAx, NVDAx, SPYx. One token either way.
+
+Every trade settles on-chain. Coming soon on Solana.
+```
+
+**Alternative — creator-first (258 chars):**
 
 ```
 Stocks went on-chain. Portfolios didn't.
 
 Create your basket from tokenized stocks — TSLAx, NVDAx, SPYx — and hold it as one token.
 
-Every trade settles on-chain. Follow top traders with receipts, not screenshots — then create yours in one click.
+Or skip the work: follow top traders and buy their baskets. Either way, every trade settles on-chain.
 
 Coming soon on Solana.
 ```
 
-**Alternative — copy-trading angle (234 chars):**
+Wording rules for this surface: end-user language only ("create your
+basket" / "buy their baskets", never "mint"; no oracle/redemption/pro-rata
+jargon — protocol details live in thread replies). **Never "fund manager" /
+"fund" / "ETF"** — the standing legal ban (AGENTS.md §1: the product is not
+a fund; "trader" + "basket" carry the same meaning). "Coming soon" instead
+of devnet status; legal ban on guaranteed/safe/advice language still
+absolute.
+
+## Founder tweet (personal account, EN — post right after the launch tweet)
+
+**Standard (271 chars):**
 
 ```
-Copy trading today: trust me bro.
+Been building: Basalt — your basket of tokenized stocks on Solana, held as one token.
 
-Basalt: every trade settles on-chain. Follow the best traders, watch their live positions, create your basket from the ones you believe in — one token, real stocks, your keys.
+Buy a top trader's basket or create your own. Every trade settles on-chain: receipts, not screenshots.
 
-Coming soon on Solana.
+Shipping it at the Stocklana hackathon this week. Coming soon → @BasaltOnSolana
 ```
 
-Rules for this surface: end-user language only ("create your basket", never
-"mint"; no oracle/redemption/pro-rata jargon — protocol details live in the
-thread replies), "Coming soon" instead of devnet status, legal ban on
-ETF/fund/guaranteed/safe/advice language still absolute.
+**Shorter (210 chars):**
+
+```
+New build: Basalt.
+
+Your basket of tokenized stocks on Solana — one token. Or skip the line and buy a top trader's basket, receipts on-chain.
+
+In the Stocklana hackathon this week. Coming soon → @BasaltOnSolana
+```
+
+**Short teaser (user preference — the launch tweet explains, this just points):**
+
+107 chars:
+```
+Cooking something → @BasaltOnSolana
+
+Baskets of tokenized stocks on Solana. Stocklana hackathon, this week.
+```
+
+82 chars:
+```
+This week's build → @BasaltOnSolana
+
+Tokenized stock baskets on Solana. One token.
+```
+
+31 chars:
+```
+Building this → @BasaltOnSolana
+```
+
+Posting order: brand account launch tweet first, then this from the personal
+account as a quote-reply or standalone with the handle pointer — personal
+tweet feeds followers into the new account. Replace `@BasaltOnSolana` with
+the handle actually secured.
 
 Follow-up replies to thread (build-in-public cadence for Stocklana):
 1. Devnet evidence — mint/redeem/fee txs, NAV reconciliation numbers (this is

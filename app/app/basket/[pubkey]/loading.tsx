@@ -2,8 +2,8 @@ import { ChartBlockSkeleton, Skeleton, TableRowSkeleton } from "@/components/sta
 
 /**
  * Route-level loading for /basket/[pubkey] — mirrors the detail page shape:
- * name-first header, 4-metric strip, then hairline-divided sections (NAV
- * history hero card, compact holdings table). Child routes (buy/redeem)
+ * name-first header, 4-metric strip, then hairline-divided sections (share
+ * price history hero card, compact holdings table). Child routes (buy/redeem)
  * render their own in-page loading states.
  */
 export default function BasketLoading() {
@@ -28,7 +28,7 @@ export default function BasketLoading() {
             <Skeleton className="h-4 w-36" />
           </div>
           <div className="hairline-primary rounded-lg bg-card p-5 ring-1 ring-border">
-            <ChartBlockSkeleton label="Loading NAV history" />
+            <ChartBlockSkeleton label="Loading share price history" />
           </div>
         </section>
         <section className="py-10">

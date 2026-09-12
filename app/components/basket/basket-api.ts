@@ -71,7 +71,9 @@ export interface NavHistoryRow {
   ts: string;
   nav: string;
   supply?: string;
-  share_price?: string;
+  share_price?: string | null;
+  /** Bucketed rows only — first share_price in the bucket (close is `share_price`). */
+  share_price_open?: string | null;
   price_source?: unknown;
   source?: string | null;
 }
@@ -166,6 +168,8 @@ export async function fetchNavHistory(
       bucket?: string;
       close?: string;
       supply?: string;
+      share_price?: string | null;
+      share_price_open?: string | null;
       source?: string | null;
     }>;
     source?: string | null;
@@ -177,6 +181,8 @@ export async function fetchNavHistory(
     ts: row.ts ?? row.bucket ?? "",
     nav: row.nav ?? row.close ?? "",
     supply: row.supply,
+    share_price: row.share_price ?? null,
+    share_price_open: row.share_price_open ?? null,
     source: row.source ?? null,
   }));
   return { rows, source: payload.source ?? null };

@@ -77,6 +77,8 @@ const NAV_HISTORY_BIN_ALL_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMPTZ '
         (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
         MIN(nav)::text AS low, MAX(nav)::text AS high,
         AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        (array_agg(share_price ORDER BY ts))[1]::text AS share_price_open,
+        (array_agg(share_price ORDER BY ts DESC))[1]::text AS share_price,
         COUNT(*) AS points
  FROM nav_snapshots WHERE basket = $2
  GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;
@@ -85,6 +87,8 @@ const NAV_HISTORY_BIN_FROM_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMPTZ 
         (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
         MIN(nav)::text AS low, MAX(nav)::text AS high,
         AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        (array_agg(share_price ORDER BY ts))[1]::text AS share_price_open,
+        (array_agg(share_price ORDER BY ts DESC))[1]::text AS share_price,
         COUNT(*) AS points
  FROM nav_snapshots WHERE basket = $2 AND ts >= $3
  GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;
@@ -93,6 +97,8 @@ const NAV_HISTORY_BIN_TO_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMPTZ '2
         (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
         MIN(nav)::text AS low, MAX(nav)::text AS high,
         AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        (array_agg(share_price ORDER BY ts))[1]::text AS share_price_open,
+        (array_agg(share_price ORDER BY ts DESC))[1]::text AS share_price,
         COUNT(*) AS points
  FROM nav_snapshots WHERE basket = $2 AND ts <= $3
  GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;
@@ -101,6 +107,8 @@ const NAV_HISTORY_BIN_FROM_TO_SQL = `SELECT date_bin($1::interval, ts, TIMESTAMP
         (array_agg(nav ORDER BY ts DESC))[1]::text AS close,
         MIN(nav)::text AS low, MAX(nav)::text AS high,
         AVG(nav)::text AS avg, MAX(supply)::text AS supply,
+        (array_agg(share_price ORDER BY ts))[1]::text AS share_price_open,
+        (array_agg(share_price ORDER BY ts DESC))[1]::text AS share_price,
         COUNT(*) AS points
  FROM nav_snapshots WHERE basket = $2 AND ts >= $3 AND ts <= $4
  GROUP BY bucket ORDER BY bucket ASC LIMIT 5000`;

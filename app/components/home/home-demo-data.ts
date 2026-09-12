@@ -43,8 +43,20 @@ function demoAvatar(handle: string): string {
   return `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(handle)}&backgroundColor=1a1a1c`;
 }
 
+/**
+ * Demo overlay labels real indexed devnet baskets — links land on live
+ * basket pages whose metadata carries the same names
+ * (scripts/social-demo-basket-metadata.mts).
+ */
+const REAL_BASKETS = [
+  { pubkey: "CZCHnprMPvBFLCs5jwApLMPj1MEUMGJ4SWr4WWzKXYCo", name: "Foundry Tech" },
+  { pubkey: "78jbGZHDiH1jSdctS9bxVkKQgNzuzt1nCX9DiimyYLir", name: "Index Plus" },
+  { pubkey: "9u5eEx1CLQd68ZTdcDKy3BqqT6FKGR3CvrApmdgb5btg", name: "Mag7 Vector" },
+] as const;
+
 // ---------------------------------------------------------------------------
-// Demo baskets — ids demo-basket-1..5, cycled by the demo trades below.
+// Demo baskets — the three REAL indexed devnet baskets above, cycled by the
+// demo trades below.
 // ---------------------------------------------------------------------------
 
 interface DemoBasketSeed {
@@ -60,16 +72,15 @@ interface DemoBasketSeed {
 }
 
 /**
- * Seeded in basket-id order (demo-basket-1..5). Returns are believable
- * mid/single-digit percents — one basket slightly underwater so the column
- * still reads honestly (a losing basket is stated, not shouted). All holder
- * counts are > 1000 per the demo brief.
+ * Seeded in REAL_BASKETS order (one seed per real basket — no demo name is
+ * aliased onto two baskets). Returns are believable mid/single-digit
+ * percents and all holder counts are > 1000 per the demo brief.
  */
 const DEMO_BASKET_SEEDS: DemoBasketSeed[] = [
   {
-    basket: "demo-basket-1",
-    basketName: "Foundry Tech",
-    symbol: "FTX",
+    basket: REAL_BASKETS[0].pubkey,
+    basketName: REAL_BASKETS[0].name,
+    symbol: "FTB",
     returnPct: 4.21,
     nav: "284.12",
     aum: "4820000",
@@ -78,9 +89,9 @@ const DEMO_BASKET_SEEDS: DemoBasketSeed[] = [
     asOfMinutesAgo: 2,
   },
   {
-    basket: "demo-basket-2",
-    basketName: "Index Plus",
-    symbol: "IPX",
+    basket: REAL_BASKETS[1].pubkey,
+    basketName: REAL_BASKETS[1].name,
+    symbol: "IPB",
     returnPct: 2.87,
     nav: "118.47",
     aum: "8140000",
@@ -89,19 +100,8 @@ const DEMO_BASKET_SEEDS: DemoBasketSeed[] = [
     asOfMinutesAgo: 3,
   },
   {
-    basket: "demo-basket-3",
-    basketName: "Yield Haven",
-    symbol: "YHX",
-    returnPct: -0.94,
-    nav: "24.63",
-    aum: "12650000",
-    holders: 3412,
-    mintCount: 6720,
-    asOfMinutesAgo: 4,
-  },
-  {
-    basket: "demo-basket-4",
-    basketName: "Mag7 Vector",
+    basket: REAL_BASKETS[2].pubkey,
+    basketName: REAL_BASKETS[2].name,
     symbol: "M7V",
     returnPct: 1.63,
     nav: "512.9",
@@ -109,17 +109,6 @@ const DEMO_BASKET_SEEDS: DemoBasketSeed[] = [
     holders: 1208,
     mintCount: 9310,
     asOfMinutesAgo: 5,
-  },
-  {
-    basket: "demo-basket-5",
-    basketName: "Dividend Stack",
-    symbol: "DVX",
-    returnPct: 0.38,
-    nav: "76.05",
-    aum: "3480000",
-    holders: 1930,
-    mintCount: 5408,
-    asOfMinutesAgo: 6,
   },
 ];
 
@@ -158,24 +147,26 @@ interface DemoTradeSeed {
 }
 
 /**
- * 12 demo traders (handle + displayName vary in style), cycling the five
- * demo baskets. USD values are `shares × a plausible $360–$590 per-share
- * NAV` so figures cohere with the NAV column; times climb from 2 to 39
- * minutes ago so the relative labels spread believably.
+ * 12 demo traders (handle + displayName vary in style), spread across the
+ * three real baskets (Foundry Tech ×4, Index Plus ×5, Mag7 Vector ×3 —
+ * mapped so trader handles stay coherent with the basket they trade, e.g.
+ * foundryfan mints Foundry Tech). USD values are `shares × a plausible
+ * $360–$590 per-share NAV` so figures cohere with the NAV column; times
+ * climb from 2 to 39 minutes ago so the relative labels spread believably.
  */
 const DEMO_TRADE_SEEDS: DemoTradeSeed[] = [
-  { n: 1, handle: "nova_trader", displayName: "Nova", type: "Minted", shares: 12.5, usdValue: 6875, basket: "demo-basket-1", minutesAgo: 2 },
-  { n: 2, handle: "elena.k", displayName: "Elena Kovacs", type: "Minted", shares: 3.2, usdValue: 1152, basket: "demo-basket-3", minutesAgo: 5 },
-  { n: 3, handle: "satoshi_21", displayName: "Satoshi 21", type: "Redeemed", shares: 8, usdValue: 4240, basket: "demo-basket-4", minutesAgo: 8 },
-  { n: 4, handle: "quietfounder", displayName: "Quiet Founder", type: "Minted", shares: 1.5, usdValue: 540, basket: "demo-basket-2", minutesAgo: 11 },
-  { n: 5, handle: "moxie_eth", displayName: "Moxie", type: "Minted", shares: 24, usdValue: 14160, basket: "demo-basket-1", minutesAgo: 14 },
-  { n: 6, handle: "foundryfan", displayName: "Foundry Fan", type: "Minted", shares: 0.5, usdValue: 180, basket: "demo-basket-5", minutesAgo: 17 },
-  { n: 7, handle: "driftwood_", displayName: "Driftwood", type: "Redeemed", shares: 5.75, usdValue: 2990, basket: "demo-basket-4", minutesAgo: 21 },
-  { n: 8, handle: "0xLena", displayName: "Lena", type: "Minted", shares: 9.1, usdValue: 5096, basket: "demo-basket-2", minutesAgo: 25 },
-  { n: 9, handle: "candlewick", displayName: "Candlewick", type: "Minted", shares: 6.4, usdValue: 3200, basket: "demo-basket-3", minutesAgo: 28 },
-  { n: 10, handle: "alpha_sam", displayName: "Alpha Sam", type: "Redeemed", shares: 2.25, usdValue: 1170, basket: "demo-basket-1", minutesAgo: 32 },
-  { n: 11, handle: "mintcondition", displayName: "Mint Condition", type: "Minted", shares: 14.8, usdValue: 8140, basket: "demo-basket-5", minutesAgo: 36 },
-  { n: 12, handle: "ronin.rs", displayName: "Ronin", type: "Minted", shares: 4.6, usdValue: 2530, basket: "demo-basket-2", minutesAgo: 39 },
+  { n: 1, handle: "nova_trader", displayName: "Nova", type: "Minted", shares: 12.5, usdValue: 6875, basket: REAL_BASKETS[0].pubkey, minutesAgo: 2 },
+  { n: 2, handle: "elena.k", displayName: "Elena Kovacs", type: "Minted", shares: 3.2, usdValue: 1152, basket: REAL_BASKETS[1].pubkey, minutesAgo: 5 },
+  { n: 3, handle: "satoshi_21", displayName: "Satoshi 21", type: "Redeemed", shares: 8, usdValue: 4240, basket: REAL_BASKETS[2].pubkey, minutesAgo: 8 },
+  { n: 4, handle: "quietfounder", displayName: "Quiet Founder", type: "Minted", shares: 1.5, usdValue: 540, basket: REAL_BASKETS[1].pubkey, minutesAgo: 11 },
+  { n: 5, handle: "moxie_eth", displayName: "Moxie", type: "Minted", shares: 24, usdValue: 14160, basket: REAL_BASKETS[0].pubkey, minutesAgo: 14 },
+  { n: 6, handle: "foundryfan", displayName: "Foundry Fan", type: "Minted", shares: 0.5, usdValue: 180, basket: REAL_BASKETS[0].pubkey, minutesAgo: 17 },
+  { n: 7, handle: "driftwood_", displayName: "Driftwood", type: "Redeemed", shares: 5.75, usdValue: 2990, basket: REAL_BASKETS[2].pubkey, minutesAgo: 21 },
+  { n: 8, handle: "0xLena", displayName: "Lena", type: "Minted", shares: 9.1, usdValue: 5096, basket: REAL_BASKETS[1].pubkey, minutesAgo: 25 },
+  { n: 9, handle: "candlewick", displayName: "Candlewick", type: "Minted", shares: 6.4, usdValue: 3200, basket: REAL_BASKETS[1].pubkey, minutesAgo: 28 },
+  { n: 10, handle: "alpha_sam", displayName: "Alpha Sam", type: "Redeemed", shares: 2.25, usdValue: 1170, basket: REAL_BASKETS[0].pubkey, minutesAgo: 32 },
+  { n: 11, handle: "mintcondition", displayName: "Mint Condition", type: "Minted", shares: 14.8, usdValue: 8140, basket: REAL_BASKETS[2].pubkey, minutesAgo: 36 },
+  { n: 12, handle: "ronin.rs", displayName: "Ronin", type: "Minted", shares: 4.6, usdValue: 2530, basket: REAL_BASKETS[1].pubkey, minutesAgo: 39 },
 ];
 
 const DEMO_BASKET_NAMES = new Map(
@@ -223,18 +214,18 @@ interface DemoThesisSeed {
 }
 
 /**
- * Genuine mini-theses about the five demo baskets — weights logic, dividend
- * mechanics, honest concentration takes — so the demo feed reads like real
- * conviction, not filler copy. Authors/likes/comments follow the same
- * believability rules as the trades.
+ * Genuine mini-theses about the three demo-labeled real baskets — weights
+ * logic, liquidity, concentration and boring-core ballast takes — so the
+ * demo feed reads like real conviction, not filler copy. Authors/likes/
+ * comments follow the same believability rules as the trades.
  */
 const DEMO_THESIS_SEEDS: DemoThesisSeed[] = [
   {
     n: 1,
     traderIndex: 0,
-    basket: "demo-basket-1",
+    basket: REAL_BASKETS[0].pubkey,
     title: "Why I keep adding to Foundry Tech on red days",
-    body: "The 60/25/15 semis–software–infra split is doing exactly what the weights promise: semis draw down harder, software cushions the ride, infra quietly compounds. I stopped trying to time the rebalance — instead I add small on red days and let the band logic do the selling for me. Four adds in two weeks, zero manual trades since.",
+    body: "The NVDA-led mega-cap lineup is doing exactly what the weights promise: the leaders set the pace, the software names cushion the ride, and the rest quietly compounds. I stopped trying to time the rebalance — instead I add small on red days and let the band logic do the selling for me. Four adds in two weeks, zero manual trades since.",
     likeCount: 41,
     commentCount: 7,
     minutesAgo: 9,
@@ -242,7 +233,7 @@ const DEMO_THESIS_SEEDS: DemoThesisSeed[] = [
   {
     n: 2,
     traderIndex: 2,
-    basket: "demo-basket-2",
+    basket: REAL_BASKETS[1].pubkey,
     title: "Index Plus is the boring core my portfolio was missing",
     body: "I parked the proceeds of my 'everything bagel' alt portfolio into Index Plus and my drawdown honestly halved. It tracks the broad basket with a slight quality tilt, which is exactly what I want from a core holding I never have to think about. Not exciting — that is the point.",
     likeCount: 18,
@@ -252,9 +243,9 @@ const DEMO_THESIS_SEEDS: DemoThesisSeed[] = [
   {
     n: 3,
     traderIndex: 4,
-    basket: "demo-basket-3",
-    title: "Yield Haven's dividend angle survives a red month",
-    body: "Yes, YHX is down roughly a percent on the window, and that is exactly the test I wanted it to face. The payout-heavy names keep distributing while the price lags, so total return is holding up better than the NAV line suggests. I would rather collect through a flat month than chase the momentum baskets at the top.",
+    basket: REAL_BASKETS[2].pubkey,
+    title: "Mag7 Vector is the liquidity play nobody talks about",
+    body: "Every name in M7V is a mega-cap with deep markets, so the basket never trades like the thin long-tail stuff. Rebalances fill at benchmark, redemptions clear without slippage stories, and the NAV line is computed off prices you could actually get filled at. Boring plumbing — but it is the reason M7V is my default parking spot for new cash.",
     likeCount: 12,
     commentCount: 2,
     minutesAgo: 76,
@@ -262,7 +253,7 @@ const DEMO_THESIS_SEEDS: DemoThesisSeed[] = [
   {
     n: 4,
     traderIndex: 6,
-    basket: "demo-basket-4",
+    basket: REAL_BASKETS[2].pubkey,
     title: "On Mag7 concentration: you are already long, so be long on purpose",
     body: "Most 'diversified' portfolios are 25%+ Mag7 through index drift anyway — pretending otherwise is the real risk. Mag7 Vector at least prices the concentration honestly instead of hiding it inside a hundred mid-caps. I size it as one deliberate position, not seven accidental ones.",
     likeCount: 27,
@@ -272,9 +263,9 @@ const DEMO_THESIS_SEEDS: DemoThesisSeed[] = [
   {
     n: 5,
     traderIndex: 8,
-    basket: "demo-basket-5",
-    title: "Dividend Stack is my counterweight to the tech sleeves",
-    body: "Between Foundry Tech and Mag7 Vector I run hot on growth, so DVX is the ballast. The payout names drag in up-months and then quietly fund the dip-buying everywhere else. Cash flow every cycle beats praying for a catalyst.",
+    basket: REAL_BASKETS[1].pubkey,
+    title: "Index Plus is my counterweight to the growth sleeves",
+    body: "Between Foundry Tech and Mag7 Vector I run hot on growth, so IPB is the ballast. The wider mix drags in up-months and then quietly funds the dip-buying everywhere else. A boring core I never have to think about beats praying for a catalyst.",
     likeCount: 5,
     commentCount: 0,
     minutesAgo: 168,

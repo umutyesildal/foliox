@@ -70,7 +70,8 @@ function metaObj(mj: unknown): Record<string, unknown> | null {
 
 /**
  * Basket detail — name-first header (same hierarchy as the /explore cards),
- * metric strip, then hairline-divided sections: NAV history (hero chart on an
+ * metric strip, then hairline-divided sections: share price history (hero
+ * chart on an
  * elevated card, mono section header + range buttons), a compact mono
  * holdings table with a scaled-total footer, and one quiet inline fees card.
  * All figures are API-driven; missing data renders as an em dash or a quiet
@@ -374,12 +375,12 @@ export default function BasketDetailPage({
             )}
           </div>
 
-          {/* dominant NAV chart — hero visual on an elevated card */}
+          {/* dominant share-price chart — hero visual on an elevated card */}
           <div className="divide-y divide-border">
-          <section aria-label="NAV history" className="pb-10 pt-2">
+          <section aria-label="Share price history" className="pb-10 pt-2">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="section-label">NAV history</h2>
+                <h2 className="section-label">Share price history</h2>
                 <FreshnessBadge source={navSource ?? "onchain-indexed"} asOf={asOf ?? undefined} />
               </div>
               <RangeLinks
@@ -391,11 +392,11 @@ export default function BasketDetailPage({
             <div className="hairline-primary rounded-lg bg-card ring-1 ring-border">
               <div className="p-5">
                 {navRows === null ? (
-                  <ChartBlockSkeleton label="Loading NAV history" />
+                  <ChartBlockSkeleton label="Loading share price history" />
                 ) : navFailed ? (
                   <div className="flex h-[320px] items-center justify-center px-6">
                     <p className="text-center font-mono text-xs text-muted-foreground">
-                      NAV history unavailable — switching ranges or reloading retries
+                      Share price history unavailable — switching ranges or reloading retries
                     </p>
                   </div>
                 ) : (
@@ -558,7 +559,7 @@ function DetailSkeleton() {
             <Skeleton className="h-4 w-36" />
           </div>
           <div className="hairline-primary rounded-lg bg-card p-5 ring-1 ring-border">
-            <ChartBlockSkeleton label="Loading NAV history" />
+            <ChartBlockSkeleton label="Loading share price history" />
           </div>
         </section>
         <section className="py-10">

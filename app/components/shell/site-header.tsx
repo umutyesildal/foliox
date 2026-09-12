@@ -38,12 +38,13 @@ function NavLink({ href, label }: { href: string; label: string }) {
 }
 
 /**
- * FolioX mark — a plain laurel wreath (owner feedback 2026-09-03: the
- * F-in-laurel monogram read badly; the wreath alone is the mark). Two
- * mirrored branches with leaf ticks rise from a bound base and open at the
- * top, leaving the center empty. currentColor throughout; decorative only.
- * The same geometry (minus the finer ticks at small sizes) is used in
- * app/icon.svg, apple-icon.tsx and opengraph-image.tsx.
+ * FolioX mark — the FOUNDRY MARK (spec §7, de-Rome pass 2026-09-12): a
+ * hexagon outline containing three descending filled bars — reads as index
+ * weights in a container and abstractly as an angular F. The canonical
+ * geometry lives here (viewBox 0 0 24 24, stroke-width 1.7, miter joins) and
+ * is reused verbatim in app/icon.svg, apple-icon.tsx and
+ * opengraph-image.tsx (same relative geometry, different scale/colors).
+ * currentColor throughout; decorative only.
  */
 function LogoMark({ size = 21 }: { size?: number }) {
   return (
@@ -54,27 +55,30 @@ function LogoMark({ size = 21 }: { size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeLinecap="round"
+      strokeLinejoin="miter"
       className="mr-2 shrink-0"
     >
-      {/* wreath: two mirrored branches + the binding arc at the base */}
-      <g strokeWidth="1.5">
-        <path d="M8.6 20.7C5.7 19.2 3.9 16.1 3.9 12.7c0-2.7.6-5.3 1.7-7.5" />
-        <path d="M15.4 20.7c2.9-1.5 4.7-4.6 4.7-8 0-2.7-.6-5.3-1.7-7.5" />
-        <path d="M8.6 20.7c1.1.9 2.3 1.4 3.4 1.4s2.3-.5 3.4-1.4" />
-        {/* leaf ticks, outboard of each branch */}
-        <path d="M4.6 7.9 3.1 7.5M3.9 11.3 2.3 11.7M4.4 14.9 2.9 15.7M5.8 18 4.4 19.1" />
-        <path d="m19.4 7.9 1.5-.4M20.1 11.3l1.6.4M19.6 14.9l1.5.8M18.2 18l1.4 1.1" />
+      {/* hexagon container, sharp miter joins */}
+      <path
+        d="M12 2.5 L20.2 7.25 V16.75 L12 21.5 L3.8 16.75 V7.25 Z"
+        strokeWidth="1.7"
+      />
+      {/* three descending weight bars (filled rects, no stroke) */}
+      <g fill="currentColor" stroke="none">
+        <rect x="8" y="8.1" width="8.6" height="2.1" />
+        <rect x="8" y="11.95" width="6.6" height="2.1" />
+        <rect x="8" y="15.8" width="4.6" height="2.1" />
       </g>
     </svg>
   );
 }
 
 /**
- * Site header: FolioX wordmark (plain laurel wreath mark + display-face text —
- * Chakra Petch under NEON FOUNDRY; the suffix stays Geist), primary nav
- * (Stocks/ETFs/Baskets), contextual actions (Create/Portfolio), network
- * indicator, wallet button, and a no-dependency mobile disclosure nav.
+ * Site header: FolioX wordmark (FOUNDRY MARK + display-face text — Chakra
+ * Petch under NEON FOUNDRY, with the trailing X in text-primary as the yellow
+ * accent; the suffix stays Geist), primary nav (Stocks/ETFs/Baskets),
+ * contextual actions (Create/Portfolio), network indicator, wallet button,
+ * and a no-dependency mobile disclosure nav.
  */
 export function SiteHeader() {
   const pathname = usePathname();
@@ -108,7 +112,7 @@ export function SiteHeader() {
           className="flex items-center rounded-sm font-display font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <LogoMark />
-          FolioX
+          Folio<span className="text-primary">X</span>
           <span className="hidden font-sans font-normal text-muted-foreground sm:inline">
             {" "}
             · xStocks baskets

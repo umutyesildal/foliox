@@ -1,6 +1,6 @@
 /**
  * Ledger section — replaces the old TraditionalVsTokenized card. No card, no
- * cell borders: an inscription layout. A center spine of dimension labels in
+ * cell borders: a terminal ledger layout. A center spine of dimension labels in
  * the shared mono section-label style, the traditional rail muted on the
  * left, the tokenized rail in full foreground on the right, each tokenized
  * phrase opened by a 6px yellow tick. The only saturated color on the page:
@@ -43,7 +43,7 @@ const ROWS = [
 const GRID =
   "grid grid-cols-[1fr_3rem_1fr] items-center gap-x-2 sm:grid-cols-[1fr_7rem_1fr] sm:gap-x-4";
 
-/** One inscription row (local to this section — the spine layout is ledger-
+/** One ledger row (local to this section — the spine layout is ledger-
  *  specific): the traditional rail muted and right-aligned, the mono
  *  dimension label on the center spine, and the tokenized rail in full
  *  foreground opened by a 6px primary tick. */

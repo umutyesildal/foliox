@@ -8,16 +8,16 @@ export interface CreateStep {
 }
 
 /**
- * Six-step wizard stepper: a slim horizontal track of roman-numeral circles
- * (I-VI, mono — roman-empire experiment) joined by thin line segments that
+ * Six-step wizard stepper: a slim horizontal track of numbered circles
+ * (01–06, mono — NEON FOUNDRY) joined by thin line segments that
  * fill as steps are reached. Current = filled (primary/yellow) circle with a
  * medium-weight label; done = primary-outlined circle (clickable to jump back,
  * never past validation); upcoming = muted. Labels hide below sm so mobile
  * shows the number track only.
  */
 
-/** Roman numerals for the step circles (indexes 0-5 → I-VI). */
-const ROMAN = ["I", "II", "III", "IV", "V", "VI"] as const;
+/** Zero-padded mono step numerals 01–06, NEON FOUNDRY (indexes 0-5 → 01-06). */
+const STEP_NUMERALS = ["01", "02", "03", "04", "05", "06"] as const;
 export function Stepper({
   steps,
   current,
@@ -108,7 +108,7 @@ function StepNumber({
         state === "upcoming" && "border border-border/60 text-muted-foreground/60",
       )}
     >
-      {ROMAN[index]}
+      {STEP_NUMERALS[index]}
     </span>
   );
 }

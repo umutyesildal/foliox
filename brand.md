@@ -2,22 +2,22 @@
 
 Onchain strategy baskets powered by xStocks. "Create an index. Own your thesis."
 
-_Last updated 2026-09-03 (Roman identity layer added — see "Roman layer" below). Supersedes Mineral Desk (2026-09-01). Telemetry: **off**._
+_Last updated 2026-09-12 (NEON FOUNDRY identity layer on branch `design/cyberpunk-yellow` — see "NEON FOUNDRY layer" below; it retires the 2026-09-03 Roman layer **on that branch only**). Supersedes Mineral Desk (2026-09-01). Telemetry: **off**._
 
-## Roman layer (branch `roman-empire`, owner experiment)
+## NEON FOUNDRY layer (branch `design/cyberpunk-yellow`, owner experiment)
 
-Layered ON TOP of the monochrome system, minimally:
+Layered ON TOP of the base system, minimally — the laurel/Pantheon/roman-numeral identity is retired on this branch:
 
-- **Display font: Cinzel** (Trajan-esque capitals, `next/font/google` as `--font-display`, exposed as `.font-display`/`.text-display` utilities) — hero headline, "FolioX" wordmark, section labels only. Everything else Geist/Geist Mono.
-- **Roman numerals**: home gateway I/II/III (small, quiet), wizard stepper I-VI (mono, small).
-- **Logo: plain laurel wreath** (open top, two mirrored stroke branches) — no monogram letter. Header 20-22px, favicon simplified for 16px legibility. Same wreath on apple-icon + OG.
-- **Imperial accents, two spots only**: `--imperial` (Tyrian purple) on the hero eyebrow chip + Tokenized ledger ticks/underline; `--pompeian` (Pompeian red) on gateway ↗ hover. UI chrome stays monochrome otherwise; red on chrome = errors only.
-- **Hero art**: Francesco Piranesi's 1790 Pantheon etching (public domain, Wikimedia) inverted to faint lines at 0.11 opacity behind the hero copy, four-edge dissolve masks, plate positioned at `top-62%` with a strengthened top fade (see `docs/roman-imagery-sources.md` for all imagery licenses).
-- **Rule**: the Roman layer appears on Home + wizard stepper + wordmark. Utility pages stay pure monochrome. Baskets are never called "ETFs" in product copy.
+- **Canvas + one loud color**: dark industrial near-black with **electric yellow** (`--primary`, #FCEE0A) used with discipline — primary buttons, focus rings, key CTAs, hero accents. Neon cyan/magenta/green/violet live **only inside data** (charts, deltas, avatars), never on chrome.
+- **Display font: Chakra Petch** (weights 500/600/700, `next/font/google` as `--font-display`, `.font-display`/`.text-display` utilities) — wordmark, page/section headings, hero stat numerals. Cinzel is gone.
+- **Geist Mono terminal labels**: every uppercase micro-label, eyebrow, numeral and price is mono — tracked, quiet, terminal-style. Zero-padded numerals `01`–`06` replace roman numerals everywhere.
+- **FOUNDRY MARK (the logo)**: a hexagon outline containing three descending horizontal bars — reads as "index weights in a container" and abstractly as an angular F. Same mark on the header wordmark (the X in the wordmark renders yellow), favicon and OG/apple icons. No laurel geometry anywhere.
+- **Motifs**: line-art terminal geometry only — stacked weight-bars, hexagon + plus, bracket + arrow, `//` chip decorations, faint inline-SVG circuit-blueprint hero watermark. No photos, no engravings.
+- **Rule**: the NEON FOUNDRY layer appears on Home + wordmark + stepper numerals; utility pages follow the base system. Baskets are never called "ETFs" in product copy.
 
 ## Direction
 
-**Monochrome.** Classic shadcn look: near-black canvas, white primary button, grayscale everything — with ONE exception: chart DATA may use the ethereal palette below. No decorative gradients, no accent hue on UI chrome, no site footer, minimal prose everywhere.
+**Monochrome** (base system; on branch `design/cyberpunk-yellow` the NEON FOUNDRY layer above supersedes it — near-black + electric yellow). Classic shadcn look: near-black canvas, white primary button, grayscale everything — with ONE exception: chart DATA may use the ethereal palette below. No decorative gradients, no accent hue on UI chrome, no site footer, minimal prose everywhere.
 
 ## Palette (applied in `app/app/globals.css`)
 
@@ -52,4 +52,4 @@ Short, factual, number-forward. One sentence per idea; details live one click de
 
 **Do:** tokens only (no hardcoded hex); `ChangeValue` helper for 24h coloring; FreshnessBadge for source/as-of; honest empty states ("not indexed" chips); demo data clearly marked (`demo-seed`).
 
-**Don't:** gradients/neon/marquee/faux chrome; fabricated numbers; `transition-all`; per-component token overrides; projected-yield or performance-promise language; more than one accent on chrome (there is none — red is errors only).
+**Don't:** gradients/neon/marquee/faux chrome (on the cyberpunk-yellow branch the sanctioned exceptions are the electric-yellow accents and the `.glow-primary`/`.text-glow`/`.hairline-primary` utilities, used sparingly); fabricated numbers; `transition-all`; per-component token overrides; projected-yield or performance-promise language; more than one accent on chrome (base: none — red is errors only; cyberpunk-yellow branch: exactly one — electric yellow).

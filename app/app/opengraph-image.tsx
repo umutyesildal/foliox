@@ -5,8 +5,9 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 /**
- * Social preview (NEON FOUNDRY, 2026-09-12): near-black cool card with the
- * plain laurel wreath (no F monogram — same stroke geometry as LogoMark in
+ * Social preview (NEON FOUNDRY de-Rome pass, 2026-09-12): near-black cool
+ * card with the FOUNDRY MARK — hexagon outline + three descending weight
+ * bars (spec §7, same 24x24 relative geometry as LogoMark in
  * components/shell/site-header.tsx) recolored to the electric-yellow accent.
  * The wordmark is set heavy in the OG renderer's built-in system font (this
  * file loads no fonts, so it stays on the default sans — mono flavor comes
@@ -111,24 +112,26 @@ export default function OpengraphImage() {
           }}
         />
 
-        {/* Plain laurel wreath — same construction as LogoMark in the header */}
+        {/* FOUNDRY MARK — same 24x24 construction as LogoMark in the header */}
         <svg
-          width="160"
-          height="160"
+          width="220"
+          height="220"
           viewBox="0 0 24 24"
           fill="none"
           stroke="#FCEE0A"
-          strokeLinecap="round"
-          style={{ marginBottom: 44 }}
+          strokeLinejoin="miter"
+          style={{ marginBottom: 40 }}
         >
-          {/* wreath: two mirrored branches + binding arc, open at the top */}
-          <g strokeWidth="1.5">
-            <path d="M8.6 20.7C5.7 19.2 3.9 16.1 3.9 12.7c0-2.7.6-5.3 1.7-7.5" />
-            <path d="M15.4 20.7c2.9-1.5 4.7-4.6 4.7-8 0-2.7-.6-5.3-1.7-7.5" />
-            <path d="M8.6 20.7c1.1.9 2.3 1.4 3.4 1.4s2.3-.5 3.4-1.4" />
-            {/* leaf ticks, outboard of each branch */}
-            <path d="M4.6 7.9 3.1 7.5M3.9 11.3 2.3 11.7M4.4 14.9 2.9 15.7M5.8 18 4.4 19.1" />
-            <path d="m19.4 7.9 1.5-.4M20.1 11.3l1.6.4M19.6 14.9l1.5.8M18.2 18l1.4 1.1" />
+          {/* hexagon container, sharp miter joins */}
+          <path
+            d="M12 2.5 L20.2 7.25 V16.75 L12 21.5 L3.8 16.75 V7.25 Z"
+            strokeWidth="1.7"
+          />
+          {/* three descending weight bars (filled rects, no stroke) */}
+          <g fill="#FCEE0A" stroke="none">
+            <rect x="8" y="8.1" width="8.6" height="2.1" />
+            <rect x="8" y="11.95" width="6.6" height="2.1" />
+            <rect x="8" y="15.8" width="4.6" height="2.1" />
           </g>
         </svg>
 

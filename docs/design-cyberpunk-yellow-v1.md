@@ -138,3 +138,40 @@ instead. `lib/format.ts` and all `lib/**`, `backend/**` are off-limits.
 Wave 2 (lead): `npx tsc --noEmit` + `npm run build` in `app/`, grep audits
 (no leftover Cinzel-only tracking hacks, no imperial/pompeian references,
 yellow-contrast spot checks), then commit on this branch.
+
+## 7. Amendment — de-Rome pass (2026-09-12, owner: "roma işinden çıkıyoruz")
+
+The laurel-wreath / Pantheon / roman-numeral identity is retired on this branch.
+Replacement set — "FOUNDRY MARK" + terminal motifs:
+
+**FOUNDRY MARK (the new logo).** A hexagon outline containing three
+descending horizontal bars — reads as "index weights in a container" and
+abstractly as an angular F. Geometry (viewBox `0 0 24 24`, stroke
+`currentColor` unless noted, sharp miter joins):
+
+- Hexagon outline: `M12 2.5 L20.2 7.25 V16.75 L12 21.5 L3.8 16.75 V7.25 Z`
+  (stroke-width 1.7, fill none).
+- Bars (FILLED rects, no stroke): y=8.1 h=2.1 x=8→16.6; y=11.95 h=2.1
+  x=8→14.6; y=15.8 h=2.1 x=8→12.6 (descending widths = weights).
+- Header wordmark: mark + "FolioX" text where the **X renders in
+  `text-primary`** (yellow accent); rest stays foreground.
+- Favicon (`icon.svg`): same geometry, yellow #FCEE0A strokes/bars on a
+  near-black #0A0A0B square (sharpen rx to 4).
+- `apple-icon.tsx` + `opengraph-image.tsx`: same mark scaled up, identical
+  colors (no laurel geometry anywhere).
+
+**Motif replacements:**
+- Home flow steps: column/coin/laurel line-art → (01) stacked weight-bars
+  with square knobs (echoes the weights editor), (02) hexagon + center plus
+  (mint a share), (03) arrow exiting a bracket (redeem out). Numerals
+  I/II/III and I–VI → zero-padded mono `01`–`06` (terminal style).
+- Hero chip laurel glyphs → mono `//` decorations in text-primary.
+- Pantheon engraving watermark → inline-SVG "circuit blueprint": concentric
+  hexagon outlines + node dots + straight connector traces, white at
+  opacity ≤0.07, same placement. No photos, no engravings.
+- `profile-editor` handle placeholder "Aurelius" → "satoshi".
+- `public/brand`: delete pantheon-engraving.jpg + roman-1..6.jpg once
+  unreferenced (grep first); keep market-hero.png only if still referenced.
+- brand.md: update Roman voice/identity references to NEON FOUNDRY (minimal edit).
+- All touched docstrings/comments drop roman/laurel phrasing (historical
+  branch names in git/docs stay as-is).

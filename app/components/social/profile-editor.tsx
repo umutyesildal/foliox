@@ -193,7 +193,7 @@ export function ProfileEditorModal({
                     setHandle(event.target.value.toLowerCase());
                     setHandleTaken(false);
                   }}
-                  placeholder="roman_index"
+                  placeholder="neon_index"
                   autoComplete="off"
                   spellCheck={false}
                   aria-invalid={handle.length > 0 && !handleValid ? true : undefined}
@@ -215,7 +215,7 @@ export function ProfileEditorModal({
               <input
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Aurelius"
+                placeholder="satoshi"
                 maxLength={40}
                 className="h-9 w-full rounded-sm border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />

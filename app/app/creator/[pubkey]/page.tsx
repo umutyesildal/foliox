@@ -25,6 +25,9 @@ import { useSocialAuth } from "@/lib/social-auth";
 import { ProfileEditorModal } from "@/components/social/profile-editor";
 import { SocialAvatar } from "@/components/social/avatar";
 import { EquityCurveChart } from "@/components/social/equity-curve-chart";
+import { isDemoMode } from "@/lib/demo-mode";
+import { getDemoCreator } from "@/lib/demo-creator";
+import { DemoCreatorProfile } from "@/components/social/demo-creator-profile";
 
 interface CreatorStats {
   basket_count?: string | number | null;
@@ -62,13 +65,35 @@ function numeric(value: string | number | null | undefined): number | null {
 const HISTORY_PAGE = 20;
 
 /**
+ * Route shell: the demo overlay gate runs before the real page mounts.
+ * Kept as a separate hookless wrapper (same pattern as feed-client.tsx)
+ * because this route is a client component whose instance persists across
+ * client-side param changes — an inline early return inside the hooked
+ * component would change the hook count between demo and real wallets.
+ */
+export default function CreatorPage() {
+  const params = useParams<{ pubkey: string }>();
+  const pubkeyParam = typeof params?.pubkey === "string" ? params.pubkey : "";
+
+  // demo overlay gate — zero network (2026-09-12): demo-wallet-1..7 are not
+  // base58, so they must resolve before any PublicKey validation or fetching;
+  // the profile renders from the pure local demo dataset (lib/demo-creator).
+  if (isDemoMode() && /^demo-wallet-[1-7]$/.test(pubkeyParam)) {
+    const creator = getDemoCreator(pubkeyParam);
+    if (creator) return <DemoCreatorProfile creator={creator} />;
+  }
+
+  return <CreatorPageReal />;
+}
+
+/**
  * Trader profile = social identity (avatar/handle/bio, follow, equity curve,
  * trade history) over the existing indexer-fed creator section (stats +
  * baskets), which is kept verbatim. Everything degrades honestly: a wallet
  * with no social profile renders identicon + truncated address; a private
  * profile renders a minimal state while the indexer baskets stay visible.
  */
-export default function CreatorPage() {
+function CreatorPageReal() {
   const params = useParams<{ pubkey: string }>();
   const pubkeyParam = typeof params?.pubkey === "string" ? params.pubkey : "";
 

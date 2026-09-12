@@ -221,3 +221,25 @@ with real post ids, so demo rows can never act on (or be mistaken for) a
 real post. On home, the live-proof band keeps a balanced 3/3 row count —
 both columns slice to `VISIBLE_ROW_COUNT = 3` so neither leads with a
 lopsided board. Flag off = the real fetch/poll path, byte-identical.
+
+## 11. Amendment — demo creator pages (2026-09-12)
+
+Behind the same `NEXT_PUBLIC_HOME_DEMO=1` flag, `/creator/demo-wallet-1..7`
+now render zero-network demo profiles: the creator route's demo gate
+(`isDemoMode()` + `demo-wallet-1..7` match) resolves the page from the pure
+data layer `lib/demo-creator.ts` (`getDemoCreator`) BEFORE any `PublicKey`
+validation or fetching, and renders `DemoCreatorProfile` — a hookless,
+server-safe component with no fetches and no event handlers. Identity
+(handle/displayName/bio/avatar) comes from the demo trader roster in
+`components/home/home-demo-data.ts`; the Follow button is an inert
+aria-disabled visual ("Demo data" tooltip, no click handler), likes/comments
+are static counts, and the only curve is a deterministic synthetic
+"EST. PERFORMANCE · DEMO" sparkline that lands exactly on the profile's
+headline est. return. Every page closes with an honesty footer stating all
+figures are synthetic demo data rendered locally with zero network calls.
+The leaderboard's demo users moved to `lib/demo-creator.ts` as the single
+source (`DEMO_LEADERBOARD_USERS`, structurally identical to
+`LeaderboardEntry`) — `leaderboard-client.tsx` imports it and keeps no local
+copy, so leaderboard rows and creator pages always resolve the same persona
+per wallet. Flag off = the real creator page and real leaderboard fetches,
+unchanged.

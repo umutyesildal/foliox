@@ -8,6 +8,10 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { RangeLinks } from "@/components/ui/range-links";
 import { SocialAvatar } from "@/components/social/avatar";
+// Demo users dataset (flag-gated) — single source is lib/demo-creator.ts,
+// which also powers the /creator/demo-wallet-1..7 profile pages; this file
+// keeps no local copy of the identities.
+import { DEMO_LEADERBOARD_USERS } from "@/lib/demo-creator";
 import { isDemoMode } from "@/lib/demo-mode";
 import {
   formatRelativeTime,
@@ -39,70 +43,6 @@ const WINDOWS: { value: LeaderboardWindow; label: string }[] = [
   { value: "all", label: "All" },
 ];
 
-// ---------------------------------------------------------------------------
-// Demo users dataset (flag-gated) — see home-demo-data.ts for the dataset
-// pattern; the identities are synthetic demo overlay rows (negative/
-// synthetic identities: one entry is deliberately underwater so the board
-// still reads honestly).
-// ---------------------------------------------------------------------------
-
-/** Weeks-ago helper — spreads first-trade stamps over 3-9 weeks back. */
-function weeksAgo(weeks: number): string {
-  return new Date(Date.now() - weeks * 7 * 24 * 60 * 60_000).toISOString();
-}
-
-/** Deterministic demo avatar URL — same seeds as home-demo-data.ts. */
-function demoAvatar(handle: string): string {
-  return `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(handle)}&backgroundColor=1a1a1c`;
-}
-
-interface DemoUserSeed {
-  /** Trader index from the home demo roster — drives the wallet id. */
-  n: number;
-  handle: string;
-  displayName: string;
-  roiPct: number;
-  valueUsd: number;
-  costBasisUsd: number;
-  positionCount: number;
-  weeksTrading: number;
-}
-
-/**
- * Demo overlay — see home-demo-data.ts for the dataset pattern; the
- * identities are synthetic (negative/synthetic identities). Handles /
- * displayNames / avatar seeds are lifted from the home demo trader roster
- * (nova_trader, elena.k, satoshi_21, quietfounder, moxie_eth, driftwood_)
- * so the same personas appear across surfaces, and wallets reuse the
- * `demo-wallet-<n>` ids the demo trades use. ROI is a believable +2.4% to
- * +21.7% spread with one negative; cost basis coheres with value × ROI.
- * Ranked by roiPct DESC — the order the real users endpoint returns.
- */
-const DEMO_USER_SEEDS: DemoUserSeed[] = [
-  { n: 1, handle: "nova_trader", displayName: "Nova", roiPct: 21.7, valueUsd: 126_000, costBasisUsd: 103_500, positionCount: 5, weeksTrading: 9 },
-  { n: 3, handle: "satoshi_21", displayName: "Satoshi 21", roiPct: 14.2, valueUsd: 94_500, costBasisUsd: 82_800, positionCount: 4, weeksTrading: 8 },
-  { n: 5, handle: "moxie_eth", displayName: "Moxie", roiPct: 9.6, valueUsd: 47_800, costBasisUsd: 43_600, positionCount: 4, weeksTrading: 7 },
-  { n: 2, handle: "elena.k", displayName: "Elena Kovacs", roiPct: 6.3, valueUsd: 26_300, costBasisUsd: 24_750, positionCount: 3, weeksTrading: 5 },
-  { n: 4, handle: "quietfounder", displayName: "Quiet Founder", roiPct: 2.4, valueUsd: 12_950, costBasisUsd: 12_650, positionCount: 2, weeksTrading: 4 },
-  { n: 7, handle: "driftwood_", displayName: "Driftwood", roiPct: -1.8, valueUsd: 8_400, costBasisUsd: 8_550, positionCount: 3, weeksTrading: 3 },
-];
-
-/**
- * Demo users leaderboard — structurally identical to LeaderboardEntry so
- * the real Row renderer handles it unchanged.
- */
-const DEMO_USERS: LeaderboardEntry[] = DEMO_USER_SEEDS.map((seed) => ({
-  wallet: `demo-wallet-${seed.n}`,
-  handle: seed.handle,
-  displayName: seed.displayName,
-  avatarUrl: demoAvatar(seed.handle),
-  roiPct: seed.roiPct,
-  valueUsd: seed.valueUsd,
-  costBasisUsd: seed.costBasisUsd,
-  positionCount: seed.positionCount,
-  firstTradeAt: weeksAgo(seed.weeksTrading),
-})).sort((a, b) => (b.roiPct ?? 0) - (a.roiPct ?? 0));
-
 /**
  * Leaderboard over GET /leaderboard (Users tab) and GET /leaderboard/baskets
  * (Baskets tab). Return figures are on-chain estimates — always labeled
@@ -117,7 +57,9 @@ export default function LeaderboardClient() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     isDemoMode() ? "ready" : "loading",
   );
-  const [items, setItems] = useState<LeaderboardEntry[]>(isDemoMode() ? DEMO_USERS : []);
+  const [items, setItems] = useState<LeaderboardEntry[]>(
+    isDemoMode() ? DEMO_LEADERBOARD_USERS : [],
+  );
   const [basketItems, setBasketItems] = useState<BasketLeaderboardEntry[]>(
     isDemoMode() ? DEMO_BASKETS : [],
   );

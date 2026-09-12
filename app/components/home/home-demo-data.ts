@@ -5,11 +5,12 @@ import type {
 } from "@/lib/social-api";
 
 /**
- * DEMO overlay datasets (NEXT_PUBLIC_HOME_DEMO=1) — the home live-proof band
- * AND the /feed page render these instead of fetching; clearly chipped in the
- * UI ("demo data" mono chip on both). NEVER rendered from real endpoints —
- * owner-requested demo look for the landing + social surfaces (2026-09-12).
- * If you are debugging real data, turn the flag off.
+ * DEMO overlay datasets (NEXT_PUBLIC_HOME_DEMO=1) — the home live-proof band,
+ * the /feed page, and (behind the same flag) the /leaderboard and /creator
+ * demo pages render these instead of fetching; clearly chipped in the UI
+ * ("demo data" mono chip on every surface). NEVER rendered from real
+ * endpoints — owner-requested demo look for the landing + social surfaces
+ * (2026-09-12). If you are debugging real data, turn the flag off.
  *
  * This module is pure data (no components, no hooks). The flag read lives in
  * `lib/demo-mode.ts` (`isDemoMode()`); the home section still reads the same
@@ -31,6 +32,11 @@ import type {
  *    demo basket logo.
  *  - Thesis ids are stringified negative numbers ("-1".."-5") — synthetic,
  *    never colliding with real post ids (detailed on DEMO_THESES below).
+ *  - The demo wallet universe is exactly `demo-wallet-1..7`: every trade,
+ *    thesis and roster persona lives in that space (personas share wallet
+ *    ids — see DEMO_TRADERS), so /creator/<wallet> links from the feed,
+ *    leaderboard and home band always resolve to a live demo page
+ *    (identity/stats resolution lives in lib/demo-creator.ts).
  */
 
 /** Minutes-ago helper — spreads the demo activity over the recent past. */
@@ -38,8 +44,12 @@ function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
-/** Deterministic demo avatar URL (notionists set, dark chip background). */
-function demoAvatar(handle: string): string {
+/**
+ * Deterministic demo avatar URL (notionists set, dark chip background) —
+ * exported so lib/demo-creator.ts renders identical avatars for the same
+ * handle across the leaderboard and /creator demo pages.
+ */
+export function demoAvatar(handle: string): string {
   return `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(handle)}&backgroundColor=1a1a1c`;
 }
 
@@ -134,10 +144,19 @@ export const DEMO_BASKETS: BasketLeaderboardEntry[] = DEMO_BASKET_SEEDS.map((see
 // ---------------------------------------------------------------------------
 
 interface DemoTradeSeed {
-  /** demo trader index — drives wallet/sig ids. */
+  /** Unique demo trade index — drives the `demo-<n>` sig (never reused). */
   n: number;
+  /**
+   * Demo wallet id (1-7) — the whole demo wallet universe is
+   * `demo-wallet-1..7` (see DEMO_TRADERS), so trades 8-12 re-use the wallet
+   * of the roster persona that trades their basket instead of minting new
+   * wallets that would 404 on /creator.
+   */
+  walletN: number;
   handle: string;
   displayName: string;
+  /** One warm, professional sentence — surfaces on /creator demo pages. */
+  bio: string;
   type: TradeFeedItem["type"];
   shares: number;
   usdValue: number;
@@ -147,26 +166,34 @@ interface DemoTradeSeed {
 }
 
 /**
- * 12 demo traders (handle + displayName vary in style), spread across the
- * three real baskets (Foundry Tech ×4, Index Plus ×5, Mag7 Vector ×3 —
+ * 12 demo traders (handle + displayName + bio vary in style), spread across
+ * the three real baskets (Foundry Tech ×4, Index Plus ×5, Mag7 Vector ×3 —
  * mapped so trader handles stay coherent with the basket they trade, e.g.
  * foundryfan mints Foundry Tech). USD values are `shares × a plausible
  * $360–$590 per-share NAV` so figures cohere with the NAV column; times
  * climb from 2 to 39 minutes ago so the relative labels spread believably.
+ *
+ * Wallet normalization: trades 1-7 belong to the six leaderboard personas
+ * plus foundryfan (one wallet each); trades 8-12 broadcast under the wallet
+ * of the roster persona that trades the same basket (0xLena→elena.k,
+ * candlewick→quietfounder, alpha_sam→moxie_eth, mintcondition→satoshi_21,
+ * ronin.rs→quietfounder) so every wallet resolves on /creator — see
+ * DEMO_TRADERS below. Sigs stay unique: `demo-<n>` keys off the trade index,
+ * not the wallet.
  */
 const DEMO_TRADE_SEEDS: DemoTradeSeed[] = [
-  { n: 1, handle: "nova_trader", displayName: "Nova", type: "Minted", shares: 12.5, usdValue: 6875, basket: REAL_BASKETS[0].pubkey, minutesAgo: 2 },
-  { n: 2, handle: "elena.k", displayName: "Elena Kovacs", type: "Minted", shares: 3.2, usdValue: 1152, basket: REAL_BASKETS[1].pubkey, minutesAgo: 5 },
-  { n: 3, handle: "satoshi_21", displayName: "Satoshi 21", type: "Redeemed", shares: 8, usdValue: 4240, basket: REAL_BASKETS[2].pubkey, minutesAgo: 8 },
-  { n: 4, handle: "quietfounder", displayName: "Quiet Founder", type: "Minted", shares: 1.5, usdValue: 540, basket: REAL_BASKETS[1].pubkey, minutesAgo: 11 },
-  { n: 5, handle: "moxie_eth", displayName: "Moxie", type: "Minted", shares: 24, usdValue: 14160, basket: REAL_BASKETS[0].pubkey, minutesAgo: 14 },
-  { n: 6, handle: "foundryfan", displayName: "Foundry Fan", type: "Minted", shares: 0.5, usdValue: 180, basket: REAL_BASKETS[0].pubkey, minutesAgo: 17 },
-  { n: 7, handle: "driftwood_", displayName: "Driftwood", type: "Redeemed", shares: 5.75, usdValue: 2990, basket: REAL_BASKETS[2].pubkey, minutesAgo: 21 },
-  { n: 8, handle: "0xLena", displayName: "Lena", type: "Minted", shares: 9.1, usdValue: 5096, basket: REAL_BASKETS[1].pubkey, minutesAgo: 25 },
-  { n: 9, handle: "candlewick", displayName: "Candlewick", type: "Minted", shares: 6.4, usdValue: 3200, basket: REAL_BASKETS[1].pubkey, minutesAgo: 28 },
-  { n: 10, handle: "alpha_sam", displayName: "Alpha Sam", type: "Redeemed", shares: 2.25, usdValue: 1170, basket: REAL_BASKETS[0].pubkey, minutesAgo: 32 },
-  { n: 11, handle: "mintcondition", displayName: "Mint Condition", type: "Minted", shares: 14.8, usdValue: 8140, basket: REAL_BASKETS[2].pubkey, minutesAgo: 36 },
-  { n: 12, handle: "ronin.rs", displayName: "Ronin", type: "Minted", shares: 4.6, usdValue: 2530, basket: REAL_BASKETS[1].pubkey, minutesAgo: 39 },
+  { n: 1, walletN: 1, handle: "nova_trader", displayName: "Nova", bio: "Semis and software. I build baskets I'd hold through a red year.", type: "Minted", shares: 12.5, usdValue: 6875, basket: REAL_BASKETS[0].pubkey, minutesAgo: 2 },
+  { n: 2, walletN: 2, handle: "elena.k", displayName: "Elena Kovacs", bio: "Broad baskets, steady adds. I'd rather own the whole index than guess the next winner.", type: "Minted", shares: 3.2, usdValue: 1152, basket: REAL_BASKETS[1].pubkey, minutesAgo: 5 },
+  { n: 3, walletN: 3, handle: "satoshi_21", displayName: "Satoshi 21", bio: "Systems engineer. I keep a written thesis for every basket I hold and rotate slowly, if at all.", type: "Redeemed", shares: 8, usdValue: 4240, basket: REAL_BASKETS[2].pubkey, minutesAgo: 8 },
+  { n: 4, walletN: 4, handle: "quietfounder", displayName: "Quiet Founder", bio: "Founder, mostly heads-down. Small automatic adds into a boring core — my portfolio should not be a second job.", type: "Minted", shares: 1.5, usdValue: 540, basket: REAL_BASKETS[1].pubkey, minutesAgo: 11 },
+  { n: 5, walletN: 5, handle: "moxie_eth", displayName: "Moxie", bio: "Growth tilt, sized honestly. I trim into strength and let the core positions do the compounding.", type: "Minted", shares: 24, usdValue: 14160, basket: REAL_BASKETS[0].pubkey, minutesAgo: 14 },
+  { n: 6, walletN: 6, handle: "foundryfan", displayName: "Foundry Fan", bio: "New here. Opened with one small mint into Foundry Tech and a plan to add on the red days.", type: "Minted", shares: 0.5, usdValue: 180, basket: REAL_BASKETS[0].pubkey, minutesAgo: 17 },
+  { n: 7, walletN: 7, handle: "driftwood_", displayName: "Driftwood", bio: "Slow money. I hold a concentrated basket on purpose and write the reasoning down so future-me can audit it.", type: "Redeemed", shares: 5.75, usdValue: 2990, basket: REAL_BASKETS[2].pubkey, minutesAgo: 21 },
+  { n: 8, walletN: 2, handle: "0xLena", displayName: "Lena", bio: "Ex-market-maker. I like baskets where the plumbing is boring and the weights do the work.", type: "Minted", shares: 9.1, usdValue: 5096, basket: REAL_BASKETS[1].pubkey, minutesAgo: 25 },
+  { n: 9, walletN: 4, handle: "candlewick", displayName: "Candlewick", bio: "Ten years of chart-watching cured me of chart-watching. Now it is broad baskets and calendar adds.", type: "Minted", shares: 6.4, usdValue: 3200, basket: REAL_BASKETS[1].pubkey, minutesAgo: 28 },
+  { n: 10, walletN: 5, handle: "alpha_sam", displayName: "Alpha Sam", bio: "Trim more than feels necessary. Redeeming a little into strength keeps one winner from becoming the whole story.", type: "Redeemed", shares: 2.25, usdValue: 1170, basket: REAL_BASKETS[0].pubkey, minutesAgo: 32 },
+  { n: 11, walletN: 3, handle: "mintcondition", displayName: "Mint Condition", bio: "Operations nerd. I care about NAV honesty, clean rebalances, and baskets I can explain in one sentence.", type: "Minted", shares: 14.8, usdValue: 8140, basket: REAL_BASKETS[2].pubkey, minutesAgo: 36 },
+  { n: 12, walletN: 4, handle: "ronin.rs", displayName: "Ronin", bio: "Reformed daytrader. The whole strategy fits in one line now: fund the core, ignore the noise.", type: "Minted", shares: 4.6, usdValue: 2530, basket: REAL_BASKETS[1].pubkey, minutesAgo: 39 },
 ];
 
 const DEMO_BASKET_NAMES = new Map(
@@ -177,13 +204,15 @@ const DEMO_BASKET_NAMES = new Map(
  * Latest-trades dataset — newest first (the same order /api/v1/feed
  * returns), structurally identical to TradeFeedItem. Sigs are
  * `demo-<n>`; the animated list appends a cycle counter to these at key
- * time so repeats never collide in AnimatePresence.
+ * time so repeats never collide in AnimatePresence. Wallets are normalized
+ * into `demo-wallet-1..7` (see DEMO_TRADE_SEEDS) so every row links to a
+ * live /creator demo page.
  */
 export const DEMO_TRADES: TradeFeedItem[] = DEMO_TRADE_SEEDS.map((seed) => ({
   kind: "trade",
   sig: `demo-${seed.n}`,
   ts: minutesAgo(seed.minutesAgo),
-  wallet: `demo-wallet-${seed.n}`,
+  wallet: `demo-wallet-${seed.walletN}`,
   handle: seed.handle,
   displayName: seed.displayName,
   avatarUrl: demoAvatar(seed.handle),
@@ -192,6 +221,42 @@ export const DEMO_TRADES: TradeFeedItem[] = DEMO_TRADE_SEEDS.map((seed) => ({
   type: seed.type,
   shares: seed.shares,
   usdValue: seed.usdValue,
+}));
+
+// ---------------------------------------------------------------------------
+// Demo trader roster — one entry per demo persona with the bio the /creator
+// demo pages render. Consumed via lib/demo-creator.ts (identity resolution).
+// ---------------------------------------------------------------------------
+
+/** One demo trader persona — the identity shape /creator demo pages need. */
+export interface DemoTrader {
+  wallet: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string;
+  bio: string;
+}
+
+/**
+ * Trader roster — 12 entries, one per demo persona. Wallet normalization:
+ * the demo wallet universe is exactly `demo-wallet-1..7`, so the twelve
+ * personas SHARE those seven ids — the six leaderboard personas (nova_trader,
+ * elena.k, satoshi_21, quietfounder, moxie_eth, driftwood_) each own their
+ * `demo-wallet-<n>`, foundryfan owns demo-wallet-6, and the remaining
+ * personas broadcast under the wallet of the persona that trades their basket
+ * (0xLena→elena.k, candlewick/ronin.rs→quietfounder, alpha_sam→moxie_eth,
+ * mintcondition→satoshi_21). That keeps every wallet in DEMO_TRADES and
+ * DEMO_THESES inside 1..7, so /creator links from the feed, leaderboard and
+ * home band always hit a live demo page. lib/demo-creator.ts resolves the
+ * page identity per wallet: the leaderboard persona first, then the first
+ * roster entry broadcasting on it (demo-wallet-6 → foundryfan).
+ */
+export const DEMO_TRADERS: DemoTrader[] = DEMO_TRADE_SEEDS.map((seed) => ({
+  wallet: `demo-wallet-${seed.walletN}`,
+  handle: seed.handle,
+  displayName: seed.displayName,
+  avatarUrl: demoAvatar(seed.handle),
+  bio: seed.bio,
 }));
 
 // ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import { YAxis } from "@/components/charts/y-axis";
 import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
 import type { EquityPoint } from "@/lib/social-api";
 
-/** Ethereal fill ceiling (charts only, same treatment as the NAV chart). */
+/** Fill ceiling for the yellow equity line (charts only, same treatment as the NAV chart). */
 const FILL_OPACITY = 0.06;
 
 /**

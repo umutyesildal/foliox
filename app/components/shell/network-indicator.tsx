@@ -24,7 +24,10 @@ export function NetworkIndicator({ className }: { className?: string }) {
     <span
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground",
+        // Terminal chip: mono uppercase micro-label per the NEON FOUNDRY rule
+        // (uppercase + tracked labels use mono). The dot stays the sole
+        // health signal; the label itself never turns red.
+        "inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-muted-foreground",
         className,
       )}
     >

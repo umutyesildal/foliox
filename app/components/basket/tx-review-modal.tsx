@@ -152,7 +152,7 @@ export function TxReviewModal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
+        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-5 outline-none"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -160,7 +160,7 @@ export function TxReviewModal({
             {flowState.status === "preparing-alt" && setupProgress ? (
               <span
                 data-testid="setup-badge"
-                className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground"
+                className="rounded-sm border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground"
               >
                 Setup {setupProgress.step}/{setupProgress.total}
               </span>
@@ -243,7 +243,7 @@ export function TxReviewModal({
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                     <p className="text-[11px] leading-4 text-muted-foreground">{account.note}</p>
-                    <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground/80">
                       {account.signer ? "signer " : ""}
                       {account.writable ? "writable" : "read-only"}
                     </p>
@@ -353,14 +353,17 @@ function StatusCard({
       );
 
     case "confirmed":
-      // SUCCESS: the delta in plain language + the two useful actions.
+      // SUCCESS: confirmed-on-chain reads through the yellow system (hairline
+      // + headline); the delta/amount inside the headline keeps its semantic
+      // green via the caller. The delta in plain language + the two useful
+      // actions.
       return (
         <div
           role="status"
           data-testid="tx-status-card"
-          className="rounded-md border border-border bg-muted/30 p-3"
+          className="hairline-primary rounded-md border border-border bg-muted/30 p-3"
         >
-          <p className="text-sm font-semibold">{successLine ?? "🎉 Done"}</p>
+          <p className="text-sm font-semibold text-primary-text">{successLine ?? "🎉 Done"}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button render={<Link href={portfolioHref} />} size="sm">
               View Portfolio

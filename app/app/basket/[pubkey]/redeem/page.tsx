@@ -347,7 +347,7 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
           {/* compact identity header — name + composition, detail via the breadcrumb */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 space-y-1.5">
-              <h1 className="text-3xl font-semibold tracking-tight" title={detail.pubkey}>
+              <h1 className="font-display text-3xl font-semibold tracking-tight" title={detail.pubkey}>
                 {headline}
               </h1>
               {name && composition ? (
@@ -600,9 +600,17 @@ export default function RedeemPage({ params }: { params: Promise<{ pubkey: strin
             endpoint={RPC_ENDPOINT}
             pendingTxId={flow.state.pendingTxId}
             successLine={
-              preview !== null
-                ? `🎉 Done — −${grouped(formatRawShares6(preview.burn))} shares${name ? ` of ${name}` : ""}`
-                : "🎉 Done"
+              preview !== null ? (
+                <>
+                  🎉 Done —{" "}
+                  <span className="text-[hsl(var(--status-positive))]">
+                    −{grouped(formatRawShares6(preview.burn))} shares
+                  </span>
+                  {name ? ` of ${name}` : ""}
+                </>
+              ) : (
+                "🎉 Done"
+              )
             }
             successExtra={
               flow.state.status === "confirmed" && detail ? (

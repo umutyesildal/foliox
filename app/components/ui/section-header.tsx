@@ -1,18 +1,18 @@
 import type { ReactNode } from "react";
 
 /**
- * SectionHeader — the shared Roman-era section header, so pages stop
- * hand-rolling eyebrow + lead + right-slot stacks.
+ * SectionHeader — the shared section header, so pages stop hand-rolling
+ * eyebrow + lead + right-slot stacks.
  *
- *   label  Cinzel tracked-caps heading text (applies the .text-display
- *          utility from globals.css — the single source of truth for the
- *          0.14em inscription tracking).
+ *   label  Display-face tracked-caps heading text (applies the .text-display
+ *          utility from globals.css — the single source of truth for Chakra
+ *          Petch caps: weight 600, 0.06em tracking).
  *   lead   One muted line under the label.
  *   right  Right-aligned slot (freshness badge, range buttons). When set, the
  *          header becomes the flex row used by page titles; without it the
  *          header is the plain vertical stack used by home sections.
  *
- * Sizes (all Cinzel via the two utilities):
+ * Sizes (all display face via the two utilities):
  *   eyebrow — xs muted tracked caps (section eyebrows, e.g. Flow).
  *   display — xl→2xl foreground tracked caps (inscription lines, e.g. Ledger).
  *   title   — page-title scale via .font-display (the h1 row with `right`).

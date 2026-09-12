@@ -147,11 +147,11 @@ export function ProfileEditorModal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
+        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card p-5 outline-none"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold">{title}</h2>
+            <h2 className="font-display text-base font-semibold">{title}</h2>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {hadProfile
                 ? "Shown on the feed, leaderboard and your profile page."
@@ -197,11 +197,11 @@ export function ProfileEditorModal({
                   autoComplete="off"
                   spellCheck={false}
                   aria-invalid={handle.length > 0 && !handleValid ? true : undefined}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-2.5 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="h-9 w-full rounded-sm border border-border bg-background px-2.5 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </div>
               {handleTaken ? (
-                <p role="alert" className="mt-1 text-xs text-[hsl(var(--chart-2))]">
+                <p role="alert" className="mt-1 text-xs text-destructive">
                   That handle is taken — pick another.
                 </p>
               ) : handle.length > 0 && !handleValid ? (
@@ -217,7 +217,7 @@ export function ProfileEditorModal({
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder="Aurelius"
                 maxLength={40}
-                className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-9 w-full rounded-sm border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
             </Field>
 
@@ -227,7 +227,7 @@ export function ProfileEditorModal({
                 onChange={(event) => setAvatarUrl(event.target.value)}
                 placeholder="https://…"
                 type="url"
-                className="h-9 w-full rounded-lg border border-border bg-background px-2.5 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-9 w-full rounded-sm border border-border bg-background px-2.5 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
             </Field>
 
@@ -237,16 +237,16 @@ export function ProfileEditorModal({
                 onChange={(event) => setBio(event.target.value)}
                 maxLength={280}
                 rows={3}
-                className="w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="w-full resize-y rounded-sm border border-border bg-background px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
             </Field>
 
-            <label className="flex items-start gap-2.5 rounded-lg border border-border bg-background p-3 text-sm">
+            <label className="flex items-start gap-2.5 rounded-sm border border-border bg-background p-3 text-sm">
               <input
                 type="checkbox"
                 checked={!isPublic}
                 onChange={(event) => setIsPublic(!event.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-[hsl(var(--foreground))]"
+                className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
               />
               <span>
                 Hide my trades from the public feed and leaderboard
@@ -289,7 +289,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <span className="font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       {hint ? <span className="ml-2 text-[11px] text-muted-foreground/80">{hint}</span> : null}

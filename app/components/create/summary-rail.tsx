@@ -59,7 +59,7 @@ export function SummaryRail({
       )}
     >
       <div>
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Basket</p>
+        <p className="section-label">Basket</p>
         <p className="mt-1 truncate font-medium">{summary.basketName || "Untitled basket"}</p>
       </div>
 
@@ -152,7 +152,7 @@ export function SummaryRail({
             <li key={label} className="flex items-center justify-between gap-2">
               <span
                 className={cn(
-                  state === "current" && "font-medium text-foreground",
+                  state === "current" && "font-medium text-primary-text",
                   state === "done" && "text-muted-foreground",
                   state === "upcoming" && "text-muted-foreground/70",
                 )}
@@ -164,7 +164,7 @@ export function SummaryRail({
                   className={cn(
                     "font-mono tabular-nums",
                     valid
-                      ? "text-foreground"
+                      ? "text-primary-text"
                       : "text-muted-foreground/60",
                   )}
                 >

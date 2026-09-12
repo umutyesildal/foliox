@@ -1,13 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- FolioX favicon (roman-empire, owner feedback 2026-09-03): plain laurel
-       wreath on a rounded near-black square — the F monogram is gone. Same
-       wreath geometry as LogoMark in components/shell/site-header.tsx, scaled
-       up to fill the frame and drawn with thick strokes; only two leaf ticks
-       per side survive — at 16px the finer ticks turn to mush and the branch
-       silhouette is what must read. Same mark also in apple-icon.tsx and
-       opengraph-image.tsx. -->
-  <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
-  <g fill="none" stroke="#fafafa" stroke-linecap="round"
+  <!-- FolioX favicon (NEON FOUNDRY, 2026-09-12): plain laurel wreath on a
+       rounded near-black square — the F monogram is gone. Geometry unchanged
+       from the previous mark; recolored to the electric-yellow accent on the
+       cool near-black canvas. Same wreath geometry as LogoMark in
+       components/shell/site-header.tsx, scaled up to fill the frame and drawn
+       with thick strokes; only two leaf ticks per side survive — at 16px the
+       finer ticks turn to mush and the branch silhouette is what must read.
+       Same mark also in apple-icon.tsx and opengraph-image.tsx. -->
+  <rect width="32" height="32" rx="7" fill="#0A0A0B"/>
+  <g fill="none" stroke="#FCEE0A" stroke-linecap="round"
      transform="translate(16 17.2) scale(1.08) translate(-16 -17.2)">
     <!-- wreath: two mirrored branches + binding arc, open at the top -->
     <g stroke-width="2.2">

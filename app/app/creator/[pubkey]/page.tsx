@@ -310,7 +310,7 @@ export default function CreatorPage() {
                   size="md"
                 />
                 <div className="min-w-0">
-                  <h1 className="text-3xl font-semibold tracking-tight">
+                  <h1 className="font-display text-3xl font-semibold tracking-tight">
                     {isPrivate ? (
                       <span
                         className="font-mono text-2xl tabular-nums"
@@ -356,6 +356,12 @@ export default function CreatorPage() {
                   <Button
                     variant={profilePayload?.viewer?.isFollowing ? "outline" : "default"}
                     size="sm"
+                    /* Followed state reads as the yellow accent wash (active/followed). */
+                    className={
+                      profilePayload?.viewer?.isFollowing
+                        ? "border-primary/50 bg-accent text-accent-foreground hover:bg-accent/80"
+                        : undefined
+                    }
                     onClick={() => void onFollow()}
                     disabled={followBusy}
                   >
@@ -401,7 +407,7 @@ export default function CreatorPage() {
         </header>
       ) : (
         <header className="pb-10">
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
             Creator{" "}
             <span
               className="font-mono text-2xl tabular-nums text-muted-foreground"
@@ -435,7 +441,7 @@ export default function CreatorPage() {
               estimated from on-chain snapshots · not advice
             </p>
           </div>
-          <div className="rounded-xl bg-card shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+          <div className="rounded-sm bg-card ring-1 ring-border hairline-primary">
             <div className="p-5">
               {curve === null ? (
                 <div role="status" aria-label="Loading equity curve" className="flex h-[280px] items-end gap-2 p-4">
@@ -464,7 +470,7 @@ export default function CreatorPage() {
             <div className="space-y-2" role="status" aria-label="Loading trade history">
               <span className="sr-only">Loading trade history</span>
               {Array.from({ length: 3 }, (_, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                <div key={i} className="flex items-center gap-3 rounded-sm border border-border bg-card px-4 py-3">
                   <Skeleton className="h-4 w-16" />
                   <Skeleton className="h-4 w-40" />
                   <Skeleton className="ml-auto h-4 w-20" />
@@ -483,7 +489,7 @@ export default function CreatorPage() {
             />
           ) : (
             <>
-              <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+              <ul className="divide-y divide-border overflow-hidden rounded-sm border border-border bg-card">
                 {history.map((item, index) => {
                   const minted = item.type === "Minted";
                   return (
@@ -494,8 +500,8 @@ export default function CreatorPage() {
                       <span
                         className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
                           minted
-                            ? "border-[hsl(var(--chart-1)/40)] bg-[hsl(var(--chart-1)/10)] text-[hsl(var(--chart-1))]"
-                            : "border-[hsl(var(--chart-2)/40)] bg-[hsl(var(--chart-2)/10)] text-[hsl(var(--chart-2))]"
+                            ? "border-[hsl(var(--status-positive)/40)] bg-[hsl(var(--status-positive)/10)] text-[hsl(var(--status-positive))]"
+                            : "border-[hsl(var(--destructive)/40)] bg-[hsl(var(--destructive)/10)] text-[hsl(var(--destructive))]"
                         }`}
                       >
                         {item.type}
@@ -538,7 +544,7 @@ export default function CreatorPage() {
           <span className="sr-only">Loading creator profile</span>
           <div className="grid gap-3 sm:grid-cols-3">
             {Array.from({ length: 3 }, (_, i) => (
-              <div key={i} aria-hidden="true" className="rounded-lg border border-border bg-card p-5">
+              <div key={i} aria-hidden="true" className="rounded-sm border border-border bg-card p-5">
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="mt-2 h-8 w-24" />
               </div>
@@ -546,7 +552,7 @@ export default function CreatorPage() {
           </div>
           <div className="mt-8 grid gap-3 sm:grid-cols-2" aria-hidden="true">
             {Array.from({ length: 2 }, (_, i) => (
-              <div key={i} className="rounded-lg border border-border bg-card p-5">
+              <div key={i} className="rounded-sm border border-border bg-card p-5">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="mt-3 h-8 w-24" />
               </div>
@@ -565,7 +571,7 @@ export default function CreatorPage() {
             action={
               <Link
                 href="/create"
-                className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="rounded-sm border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 Open the create wizard
               </Link>
@@ -651,7 +657,7 @@ export default function CreatorPage() {
                       key={row.pubkey}
                       href={`/basket/${row.pubkey}`}
                       title={`Open basket ${row.pubkey}`}
-                      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      className="group flex flex-col rounded-sm border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span
@@ -679,7 +685,7 @@ export default function CreatorPage() {
                           : "Share mint —"}
                       </span>
                       <div className="mt-auto border-t border-border/60 pt-3">
-                        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        <span className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
                           Created
                         </span>
                         <span className="block font-mono text-xs tabular-nums">

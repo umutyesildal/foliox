@@ -189,6 +189,21 @@ export function InKindMintForm({
     net !== null
       ? `🎉 Done — +${grouped(formatRawShares6(net))} shares${name ? ` of ${name}` : ""}`
       : "🎉 Done";
+  // Modal headline: same copy as the banner line, with the share delta wrapped
+  // in semantic green — the SUCCESS card itself is yellow-accented (see
+  // tx-review-modal); green is reserved for the delta/amount only.
+  const successLineNode =
+    net !== null ? (
+      <>
+        🎉 Done —{" "}
+        <span className="text-[hsl(var(--status-positive))]">
+          +{grouped(formatRawShares6(net))} shares
+        </span>
+        {name ? ` of ${name}` : ""}
+      </>
+    ) : (
+      "🎉 Done"
+    );
   const depositLine = check?.ok
     ? (amounts as bigint[])
         .map((amount, i) => {
@@ -503,7 +518,7 @@ export function InKindMintForm({
                 return (
                   <div key={i} className="h-1 flex-1 bg-muted">
                     <div
-                      className={`h-1 rounded-full ${off ? "bg-foreground" : "bg-foreground/70"}`}
+                      className={`h-1 rounded-full ${off ? "bg-primary" : "bg-primary/70"}`}
                       style={{ width: `${Math.max(pct, 2)}%` }}
                     />
                   </div>
@@ -619,7 +634,7 @@ export function InKindMintForm({
           confirmLabel="Buy shares"
           endpoint={RPC_ENDPOINT}
           pendingTxId={flow.state.pendingTxId}
-          successLine={successLineText}
+          successLine={successLineNode}
           successExtra={
             flow.state.status === "confirmed" ? (
               <ThesisShareCta basket={detail.pubkey} basketName={name} />

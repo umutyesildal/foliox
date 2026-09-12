@@ -82,7 +82,7 @@ export function WeightsEditor({
           aria-live="polite"
           className={cn(
             "ml-auto flex items-center gap-1.5 font-mono text-xs tabular-nums",
-            valid ? "text-foreground" : "text-destructive",
+            valid ? "text-primary-text" : "text-destructive",
           )}
         >
           {/* Raw bps, locale-independent (no thousands grouping): grouped

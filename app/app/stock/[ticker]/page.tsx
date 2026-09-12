@@ -227,7 +227,7 @@ export default async function StockPage({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Price comparison — {range} (normalized 100)</CardTitle>
+          <CardTitle className="font-display text-base font-medium">Price comparison — {range} (normalized 100)</CardTitle>
           <CardDescription className="text-xs leading-relaxed">
             xStock token (simulated in V0) · real equity · Nasdaq QQQ (dashed).
           </CardDescription>

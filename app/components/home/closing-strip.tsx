@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api-client";
  * hairline-divided row of three cells: STOCKS (the dev catalog tickers —
  * GET /api/v1/xstocks/mock, falling back to the xStocks registry),
  * TOKENIZED ETFS (SPYx), BASKETS. Each cell links; its ↗
- * lifts and warms to pompeian red on hover. Nothing renders in the ticker
+ * lifts and warms to primary yellow on hover. Nothing renders in the ticker
  * line when the backend is unreachable (no fabricated tickers) — and no
  * endpoint/as-of text is shown.
  */
@@ -80,7 +80,7 @@ export function ClosingStrip() {
               </span>
               <span
                 aria-hidden="true"
-                className="font-mono text-sm text-muted-foreground transition-all duration-200 group-hover:-translate-y-0.5 group-hover:text-[hsl(var(--pompeian))] motion-reduce:transform-none motion-reduce:transition-none"
+                className="font-mono text-sm text-muted-foreground transition-all duration-200 group-hover:-translate-y-0.5 group-hover:text-primary-text motion-reduce:transform-none motion-reduce:transition-none"
               >
                 ↗
               </span>

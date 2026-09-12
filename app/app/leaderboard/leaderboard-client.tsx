@@ -81,7 +81,7 @@ export default function LeaderboardClient() {
     <div className="mx-auto w-full max-w-4xl">
       <header className="flex flex-wrap items-baseline justify-between gap-3 pb-6">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Leaderboard</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Leaderboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Public traders ranked by estimated portfolio return. Self-custodial wallets only —
             nothing here is managed or advised.
@@ -183,8 +183,8 @@ function RoiValue({ roiPct }: { roiPct: number | null }) {
     <span
       className={`font-mono text-sm tabular-nums ${
         positive
-          ? "text-[hsl(var(--chart-1))]"
-          : "text-[hsl(var(--chart-2))]"
+          ? "text-[hsl(var(--status-positive))]"
+          : "text-[hsl(var(--destructive))]"
       }`}
     >
       {positive ? "+" : ""}
@@ -196,12 +196,17 @@ function RoiValue({ roiPct }: { roiPct: number | null }) {
 function Row({ rank, entry }: { rank: number; entry: LeaderboardEntry }) {
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4">
-      <span className="w-7 shrink-0 font-mono text-sm tabular-nums text-muted-foreground">
+      {/* Rank #1 is the page's single yellow accent spot. */}
+      <span
+        className={`w-7 shrink-0 font-mono text-sm tabular-nums ${
+          rank === 1 ? "text-glow text-primary-text" : "text-muted-foreground"
+        }`}
+      >
         {rank}
       </span>
       <Link
         href={`/creator/${entry.wallet}`}
-        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <SocialAvatar
           wallet={entry.wallet}
@@ -225,13 +230,13 @@ function Row({ rank, entry }: { rank: number; entry: LeaderboardEntry }) {
           <span className="block font-mono text-sm tabular-nums text-foreground">
             {entry.valueUsd !== null ? formatUsd(entry.valueUsd, { maximumFractionDigits: 0 }) : NOT_A_NUMBER_LABEL}
           </span>
-          <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="block font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
             est. value
           </span>
         </span>
         <span className="w-20 text-right">
           <RoiValue roiPct={entry.roiPct} />
-          <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="block font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
             est. return
           </span>
         </span>

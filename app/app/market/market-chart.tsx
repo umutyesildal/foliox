@@ -133,7 +133,7 @@ export default function MarketChart({ rows, series, volume, volumeLabel }: Marke
 
       <div className="space-y-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-medium">{volumeLabel} — daily volume, last 30 candles</h2>
+          <h2 className="font-display text-base font-medium">{volumeLabel} — daily volume, last 30 candles</h2>
           {peakVolume > 0 ? (
             <span className="font-mono text-xs tabular-nums text-muted-foreground">
               peak {formatTokenAmount(peakVolume, { maximumFractionDigits: 1 })} shares

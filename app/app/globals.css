@@ -4,102 +4,115 @@
 
 @layer base {
   :root {
-    /* Monochrome (user decision 2026-09-02) — replaces Mineral Desk; single accent retired;
-       destructive red is the only color, errors only. */
-    --border-strong: 0.0 0.0% 62.0%;
-    --background: 0.0 0.0% 100.0%;
-    --foreground: 0.0 0.0% 3.9%;
-    --card: 0.0 0.0% 100.0%;
-    --card-foreground: 0.0 0.0% 3.9%;
-    --popover: 0.0 0.0% 100.0%;
-    --popover-foreground: 0.0 0.0% 3.9%;
-    --primary: 0.0 0.0% 9.0%;
-    --primary-foreground: 0.0 0.0% 98.0%;
-    --secondary: 0.0 0.0% 96.1%;
-    --secondary-foreground: 0.0 0.0% 9.0%;
-    --muted: 0.0 0.0% 96.1%;
-    --muted-foreground: 0.0 0.0% 45.1%;
-    --accent: 0.0 0.0% 96.1%;
-    --accent-foreground: 0.0 0.0% 9.0%;
-    --destructive: 0.0 84.2% 60.2%;
-    --destructive-foreground: 0.0 0.0% 98.0%;
-    /* Border/input at 87% (not the stock 89.8%): the redesign uses
-       border-border/40 and /60 dividers, which are nearly invisible on white
-       at 89.8%. 87% keeps card borders crisp and lets the alpha dividers
-       read. Dark values are untouched. */
-    --border: 0.0 0.0% 87.0%;
-    --input: 0.0 0.0% 87.0%;
-    --ring: 0.0 0.0% 9.0%;
-    --status-positive: 0.0 0.0% 35.0%;
-    --status-caution: 0.0 0.0% 45.0%;
-    --status-info: 0.0 0.0% 55.0%;
-    /* Ethereal chart palette per user decision — UI chrome stays monochrome.
-       Soft, desaturated, luminous-on-dark data hues (sage-mint / rose / powder
-       blue / sand / lavender). Benchmarks use --muted-foreground (gray,
-       dashed), never a chart hue. */
-    /* Light variants deepened for on-white contrast: chart-1/chart-2 double as
-       text colors (ChangeValue up/down), so they must clear 4.5:1 —
-       chart-1 was 3.8:1 at L44, chart-2 4.6:1 at L52. Dark values unchanged. */
-    --chart-1: 150.0 30.0% 36.0%;
-    --chart-2: 350.0 34.0% 46.0%;
-    --chart-3: 215.0 34.0% 46.0%;
-    --chart-4: 40.0 30.0% 40.0%;
-    --chart-5: 265.0 28.0% 48.0%;
-    /* Roman experiment (roman-empire) — two imperial accents, used sparingly.
-       --imperial  = Tyrian purple: home eyebrow chip text/border + the
-                     Tokenized-column underline in Traditional-vs-Tokenized.
-       --pompeian  = Pompeian red: bento arrow hover accent ONLY.
-       The dark imperial value keeps the brief's hue/saturation identity but
-       lifts lightness (L30% → L62%) so it clears legible contrast on the
-       near-black canvas; the light value matches the brief as-is. Pompeian
-       reads on both canvases at L45%, so it is mode-invariant. */
-    --imperial: 315.0 50.0% 38.0%;
-    --pompeian: 4.0 55.0% 45.0%;
-    --radius: 0.625rem;
-    --chart-background: 0.0 0.0% 100.0%;
-    --chart-foreground: 0.0 0.0% 3.9%;
-    --chart-grid: 0.0 0.0% 89.8%;
+    /* NEON FOUNDRY light mode — "daylight industrial" (cyberpunk-yellow spec,
+       docs/design-cyberpunk-yellow-v1.md, 2026-09-12). Warm paper canvas with
+       a deepened yellow primary; supersedes the monochrome decision (AGENTS
+       §10, 2026-09-03) on this branch only. Yellow is the one loud color on
+       the chrome; cyan/magenta/green/violet live only inside data. */
+    --border-strong: 240 4% 55%;
+    --background: 60 20% 97%;
+    --foreground: 240 6% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 8%;
+    /* Light primary sits at L42% for yellow FILLS (buttons/badges — always
+       paired with near-black --primary-foreground text, which clears AA
+       comfortably). Yellow as TEXT uses the separate --primary-text token:
+       L42 yellow on paper is 1.59:1 (audit W2-B2), so text usages take the
+       text-grade L24 value below. */
+    --primary: 59 95% 42%;
+    --primary-foreground: 60 9% 6%;
+    /* Text-grade yellow (audit-measured 4.5:1+ on the warm paper). Dark mode
+       reuses the flagship primary as-is (17.5:1). */
+    --primary-text: 59 90% 24%;
+    --secondary: 60 12% 92%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 60 12% 91%;
+    --muted-foreground: 240 4% 38%;
+    /* Pale yellow wash — the only sanctioned yellow background beyond fills
+       (hover/active surfaces). */
+    --accent: 59 80% 88%;
+    --accent-foreground: 60 9% 10%;
+    --destructive: 0 74% 46%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 45 8% 82%;
+    --input: 45 8% 82%;
+    --ring: 59 90% 30%;
+    /* Status hues are text-grade in light mode (each clears 4.5:1 on white). */
+    --status-positive: 152 75% 28%;
+    --status-caution: 38 92% 34%;
+    --status-info: 192 90% 30%;
+    /* Data palette (charts / avatars only — NEVER chrome): yellow · cyan ·
+       magenta · green · violet. Light values are deepened for on-white
+       graphics contrast. Direction deltas do NOT use chart hues (see the
+       2026-09-12 spec amendment): ChangeValue reads --status-positive /
+       --destructive. Benchmarks stay --muted-foreground dashed — never a
+       chart hue. */
+    --chart-1: 59 92% 30%;
+    --chart-2: 192 92% 30%;
+    --chart-3: 325 85% 38%;
+    --chart-4: 152 78% 26%;
+    --chart-5: 262 68% 42%;
+    /* Neon data accents — replace the retired imperial/pompeian pair. Each
+       mirrors a chart series (cyan = chart-2, magenta = chart-3) so small
+       data badges can quote a series without inventing a new hue. */
+    --neon-cyan: 192 92% 30%;
+    --neon-magenta: 325 85% 38%;
+    /* Sharp corners ARE the system. lg/md/sm derive from this in
+       tailwind.config.js → 4px / 2px / 0px at the current value. */
+    --radius: 0.25rem;
+    --chart-background: 60 20% 97%;
+    --chart-foreground: 240 6% 8%;
+    --chart-grid: 60 8% 86%;
     --chart-line-primary: hsl(var(--chart-1));
     --chart-line-secondary: hsl(var(--chart-2));
   }
   .dark {
-    /* Monochrome dark — near-black neutral canvas, white primary (classic shadcn dark). */
-    --border-strong: 0.0 0.0% 28.0%;
-    --background: 0.0 0.0% 3.9%;
-    --foreground: 0.0 0.0% 98.0%;
-    --card: 0.0 0.0% 7.0%;
-    --card-foreground: 0.0 0.0% 98.0%;
-    --popover: 0.0 0.0% 9.0%;
-    --popover-foreground: 0.0 0.0% 98.0%;
-    --primary: 0.0 0.0% 98.0%;
-    --primary-foreground: 0.0 0.0% 9.0%;
-    --secondary: 0.0 0.0% 14.0%;
-    --secondary-foreground: 0.0 0.0% 98.0%;
-    --muted: 0.0 0.0% 14.0%;
-    --muted-foreground: 0.0 0.0% 63.0%;
-    --accent: 0.0 0.0% 16.0%;
-    --accent-foreground: 0.0 0.0% 98.0%;
-    --destructive: 0.0 72.0% 50.0%;
-    --destructive-foreground: 0.0 0.0% 98.0%;
-    --border: 0.0 0.0% 14.9%;
-    --input: 0.0 0.0% 14.9%;
-    --ring: 0.0 0.0% 98.0%;
-    --status-positive: 0.0 0.0% 85.0%;
-    --status-caution: 0.0 0.0% 70.0%;
-    --status-info: 0.0 0.0% 55.0%;
-    /* Ethereal chart palette, dark-adapted — soft, glowing on the warm near-black. */
-    --chart-1: 150.0 30.0% 70.0%;
-    --chart-2: 350.0 35.0% 72.0%;
-    --chart-3: 215.0 35.0% 72.0%;
-    --chart-4: 40.0 30.0% 68.0%;
-    --chart-5: 265.0 30.0% 74.0%;
-    /* Imperial accents, dark-adapted (see light-mode note above). */
-    --imperial: 315.0 45.0% 62.0%;
-    --pompeian: 4.0 55.0% 45.0%;
-    --radius: 0.625rem;
-    --chart-background: 0.0 0.0% 3.9%;
-    --chart-foreground: 0.0 0.0% 98.0%;
-    --chart-grid: 0.0 0.0% 18.0%;
+    /* NEON FOUNDRY dark — the flagship: near-black cool canvas, ONE loud
+       electric yellow (#FCEE0A) for chrome (primary buttons, focus rings,
+       active nav, hero accents). Text on yellow must be near-black, never
+       white; every other hue stays inside data. */
+    --border-strong: 240 4% 26%;
+    --background: 240 6% 4%;
+    --foreground: 60 8% 96%;
+    --card: 240 5% 7%;
+    --card-foreground: 60 8% 96%;
+    --popover: 240 5% 9%;
+    --popover-foreground: 60 8% 96%;
+    --primary: 59 98% 51%;
+    --primary-foreground: 60 9% 6%;
+    /* Dark flagship yellow clears 17.5:1 on the canvas — text-grade IS the
+       fill value here (audit W2-B2). */
+    --primary-text: 59 98% 51%;
+    --secondary: 240 4% 13%;
+    --secondary-foreground: 60 8% 92%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 60 4% 62%;
+    /* Dim yellow wash for hover/active surfaces — never a full yellow fill. */
+    --accent: 59 60% 12%;
+    --accent-foreground: 59 90% 70%;
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 15%;
+    --input: 240 4% 15%;
+    --ring: 59 98% 51%;
+    --status-positive: 152 70% 55%;
+    --status-caution: 45 90% 58%;
+    --status-info: 190 90% 60%;
+    /* Data palette, luminous on the near-black canvas (series order and
+       usage rules as in the light block above). */
+    --chart-1: 59 95% 58%;
+    --chart-2: 187 95% 55%;
+    --chart-3: 325 90% 62%;
+    --chart-4: 152 70% 55%;
+    --chart-5: 262 85% 68%;
+    --neon-cyan: 187 95% 55%;
+    --neon-magenta: 325 90% 62%;
+    --radius: 0.25rem;
+    --chart-background: 240 6% 4%;
+    --chart-foreground: 60 8% 96%;
+    --chart-grid: 240 4% 14%;
     --chart-line-primary: hsl(var(--chart-1));
     --chart-line-secondary: hsl(var(--chart-2));
   }
@@ -109,41 +122,64 @@
   body { @apply bg-background text-foreground; }
 }
 
-/* Roman display typography (roman-empire, refined 2026-09-03 after owner
-   feedback). Cinzel is an inscriptional, Trajan-like face with openly spaced
-   capitals: heavy uniform tracking that reads "classical" on tiny sans caps
-   turns into gaps on Cinzel, so tracked display labels settle at 0.14em and
-   running display text at a near-neutral 0.02em. These utilities are the
-   single source of truth for Cinzel usage — apply ONLY to headings, the
-   wordmark, and all-caps section labels, never body/mono text. */
+/* NEON FOUNDRY typography (cyberpunk-yellow, 2026-09-12). Chakra Petch is the
+   squared techno display spine — wordmark, headings, hero stat numerals; body
+   stays Geist, and ALL uppercase micro-labels plus prices/tickers/numbers stay
+   Geist Mono. Tracking is per role: Chakra Petch is a compact squarish face,
+   so tracked caps settle at 0.06em and running display text at a near-neutral
+   0.01em — the old inscriptional display face's uniform 0.14em tracking gapped
+   badly and is gone. These utilities are the single source of truth for the
+   display face — never apply it to body/mono text. */
 @layer utilities {
   /* Display face for headlines and the wordmark. Line-height is set
-     per-use (hero uses leading-[1.08], which sits well with Cinzel's tall
-     caps); only family + a slight positive tracking live here. */
+     per-use (the hero uses leading-[1.08], which suits Chakra Petch's tall
+     x-height); only family + a slight positive tracking live here. */
   .font-display {
     font-family: var(--font-display);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
   }
-  /* All-caps Cinzel section label (e.g. "CREATE · MINT · REDEEM"). Replaces
-     first-pass inline tracking-[0.18em]/[0.22em], which gapped badly. Size
-     and color stay per-use, so it serves both the small muted eyebrow and the
-     large foreground inscription line (see <SectionHeader>). */
+  /* All-caps display heading (section/inscription lines, e.g. "CREATE ·
+     MINT · REDEEM"). Weight 600 — Chakra Petch caps read thin at 500 on the
+     near-black canvas. Size and color stay per-use, so it serves both the
+     small muted eyebrow and the large foreground line (see <SectionHeader>). */
   .text-display {
     font-family: var(--font-display);
-    font-weight: 500;
-    letter-spacing: 0.14em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
   }
-  /* Standalone section eyebrow — Cinzel tracked caps pinned to xs/muted.
-     Use directly for labels outside a <SectionHeader> (nav cell labels,
-     quiet chips); <SectionHeader>'s "eyebrow" size composes .text-display
-     instead so size/color remain prop-driven. */
+  /* Terminal eyebrow — mono uppercase micro-label pinned to 0.7rem/muted
+     (quiet chips, data captions, tiny nav labels). House rule: uppercase +
+     tracked labels ALWAYS use mono. Size/color remain overridable per-use. */
   .section-label {
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-weight: 500;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     line-height: 1rem;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
     color: hsl(var(--muted-foreground));
+  }
+  /* Signature glow pair — sparingly: hero, primary CTA, featured card ONLY.
+     If everything glows, nothing does. */
+  .glow-primary {
+    box-shadow: 0 0 24px hsl(var(--primary) / 0.18);
+  }
+  .text-glow {
+    text-shadow: 0 0 14px hsl(var(--primary) / 0.45);
+  }
+  /* Faint 24px engineering grid for hero / empty-canvas backdrops. Sets
+     background-image only, so it layers under content without touching
+     bg-color. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.35) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  /* 1px yellow top-edge accent (inset, so it never shifts layout). Heroes /
+     featured cards only. */
+  .hairline-primary {
+    box-shadow: inset 0 1px 0 hsl(var(--primary) / 0.5);
   }
 }
 

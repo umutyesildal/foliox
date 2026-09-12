@@ -4,10 +4,11 @@ export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
 /**
- * Apple touch icon (roman-empire, owner feedback 2026-09-03): Next ignores
- * apple-icon.svg (raster-only convention), so this renders the plain laurel
- * wreath via ImageResponse instead — no F monogram. Full-bleed square, iOS
- * applies its own corner mask. Same stroke geometry as LogoMark in
+ * Apple touch icon (NEON FOUNDRY, 2026-09-12): Next ignores apple-icon.svg
+ * (raster-only convention), so this renders the plain laurel wreath via
+ * ImageResponse instead — no F monogram. Full-bleed square, iOS applies its
+ * own corner mask. Near-black cool canvas with the wreath recolored to the
+ * electric-yellow accent. Same stroke geometry as LogoMark in
  * components/shell/site-header.tsx, drawn a touch heavier so the wreath
  * survives the rasterizer.
  */
@@ -21,7 +22,7 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#0a0a0a",
+          backgroundColor: "#0A0A0B",
         }}
       >
         <svg
@@ -29,7 +30,7 @@ export default function AppleIcon() {
           height="128"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#fafafa"
+          stroke="#FCEE0A"
           strokeLinecap="round"
         >
           {/* wreath: two mirrored branches + binding arc, open at the top */}

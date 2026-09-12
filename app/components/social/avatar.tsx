@@ -91,20 +91,35 @@ export function ActorLine({
         displayName={displayName}
         avatarUrl={avatarUrl}
       />
-      <span className="truncate text-sm font-medium text-foreground" title={wallet}>
+      <span
+        className="truncate font-mono text-xs uppercase tracking-widest text-foreground"
+        title={wallet}
+      >
         {label}
       </span>
     </span>
   );
 }
 
-/** Deterministic hue pair from the wallet bytes (stable across renders). */
+/** Deterministic hue pair from the wallet bytes (stable across renders).
+ *  Hues are drawn from the data palette only — cyan / magenta / green / violet
+ *  (`--chart-2..5` families). Yellow (`--chart-1`) is reserved for primary
+ *  actions and never appears on avatars. */
+const IDENTICON_HUE_FAMILIES = [
+  { base: 187, spread: 16 }, // neon cyan
+  { base: 325, spread: 14 }, // neon magenta
+  { base: 152, spread: 16 }, // neon green
+  { base: 262, spread: 18 }, // neon violet
+] as const;
+
 function identiconPalette(wallet: string): { a: string; b: string } {
   let hash = 0;
   for (let i = 0; i < wallet.length; i += 1) {
     hash = (hash * 31 + wallet.charCodeAt(i)) >>> 0;
   }
-  const hueA = hash % 360;
-  const hueB = (hueA + 40 + (hash % 80)) % 360;
-  return { a: `${hueA} 24% 46%`, b: `${hueB} 28% 30%` };
+  const family = IDENTICON_HUE_FAMILIES[hash % IDENTICON_HUE_FAMILIES.length];
+  const jitter = (((hash >>> 2) % (family.spread * 2 + 1)) - family.spread) | 0;
+  const hueA = (family.base + jitter + 360) % 360;
+  const hueB = (hueA + 12 + ((hash >>> 8) % 16)) % 360;
+  return { a: `${hueA} 80% 42%`, b: `${hueB} 72% 30%` };
 }

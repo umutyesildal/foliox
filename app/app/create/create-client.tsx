@@ -392,7 +392,7 @@ export default function CreateClient() {
     <div className="mx-auto w-full max-w-6xl pb-16">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Create a strategy basket</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Create a strategy basket</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Six steps, each gated. The deployed basket is immutable.
           </p>
@@ -449,7 +449,7 @@ export default function CreateClient() {
           />
 
           <section className="mt-5 rounded-lg border border-border bg-card p-5" aria-label={`Step ${step + 1}: ${STEPS[step]}`}>
-            <h2 className="mb-4 text-lg font-medium">
+            <h2 className="font-display mb-4 text-lg font-medium">
               {step + 1}. {STEPS[step]}
             </h2>
 

@@ -275,7 +275,7 @@ export default function BasketDetailPage({
           {/* identity + action rail */}
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-1.5">
-              <h1 className="text-3xl font-semibold tracking-tight" title={detail.pubkey}>
+              <h1 className="font-display text-3xl font-semibold tracking-tight" title={detail.pubkey}>
                 {headline}
               </h1>
               {name && composition ? (
@@ -292,11 +292,13 @@ export default function BasketDetailPage({
               <Button render={<Link href={`/basket/${pubkey}/redeem`} />} variant="outline">
                 Redeem shares
               </Button>
-              <Button variant="ghost" onClick={() => setThesisOpen(true)}>
+              <Button variant="outline" onClick={() => setThesisOpen(true)}>
                 Write thesis
               </Button>
+              {/* Clone stays outline: "Buy shares" owns the one yellow CTA
+                  slot on this surface (NEON FOUNDRY review, 2026-09-12). */}
               <Button
-                variant="ghost"
+                variant="outline"
                 onClick={() => router.push(`/create?clone=${encodeURIComponent(pubkey)}`)}
                 title="Start the create wizard pre-filled with this basket's constituents, weights and fees"
               >
@@ -325,7 +327,7 @@ export default function BasketDetailPage({
             <Card className="h-full">
               <CardHeader className="pb-2">
                 <CardDescription>Share price</CardDescription>
-                <CardTitle className="font-mono text-2xl tabular-nums">
+                <CardTitle className="font-mono text-2xl tabular-nums text-glow">
                   {sharePrice !== null ? formatUsd(sharePrice) : "—"}
                 </CardTitle>
               </CardHeader>
@@ -377,9 +379,7 @@ export default function BasketDetailPage({
           <section aria-label="NAV history" className="pb-10 pt-2">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
-                  NAV history
-                </h2>
+                <h2 className="section-label">NAV history</h2>
                 <FreshnessBadge source={navSource ?? "onchain-indexed"} asOf={asOf ?? undefined} />
               </div>
               <RangeLinks
@@ -388,7 +388,7 @@ export default function BasketDetailPage({
                 onChange={setRange}
               />
             </div>
-            <div className="rounded-xl bg-card shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+            <div className="hairline-primary rounded-lg bg-card ring-1 ring-border">
               <div className="p-5">
                 {navRows === null ? (
                   <ChartBlockSkeleton label="Loading NAV history" />
@@ -408,9 +408,7 @@ export default function BasketDetailPage({
           {/* holdings — compact mono table */}
           <section aria-label="Holdings" className="py-10">
             <div className="flex flex-wrap items-baseline justify-between gap-2 pb-4">
-              <h2 className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
-                Holdings
-              </h2>
+              <h2 className="section-label">Holdings</h2>
               <p className="font-mono text-[11px] text-muted-foreground">
                 target vs actual · no auto-rebalance in V0
               </p>
@@ -420,19 +418,19 @@ export default function BasketDetailPage({
                 <Table>
                   <TableHeader>
                     <TableRow className="h-11 hover:bg-transparent">
-                      <TableHead className="pl-5 font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="pl-5 font-mono text-[10px] font-normal uppercase tracking-[0.22em] text-muted-foreground">
                         Asset
                       </TableHead>
-                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-[0.22em] text-muted-foreground">
                         Target
                       </TableHead>
-                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-[0.22em] text-muted-foreground">
                         Actual
                       </TableHead>
-                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="text-right font-mono text-[10px] font-normal uppercase tracking-[0.22em] text-muted-foreground">
                         Raw
                       </TableHead>
-                      <TableHead className="pr-5 text-right font-mono text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="pr-5 text-right font-mono text-[10px] font-normal uppercase tracking-[0.22em] text-muted-foreground">
                         Scaled
                       </TableHead>
                     </TableRow>
@@ -481,7 +479,7 @@ export default function BasketDetailPage({
                     })}
                     {scaledTotal !== null ? (
                       <TableRow className="h-11 border-t border-border hover:bg-transparent">
-                        <TableCell className="py-0 pl-5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <TableCell className="py-0 pl-5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                           Total scaled
                         </TableCell>
                         <TableCell colSpan={3} />
@@ -498,9 +496,7 @@ export default function BasketDetailPage({
 
           {/* fees + parameters — one visually quiet card */}
           <section aria-label="Fees and parameters" className="pt-10">
-            <h2 className="pb-4 font-mono text-xs uppercase tracking-wide text-muted-foreground">
-              Fees &amp; parameters
-            </h2>
+            <h2 className="section-label pb-4">Fees &amp; parameters</h2>
             <Card>
               <CardContent className="flex flex-col gap-2.5 p-5 first:pt-5">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-sm tabular-nums">
@@ -561,7 +557,7 @@ function DetailSkeleton() {
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-4 w-36" />
           </div>
-          <div className="rounded-xl bg-card p-5 shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+          <div className="hairline-primary rounded-lg bg-card p-5 ring-1 ring-border">
             <ChartBlockSkeleton label="Loading NAV history" />
           </div>
         </section>

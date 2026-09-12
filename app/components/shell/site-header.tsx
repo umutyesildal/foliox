@@ -22,9 +22,13 @@ function NavLink({ href, label }: { href: string; label: string }) {
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "rounded-md px-2.5 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        // Terminal nav cell: mono uppercase micro-label (house rule —
+        // uppercase + tracked labels use mono). The active route reads
+        // YELLOW: yellow text on the dim accent wash pill, never a full
+        // yellow fill (yellow is for CTAs, not for nav chrome at large).
+        "rounded-md px-2.5 py-1 font-mono text-xs uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active
-          ? "bg-muted text-foreground"
+          ? "bg-accent text-primary-text"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
@@ -68,7 +72,7 @@ function LogoMark({ size = 21 }: { size?: number }) {
 
 /**
  * Site header: FolioX wordmark (plain laurel wreath mark + display-face text —
- * roman-empire experiment; the suffix stays Geist), primary nav
+ * Chakra Petch under NEON FOUNDRY; the suffix stays Geist), primary nav
  * (Stocks/ETFs/Baskets), contextual actions (Create/Portfolio), network
  * indicator, wallet button, and a no-dependency mobile disclosure nav.
  */
@@ -173,7 +177,9 @@ export function SiteHeader() {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     mobileLinkClasses,
-                    active && "bg-muted text-foreground",
+                    // Active route reads yellow (accent wash + primary text),
+                    // matching the desktop nav's active pill.
+                    active && "bg-accent text-primary-text",
                   )}
                 >
                   {item.label}

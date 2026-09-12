@@ -405,9 +405,9 @@ export function DeployPanel({
         <div
           role="status"
           data-testid="deploy-success-card"
-          className="rounded-md border border-border bg-muted/30 p-5"
+          className="hairline-primary rounded-md border border-border bg-muted/30 p-5"
         >
-          <p className="text-base font-semibold">🎉 Basket created!</p>
+          <p className="text-base font-semibold text-primary-text">🎉 Basket created!</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {GENESIS_SHARES.toLocaleString()} genesis shares are in your wallet — you&apos;re
             the creator and earn 90% of fees.
@@ -549,7 +549,7 @@ export function DeployPanel({
             aria-modal="true"
             aria-labelledby="deploy-review-title"
             tabIndex={-1}
-            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-card p-5 outline-none"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -559,7 +559,7 @@ export function DeployPanel({
                 {phase === "preparing-alt" && setupProgress ? (
                   <span
                     data-testid="setup-badge"
-                    className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground"
+                    className="rounded-sm border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground"
                   >
                     Setup {setupProgress.step}/{setupProgress.total}
                   </span>
@@ -615,7 +615,7 @@ export function DeployPanel({
                   })}
                 </ul>
               ) : (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-primary-text">
                   ✓ All creator token balances cover the seed amounts.
                 </p>
               )}
@@ -740,7 +740,7 @@ export function DeployPanel({
 
                 <div>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium uppercase tracking-wide">Metadata (hashed, not uploaded)</p>
+                    <p className="font-mono font-medium uppercase tracking-[0.22em]">Metadata (hashed, not uploaded)</p>
                     <button
                       type="button"
                       onClick={() => navigator.clipboard?.writeText(metadataJson).catch(() => {})}
@@ -762,7 +762,7 @@ export function DeployPanel({
                 </div>
 
                 <div>
-                  <p className="font-medium uppercase tracking-wide">
+                  <p className="font-mono font-medium uppercase tracking-[0.22em]">
                     Accounts ({accountList.length}) — order exactly as serialized
                   </p>
                   <ol className="mt-1 flex flex-col gap-1">
@@ -794,7 +794,7 @@ export function DeployPanel({
 
                 {simulationLogs.length > 0 && (
                   <div>
-                    <p className="font-medium uppercase tracking-wide">Last simulation log</p>
+                    <p className="font-mono font-medium uppercase tracking-[0.22em]">Last simulation log</p>
                     <pre className="mt-1 max-h-32 overflow-auto rounded-md border border-border/60 bg-background p-2 font-mono text-[11px] leading-4">
                       {simulationLogs.slice(-8).join("\n")}
                     </pre>

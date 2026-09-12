@@ -29,7 +29,9 @@ function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
   return (
     <ProgressPrimitive.Track
       className={cn(
-        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
+        // Sharp bar — the old rounded-full fought the sharp-corner system and
+        // is invisible at h-1 anyway. Indicator fills in primary (yellow).
+        "relative flex h-1 w-full items-center overflow-x-hidden bg-muted",
         className
       )}
       data-slot="progress-track"

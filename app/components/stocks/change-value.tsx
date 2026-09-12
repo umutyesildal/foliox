@@ -3,13 +3,14 @@ import { cn } from "@/lib/utils";
 /**
  * 24h change value with direction coloring.
  *
- * Color decision (per user decision, 2026-09-02): direction values on data
- * cards use the chart data tokens — chart-1 (green) for up, chart-2 (red) for
- * down. All other UI chrome stays monochrome. Keep the classes here (single
- * source of truth); never scatter inline direction styles.
+ * Color decision (NEON FOUNDRY, 2026-09-12): direction is SEMANTIC —
+ * status-positive (neon green) for up, destructive (red) for down. Under the
+ * cyberpunk palette chart-1/chart-2 became yellow/cyan data hues, so they can
+ * no longer encode direction. Keep the classes here (single source of truth);
+ * never scatter inline direction styles.
  */
-export const CHANGE_UP_CLASS = "text-[hsl(var(--chart-1))]";
-export const CHANGE_DOWN_CLASS = "text-[hsl(var(--chart-2))]";
+export const CHANGE_UP_CLASS = "text-[hsl(var(--status-positive))]";
+export const CHANGE_DOWN_CLASS = "text-[hsl(var(--destructive))]";
 
 export function changeColorClass(changePct: number | null): string {
   if (changePct === null) return "text-muted-foreground";

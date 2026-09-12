@@ -12,7 +12,7 @@ export default function StocksPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-1.5">
-        <h1 className="text-3xl font-semibold tracking-tight">Stocks</h1>
+        <h1 className="font-display text-3xl font-semibold">Stocks</h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           The mock xStock dev catalog — the building blocks for custom baskets.
         </p>

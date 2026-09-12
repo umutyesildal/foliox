@@ -216,7 +216,7 @@ export default function BuyPage({ params }: { params: Promise<{ pubkey: string }
           {/* compact identity header — name + composition, detail via the breadcrumb */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 space-y-1.5">
-              <h1 className="text-3xl font-semibold tracking-tight" title={detail.pubkey}>
+              <h1 className="font-display text-3xl font-semibold tracking-tight" title={detail.pubkey}>
                 {headline}
               </h1>
               {name && composition ? (
@@ -342,7 +342,7 @@ function TabButton({
         disabled
           ? "cursor-not-allowed border-transparent text-muted-foreground/50"
           : active
-            ? "border-foreground font-medium text-foreground"
+            ? "border-primary font-medium text-primary-text"
             : "border-transparent text-muted-foreground hover:text-foreground"
       }`}
     >

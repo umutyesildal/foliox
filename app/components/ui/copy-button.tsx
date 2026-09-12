@@ -46,7 +46,7 @@ export function CopyButton({
       title={label}
       aria-label={`${label}: ${value}`}
       className={cn(
-        "inline-flex h-5 items-center gap-1 rounded-[4px] border border-border bg-background px-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "inline-flex h-5 items-center gap-1 rounded-lg border border-border bg-background px-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         className,
       )}
     >

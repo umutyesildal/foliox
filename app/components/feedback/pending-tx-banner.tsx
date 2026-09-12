@@ -74,7 +74,7 @@ function PendingTxCard({ entry }: { entry: PendingTxEntry }) {
     <div
       role="status"
       data-testid="pending-tx-banner"
-      className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-lg"
+      className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-lg border border-border bg-card p-3"
     >
       {entry.status === "pending" ? (
         <span

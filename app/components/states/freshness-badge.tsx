@@ -32,7 +32,7 @@ export function FreshnessBadge({
       {demo && (
         <span
           title="Fixture data, not live"
-          className="rounded-full border border-border px-1.5 py-px font-sans text-[11px] uppercase tracking-wide"
+          className="rounded-sm border border-border px-1.5 py-px font-mono text-[11px] uppercase tracking-wide"
         >
           demo
         </span>

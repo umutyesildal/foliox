@@ -10,10 +10,10 @@ export interface CreateStep {
 /**
  * Six-step wizard stepper: a slim horizontal track of roman-numeral circles
  * (I-VI, mono — roman-empire experiment) joined by thin line segments that
- * fill as steps are reached. Current = filled (foreground) circle with a
- * medium-weight label; done = outlined circle (clickable to jump back, never
- * past validation); upcoming = muted. Labels hide below sm so mobile shows
- * the number track only.
+ * fill as steps are reached. Current = filled (primary/yellow) circle with a
+ * medium-weight label; done = primary-outlined circle (clickable to jump back,
+ * never past validation); upcoming = muted. Labels hide below sm so mobile
+ * shows the number track only.
  */
 
 /** Roman numerals for the step circles (indexes 0-5 → I-VI). */
@@ -44,9 +44,9 @@ export function Stepper({
               className={cn(
                 "hidden min-w-0 truncate text-xs sm:block",
                 isCurrent
-                  ? "font-medium text-foreground"
+                  ? "font-medium text-primary-text"
                   : isDone
-                    ? "text-muted-foreground group-hover/step:text-foreground"
+                    ? "text-muted-foreground group-hover/step:text-primary-text"
                     : "text-muted-foreground/60",
               )}
             >
@@ -60,7 +60,7 @@ export function Stepper({
                   aria-hidden="true"
                   className={cn(
                     "h-px w-3 shrink-0 transition-colors sm:w-5",
-                    index <= current ? "bg-foreground/40" : "bg-border",
+                    index <= current ? "bg-primary/50" : "bg-border",
                   )}
                 />
               )}
@@ -103,8 +103,8 @@ function StepNumber({
       aria-hidden="true"
       className={cn(
         "flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] tabular-nums transition-colors",
-        state === "current" && "bg-foreground text-background",
-        state === "done" && "border border-border text-muted-foreground",
+        state === "current" && "bg-primary text-primary-foreground",
+        state === "done" && "border border-primary/60 text-primary-text",
         state === "upcoming" && "border border-border/60 text-muted-foreground/60",
       )}
     >

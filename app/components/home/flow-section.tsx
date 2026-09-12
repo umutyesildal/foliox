@@ -6,7 +6,7 @@ import { SectionHeader } from "@/components/ui/section-header";
  * Flow section — replaces the old bento gateway. One idea: every basket
  * follows the same three steps, shown as three bare inscription columns —
  * no card chrome (owner feedback 2026-09-03: kill the boxes), just a
- * hand-drawn Roman motif, a small quiet Cinzel numeral, and two lines of
+ * line-drawn motif, a small quiet mono numeral, and two lines of
  * copy. Columns are separated by hairline verticals on desktop only. The
  * motif brightens muted→foreground on hover (≤200ms, reduced-motion
  * honored); the numeral stays still. No color — line art only, all
@@ -126,7 +126,7 @@ export function FlowSection() {
       className="border-t border-border py-16 dark:border-border/60"
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
-        {/* Section header — tracked Cinzel eyebrow + the one line. */}
+        {/* Section header — tracked mono eyebrow + the one line. */}
         <SectionHeader
           id="flow-heading"
           label="CREATE · MINT · REDEEM"
@@ -148,7 +148,7 @@ export function FlowSection() {
                 {/* Numeral — a whisper, not a headline. */}
                 <span
                   aria-hidden="true"
-                  className="mt-4 block font-[family-name:var(--font-display)] text-sm font-medium leading-none tracking-[0.18em] text-muted-foreground/70"
+                  className="mt-4 block font-mono text-sm font-medium leading-none tracking-[0.22em] text-muted-foreground/70"
                 >
                   {step.numeral}
                 </span>

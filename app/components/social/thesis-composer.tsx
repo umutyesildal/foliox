@@ -105,11 +105,11 @@ export function ThesisComposerModal({
           aria-modal="true"
           aria-label="Write a thesis"
           tabIndex={-1}
-          className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg outline-none"
+          className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-5 outline-none"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold">Write a thesis</h2>
+              <h2 className="font-display text-base font-semibold">Write a thesis</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 Published to the public feed under your handle.
               </p>
@@ -120,7 +120,7 @@ export function ThesisComposerModal({
           </div>
 
           {needsProfile ? (
-            <div className="mt-4 rounded-md border border-border bg-muted/30 p-4">
+            <div className="mt-4 rounded-sm border border-border bg-muted/30 p-4">
               <p className="text-sm font-medium">Claim a handle first</p>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
                 Theses are signed with a public handle. Your draft stays in this window — claim a
@@ -149,7 +149,7 @@ export function ThesisComposerModal({
               }}
             >
               {basket ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
+                <div className="flex flex-wrap items-center gap-2 rounded-sm border border-border bg-muted/30 px-2.5 py-1.5">
                   <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                     Basket
                   </span>
@@ -163,7 +163,7 @@ export function ThesisComposerModal({
               ) : null}
 
               <label className="block">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Title
                 </span>
                 <input
@@ -171,12 +171,12 @@ export function ThesisComposerModal({
                   onChange={(event) => setTitle(event.target.value)}
                   maxLength={TITLE_MAX}
                   placeholder="Why this basket, in one line"
-                  className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="mt-1.5 h-9 w-full rounded-sm border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Thesis
                 </span>
                 <textarea
@@ -185,7 +185,7 @@ export function ThesisComposerModal({
                   maxLength={BODY_MAX}
                   rows={6}
                   placeholder="The assets, the weights, and the reasoning — not advice."
-                  className="mt-1.5 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="mt-1.5 w-full resize-y rounded-sm border border-border bg-background px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
                 <span className="mt-1 block text-right font-mono text-[10px] tabular-nums text-muted-foreground">
                   {body.length}/{BODY_MAX}

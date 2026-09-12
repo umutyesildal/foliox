@@ -1,11 +1,11 @@
 /**
  * Ledger section — replaces the old TraditionalVsTokenized card. No card, no
- * cell borders: a marble-inscription layout. A center spine of dimensions in
- * Cinzel small caps (Cinzel's lowercase are small capitals — the inscription
- * face itself), the traditional rail muted on the left, the tokenized rail in
- * full foreground on the right, each tokenized phrase opened by a 6px
- * imperial tick. The only purple on the page: the hero chip, these ticks, and
- * the Tokenized header's 2px imperial underline.
+ * cell borders: an inscription layout. A center spine of dimension labels in
+ * the shared mono section-label style, the traditional rail muted on the
+ * left, the tokenized rail in full foreground on the right, each tokenized
+ * phrase opened by a 6px yellow tick. The only saturated color on the page:
+ * the hero chip, these ticks, and the Tokenized header's 2px primary
+ * underline.
  */
 
 import { SectionHeader } from "@/components/ui/section-header";
@@ -44,9 +44,9 @@ const GRID =
   "grid grid-cols-[1fr_3rem_1fr] items-center gap-x-2 sm:grid-cols-[1fr_7rem_1fr] sm:gap-x-4";
 
 /** One inscription row (local to this section — the spine layout is ledger-
- *  specific): the traditional rail muted and right-aligned, the Cinzel
- *  dimension on the center spine, and the tokenized rail in full foreground
- *  opened by a 6px imperial tick. */
+ *  specific): the traditional rail muted and right-aligned, the mono
+ *  dimension label on the center spine, and the tokenized rail in full
+ *  foreground opened by a 6px primary tick. */
 function SpineRow({
   dimension,
   traditional,
@@ -61,13 +61,13 @@ function SpineRow({
       <span className="text-right text-xs leading-5 text-muted-foreground/60">
         {traditional}
       </span>
-      <span className="text-center font-[family-name:var(--font-display)] text-xs font-medium tracking-[0.08em] text-muted-foreground">
+      <span className="section-label text-center">
         {dimension}
       </span>
       <span className="flex items-center gap-2.5 text-left text-xs leading-5 text-foreground">
         <span
           aria-hidden="true"
-          className="h-4 w-1.5 shrink-0 bg-[hsl(var(--imperial))]"
+          className="h-4 w-1.5 shrink-0 bg-primary"
         />
         {tokenized}
       </span>
@@ -89,14 +89,14 @@ export function LedgerSection() {
           lead="What changes is how you hold it."
         />
 
-        {/* Column headers — the Tokenized side carries the 2px imperial
+        {/* Column headers — the Tokenized side carries the 2px primary
             underline, inherited from the component this replaces. */}
         <div className={`${GRID} mt-10`}>
           <span className="border-b-2 border-transparent pb-1.5 text-right font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
             Traditional
           </span>
           <span aria-hidden="true" />
-          <span className="self-start border-b-2 border-[hsl(var(--imperial)/0.7)] pb-1.5 text-left font-mono text-[11px] uppercase tracking-wide text-foreground">
+          <span className="self-start border-b-2 border-primary/70 pb-1.5 text-left font-mono text-[11px] uppercase tracking-wide text-foreground">
             Tokenized
           </span>
         </div>

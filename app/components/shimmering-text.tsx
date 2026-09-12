@@ -66,6 +66,10 @@ export function ShimmeringText({
     <motion.span
       className={cn(
         "inline-flex select-none items-center leading-none",
+        // NEON FOUNDRY: shimmer defaults are tokens (muted → foreground), no
+        // hardcoded colors. Hero/CTA consumers opt into the yellow shimmer by
+        // passing e.g. [--shimmering-color:var(--primary)] via className —
+        // keep yellow out of quiet loading labels.
         "[--color:var(--muted-foreground)] [--shimmering-color:var(--foreground)]",
         className
       )}

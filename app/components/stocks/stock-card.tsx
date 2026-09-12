@@ -28,10 +28,10 @@ export function StockCard({
   return (
     <Link
       href={`/stock/${encodeURIComponent(ticker)}`}
-      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-semibold tracking-tight text-foreground">{ticker}</span>
+        <span className="font-mono text-sm font-semibold text-foreground">{ticker}</span>
         <ChangeValue changePct={changePct} />
       </div>
       <span className="mt-0.5 text-xs text-muted-foreground">{provider}</span>

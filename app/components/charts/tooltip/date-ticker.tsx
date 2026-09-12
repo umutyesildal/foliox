@@ -20,9 +20,11 @@ const DateTickerCompact = memo(function DateTickerCompact({
   const label = labels[currentIndex] ?? labels[0] ?? "";
 
   return (
-    <div className="overflow-hidden rounded-full bg-zinc-900 px-4 py-1 text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
+    <div className="overflow-hidden rounded-sm bg-foreground px-4 py-1 text-background">
       <div className="flex h-6 items-center justify-center">
-        <span className="whitespace-nowrap font-medium text-sm">{label}</span>
+        <span className="whitespace-nowrap font-mono font-medium text-sm tabular-nums">
+          {label}
+        </span>
       </div>
     </div>
   );
@@ -93,7 +95,7 @@ const DateTickerInner = memo(function DateTickerInner({
   }
 
   return (
-    <div className="overflow-hidden rounded-full bg-zinc-900 px-4 py-1 text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
+    <div className="overflow-hidden rounded-sm bg-foreground px-4 py-1 text-background">
       <div className="relative h-6 overflow-hidden">
         <div className="flex items-center justify-center gap-1">
           {/* Month stack */}
@@ -104,7 +106,7 @@ const DateTickerInner = memo(function DateTickerInner({
                   className="flex h-6 shrink-0 items-center justify-center"
                   key={segment.key}
                 >
-                  <span className="whitespace-nowrap font-medium text-sm">
+                  <span className="whitespace-nowrap font-mono font-medium text-sm tabular-nums">
                     {segment.month}
                   </span>
                 </div>
@@ -120,7 +122,7 @@ const DateTickerInner = memo(function DateTickerInner({
                   className="flex h-6 shrink-0 items-center justify-center"
                   key={label.key}
                 >
-                  <span className="whitespace-nowrap font-medium text-sm">
+                  <span className="whitespace-nowrap font-mono font-medium text-sm tabular-nums">
                     {label.day}
                   </span>
                 </div>

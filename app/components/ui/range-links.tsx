@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 /**
  * RangeLinks — the one text range switcher rendered above charts (market
  * overview, stock detail, basket NAV history). Minimal type-driven style:
- * active = medium foreground with an underline (the underline keeps the
- * active state visible in light mode, where the gray→black step alone is
- * subtle); inactive = muted, foreground on hover.
+ * active = medium yellow (text-primary-text) with a yellow underline — the active
+ * state is the one chrome element allowed to read yellow here, matching the
+ * NEON FOUNDRY active-nav rule; inactive = muted, foreground on hover.
  *
  * Two modes — pass exactly one:
  *   hrefFor   link mode for server pages (the URL is the state) → <Link>s.
@@ -61,7 +61,7 @@ export function RangeLinks<T extends string>({
         const active = option.value === value;
         const cls = `text-xs transition-colors ${
           active
-            ? "font-medium text-foreground underline decoration-foreground/50 underline-offset-4"
+            ? "font-medium text-primary-text underline decoration-primary-text/60 underline-offset-4"
             : "text-muted-foreground hover:text-foreground"
         }`;
         return hrefFor ? (

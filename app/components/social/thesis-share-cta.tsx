@@ -29,7 +29,9 @@ export function ThesisShareCta({
         Made the trade? Tell the feed why.
       </p>
       <div className="flex items-center gap-1.5">
-        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        {/* Default (yellow) on purpose: this is the single CTA of the
+            post-trade success moment (NEON FOUNDRY review, 2026-09-12). */}
+        <Button size="sm" onClick={() => setOpen(true)}>
           Share your thesis
         </Button>
         <Button

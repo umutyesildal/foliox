@@ -238,7 +238,7 @@ export default async function MarketPage({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Index comparison — {range} (normalized 100)</CardTitle>
+          <CardTitle className="font-display text-base font-medium">Index comparison — {range} (normalized 100)</CardTitle>
         </CardHeader>
         <CardContent>
           <MarketChart rows={rows} series={series} volume={volume} volumeLabel={volumeLabel} />

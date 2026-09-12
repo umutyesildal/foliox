@@ -120,7 +120,7 @@ export default function FeedClient() {
     <div className="mx-auto w-full max-w-4xl">
       <header className="flex flex-wrap items-baseline justify-between gap-3 pb-6">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Feed</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Feed</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Trades and theses from public FolioX baskets — self-reported, not advice.
           </p>
@@ -267,7 +267,7 @@ function TradeCard({ item }: { item: Extract<FeedItem, { kind: "trade" }> }) {
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <Link
             href={`/creator/${item.wallet}`}
-            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <ActorLine
               wallet={item.wallet}
@@ -277,10 +277,10 @@ function TradeCard({ item }: { item: Extract<FeedItem, { kind: "trade" }> }) {
             />
           </Link>
           <span
-            className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
+            className={`shrink-0 rounded-sm border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
               minted
-                ? "border-[hsl(var(--chart-1)/40)] bg-[hsl(var(--chart-1)/10)] text-[hsl(var(--chart-1))]"
-                : "border-[hsl(var(--chart-2)/40)] bg-[hsl(var(--chart-2)/10)] text-[hsl(var(--chart-2))]"
+                ? "border-[hsl(var(--status-positive)/40)] bg-[hsl(var(--status-positive)/10)] text-[hsl(var(--status-positive))]"
+                : "border-[hsl(var(--destructive)/40)] bg-[hsl(var(--destructive)/10)] text-[hsl(var(--destructive))]"
             }`}
           >
             {item.type}
@@ -383,7 +383,7 @@ function ThesisCard({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <Link
           href={`/creator/${item.wallet}`}
-          className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <ActorLine
             wallet={item.wallet}
@@ -439,10 +439,10 @@ function ThesisCard({
         {item.basket ? (
           <Link
             href={`/basket/${item.basket}`}
-            className="inline-flex items-center gap-1.5 rounded border border-border bg-muted/40 px-2 py-0.5 font-mono text-[11px] text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="inline-flex items-center gap-1.5 rounded-sm bg-accent px-2 py-0.5 font-mono text-[11px] text-accent-foreground transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             title={item.basket}
           >
-            <span aria-hidden="true" className="text-muted-foreground">
+            <span aria-hidden="true" className="text-accent-foreground/70">
               basket
             </span>
             {item.basketName ?? truncateAddress(item.basket, 4, 4)}
@@ -453,8 +453,8 @@ function ThesisCard({
           onClick={() => void onLike()}
           disabled={liking}
           aria-pressed={liked}
-          className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
-            liked ? "text-[hsl(var(--chart-1))]" : "text-muted-foreground hover:text-foreground"
+          className={`inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 font-mono text-xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+            liked ? "text-primary-text" : "text-muted-foreground hover:text-foreground"
           }`}
           title={social.isAuthed ? undefined : "Sign-in with your wallet is requested on like"}
         >
@@ -468,7 +468,7 @@ function ThesisCard({
       </div>
 
       {expanded && full ? (
-        <div className="mt-3 space-y-3 rounded-lg border border-border bg-card p-4">
+        <div className="mt-3 space-y-3 rounded-sm border border-border bg-card p-4">
           {comments === null ? (
             <p role="status" className="text-xs text-muted-foreground">
               Loading comments…

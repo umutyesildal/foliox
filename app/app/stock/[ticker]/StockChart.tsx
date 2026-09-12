@@ -34,10 +34,10 @@ function normalize(candles: Candle[] | undefined): { ts: number; v: number }[] {
 }
 
 /**
- * Chart data colors per user decision — ethereal palette tokens (soft,
- * desaturated); UI chrome stays monochrome. chart-1 = xStock token
- * (simulated in V0), chart-2 = real equity, Nasdaq benchmark = muted gray
- * (dashed). Legend order matches the Area render order below.
+ * Chart data colors per the NEON FOUNDRY spec — data palette tokens only
+ * (chart-1 yellow = xStock token simulated in V0, chart-2 cyan = real
+ * equity), Nasdaq benchmark = muted gray (dashed, never a chart hue).
+ * Legend order matches the Area render order below.
  */
 const SERIES = [
   { key: "xStock", label: "xStock (simulated)", color: "hsl(var(--chart-1))" },

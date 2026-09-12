@@ -557,9 +557,16 @@ export function ZapInForm({
           endpoint={RPC_ENDPOINT}
           pendingTxId={flow.state.pendingTxId}
           successLine={
-            quote && /^\d+$/.test(quote.expectedShares?.trim() ?? "")
-              ? `🎉 Done — +${grouped(formatRawShares6(BigInt(quote.expectedShares!.trim())))} shares`
-              : "🎉 Done"
+            quote && /^\d+$/.test(quote.expectedShares?.trim() ?? "") ? (
+              <>
+                🎉 Done —{" "}
+                <span className="text-[hsl(var(--status-positive))]">
+                  +{grouped(formatRawShares6(BigInt(quote.expectedShares!.trim())))} shares
+                </span>
+              </>
+            ) : (
+              "🎉 Done"
+            )
           }
           successExtra={
             flow.state.status === "confirmed" ? (

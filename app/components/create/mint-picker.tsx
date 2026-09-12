@@ -83,7 +83,7 @@ export function MintPicker({
             <SkeletonRow key={i} />
           ))}
         </div>
-        <p className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground/80">
+        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground/80">
           Layout preview — selectable xStock tiles
         </p>
       </div>

@@ -32,19 +32,21 @@ function LaurelGlyph({ flip = false }: { flip?: boolean }) {
 }
 
 /**
- * Landing — classic shadcn-style hero (monochrome simplification, 2026-09-02;
- * roman-empire redesign, 2026-09-03): laurel chip, Cinzel headline, one
- * subline, two CTAs — with a public-domain Piranesi engraving of the Pantheon
+ * Landing — NEON FOUNDRY hero (cyberpunk-yellow restyle, 2026-09-12; was the
+ * roman-empire redesign of 2026-09-03): yellow mono chip, Chakra Petch
+ * headline with a soft primary glow, one subline, two CTAs — over a faint
+ * engineering grid, with a public-domain Piranesi engraving of the Pantheon
  * ghosted BEHIND the hero copy as a barely-visible watermark (owner feedback:
  * real drawing, not a framed photo, not the hand-drawn SVG), then the
- * three-step Flow section (drawn Roman motifs), the Ledger inscription
- * (traditional vs tokenized rails), and a closing navigation strip fed by
- * the live xStocks registry. No footer, no photography.
+ * three-step Flow section (drawn motifs), the Ledger rails comparison
+ * (traditional vs tokenized), and a closing navigation strip fed by
+ * the live xStocks registry. No footer, no photography. `.bg-grid` appears
+ * on the hero section only — one grid per page.
  */
 export default function LandingPage() {
   return (
     <div className="mx-auto w-full">
-      <section className="relative w-full overflow-hidden">
+      <section className="bg-grid relative w-full overflow-hidden">
         {/* Watermark — Francesco Piranesi, "Veduta del Pantheon d'Agrippa"
             (1790, public domain). The plate is dark ink on light paper, so
             `invert` flips it to light lines on dark; at 11% opacity over the
@@ -66,12 +68,12 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_62%_48%_at_50%_34%,hsl(var(--background)/0.55)_0%,hsl(var(--background)/0.3)_55%,transparent_78%)]" />
         </div>
         <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center px-4 pb-20 pt-24 text-center sm:px-6 md:pt-32">
-          <p className="inline-flex items-center gap-2.5 rounded-full border border-[hsl(var(--imperial)/0.45)] bg-muted/40 px-3.5 py-1 font-mono text-xs tracking-wide text-[hsl(var(--imperial))]">
+          <p className="inline-flex items-center gap-2.5 border border-primary/40 bg-accent/30 px-3.5 py-1 font-mono text-xs tracking-wide text-primary-text">
             <LaurelGlyph />
             Onchain strategy baskets · xStocks
             <LaurelGlyph flip />
           </p>
-          <h1 className="mt-6 font-[family-name:var(--font-display)] text-balance text-6xl font-semibold leading-[1.08] tracking-normal md:text-7xl">
+          <h1 className="text-display text-glow mt-6 text-balance text-6xl leading-[1.08] md:text-7xl">
             Create an index. Own your thesis.
           </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
@@ -81,7 +83,7 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/create"
-              className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="glow-primary inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               Create an index
             </Link>

@@ -115,7 +115,7 @@ async function EtfListing() {
     return (
       <div className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <h2 id="tokenized-etfs" className="text-sm font-medium tracking-tight">
+          <h2 id="tokenized-etfs" className="font-display text-sm font-medium">
             Tokenized ETFs on FolioX
           </h2>
           <FreshnessBadge source="dev catalog · mock prices (not live)" />
@@ -207,7 +207,7 @@ async function EtfListing() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <h2 id="tokenized-etfs" className="text-sm font-medium tracking-tight">
+        <h2 id="tokenized-etfs" className="font-display text-sm font-medium">
           Tokenized ETFs on FolioX
         </h2>
         <FreshnessBadge source="Jupiter · Yahoo Finance" asOf={asOf} />
@@ -225,7 +225,7 @@ export default function EtfsPage() {
   return (
     <div>
       <header className="pb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Tokenized ETFs</h1>
+        <h1 className="font-display text-3xl font-semibold">Tokenized ETFs</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           The tokenized ETF tickers FolioX lists today.
         </p>

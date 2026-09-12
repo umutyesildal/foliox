@@ -92,7 +92,7 @@ export default function LegalPage() {
   return (
     <div className="mx-auto w-full max-w-3xl">
       <header className="space-y-1.5">
-        <h1 className="text-3xl font-semibold tracking-tight">Risks &amp; Disclosures</h1>
+        <h1 className="font-display text-3xl font-semibold">Risks &amp; Disclosures</h1>
         <p className="text-sm leading-6 text-muted-foreground">
           Placeholder disclosure copy for FolioX baskets — an engineering draft, not
           counsel-approved legal text.
@@ -125,7 +125,7 @@ export default function LegalPage() {
             aria-labelledby={`legal-section-${index}`}
             className="rounded-lg border bg-card p-5 scroll-mt-20"
           >
-            <h2 id={`legal-section-${index}`} className="text-base font-medium tracking-tight">
+            <h2 id={`legal-section-${index}`} className="font-display text-base font-medium">
               <span className="mr-2 font-mono text-xs tabular-nums text-muted-foreground">
                 {String(index + 1).padStart(2, "0")}
               </span>

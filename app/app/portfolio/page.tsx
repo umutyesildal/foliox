@@ -198,7 +198,7 @@ function PositionCard({ position, meta, mintTickers }: PositionCardProps) {
           ) : null}
         </div>
         {!hasValue ? (
-          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
             no nav
           </span>
         ) : null}
@@ -219,7 +219,7 @@ function PositionCard({ position, meta, mintTickers }: PositionCardProps) {
       <div className="mt-auto pt-4">
         <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
               Shares held
             </span>
             <span
@@ -232,7 +232,7 @@ function PositionCard({ position, meta, mintTickers }: PositionCardProps) {
             </span>
           </span>
           <span className="flex flex-col items-end gap-0.5">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">24h</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">24h</span>
             <ChangeValue changePct={change} />
           </span>
         </div>
@@ -407,7 +407,7 @@ export default function PortfolioPage() {
     return (
       <div className="mx-auto w-full max-w-4xl">
         <div className="space-y-1.5">
-          <h1 className="text-3xl font-semibold tracking-tight">Portfolio</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Portfolio</h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Basket share positions held by the connected wallet.
           </p>
@@ -435,7 +435,7 @@ export default function PortfolioPage() {
     <div className="mx-auto w-full max-w-6xl">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1.5">
-          <h1 className="text-3xl font-semibold tracking-tight">Portfolio</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Portfolio</h1>
           <p className="max-w-2xl font-mono text-xs tabular-nums text-muted-foreground">
             {truncateAddress(publicKey.toBase58(), 6, 6)}
           </p>
@@ -505,11 +505,11 @@ export default function PortfolioPage() {
           {/* Summary strip — total is a reference sum, never a quote. */}
           <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 rounded-lg border border-border bg-card px-5 py-4">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
                 Total value (reference)
               </span>
               <span
-                className={`font-mono text-2xl tabular-nums ${
+                className={`font-mono text-2xl font-semibold tabular-nums ${
                   totalValue !== null ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -517,10 +517,10 @@ export default function PortfolioPage() {
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
                 Positions
               </span>
-              <span className="font-mono text-2xl tabular-nums text-foreground">
+              <span className="font-mono text-2xl font-semibold tabular-nums text-foreground">
                 {positions.length}
               </span>
             </div>

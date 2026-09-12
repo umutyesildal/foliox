@@ -229,7 +229,7 @@ function BasketCard({ b, bench, showVs24, mintTickers }: BasketCardProps) {
     <Link
       href={`/basket/${b.pubkey}`}
       title={`Open basket ${b.pubkey}`}
-      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -478,7 +478,7 @@ export default function ExploreClient() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1.5">
-          <h1 className="text-3xl font-semibold tracking-tight">Baskets</h1>
+          <h1 className="font-display text-3xl font-semibold">Baskets</h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Community-made strategy baskets — every creator and every return is on-chain.
           </p>

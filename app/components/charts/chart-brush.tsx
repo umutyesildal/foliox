@@ -195,19 +195,19 @@ export function ChartBrushLayout({
         <div className="mt-1 px-1">
           <div className="relative h-4 flex items-center">
             {/* track background */}
-            <div className="absolute left-0 right-0 h-1.5 rounded-full bg-muted" />
+            <div className="absolute left-0 right-0 h-1.5 rounded-sm bg-muted" />
             {/* selected range highlight */}
             <div
-              className="absolute h-1.5 rounded-full bg-primary/30 border border-primary/40"
+              className="absolute h-1.5 rounded-sm bg-primary/30 border border-primary/40"
               style={{ left: `${progressLeft}%`, right: `${100 - progressRight}%` }}
             />
             {/* thumb indicators */}
             <div
-              className="absolute h-3 w-1.5 -ml-0.5 rounded-full bg-primary shadow-sm border border-primary-foreground"
+              className="absolute h-3 w-1.5 -ml-0.5 rounded-sm bg-primary border border-primary-foreground"
               style={{ left: `${progressLeft}%` }}
             />
             <div
-              className="absolute h-3 w-1.5 -ml-0.5 rounded-full bg-primary shadow-sm border border-primary-foreground"
+              className="absolute h-3 w-1.5 -ml-0.5 rounded-sm bg-primary border border-primary-foreground"
               style={{ left: `${progressRight}%` }}
             />
             <input

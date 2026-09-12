@@ -27,7 +27,7 @@ export default function BasketLoading() {
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-4 w-36" />
           </div>
-          <div className="rounded-xl bg-card p-5 shadow-sm ring-1 ring-border dark:shadow-xl dark:shadow-black/20">
+          <div className="hairline-primary rounded-lg bg-card p-5 ring-1 ring-border">
             <ChartBlockSkeleton label="Loading NAV history" />
           </div>
         </section>

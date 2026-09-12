@@ -207,3 +207,17 @@ actually used. `ActorLine` grows an opt-in `friendlyFallback` prop —
 anonymous wallets render as "a trader" instead of truncated pubkeys (the
 address stays on the `title` attribute; every existing caller is
 unchanged). Three rows per column throughout.
+
+## 10. Amendment — demo overlay extended to /feed and /leaderboard (2026-09-12)
+
+The `NEXT_PUBLIC_HOME_DEMO=1` demo overlay (introduced on the home
+live-proof band) now also gates `/feed` and `/leaderboard`, all reading the
+one shared helper `lib/demo-mode.ts` (`isDemoMode()`). Demo mode makes zero
+network calls — no fetches, no polling, no auth prompts, no write
+endpoints — and every demo surface is labeled with the mono "demo data"
+chip so the synthetic datasets can never masquerade as live activity. Demo
+theses carry stringified negative ids ("-1".."-5") that can never collide
+with real post ids, so demo rows can never act on (or be mistaken for) a
+real post. On home, the live-proof band keeps a balanced 3/3 row count —
+both columns slice to `VISIBLE_ROW_COUNT = 3` so neither leads with a
+lopsided board. Flag off = the real fetch/poll path, byte-identical.

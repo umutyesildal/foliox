@@ -490,7 +490,10 @@ function DemoBasketsColumn() {
   return (
     <div>
       <ColumnHeaderLink label="TOP BASKETS" href="/leaderboard" />
-      <BasketsRows items={DEMO_BASKETS} />
+      {/* Row parity (owner feedback, 2026-09-12): the full 5-basket dataset
+          stays available for the demo, but the preview surfaces only
+          VISIBLE_ROW_COUNT rows so the two columns match. */}
+      <BasketsRows items={DEMO_BASKETS.slice(0, VISIBLE_ROW_COUNT)} />
     </div>
   );
 }
@@ -540,7 +543,10 @@ function BasketsColumn({ resource }: { resource: LiveResource<BasketLeaderboardE
             The board builds as baskets trade.
           </p>
         ) : (
-          <BasketsRows items={resource.data} />
+          // Row parity (owner feedback, 2026-09-12): cap the preview at
+          // VISIBLE_ROW_COUNT rows so the baskets column matches the trades
+          // column.
+          <BasketsRows items={resource.data.slice(0, VISIBLE_ROW_COUNT)} />
         )
       ) : null}
     </div>

@@ -1,25 +1,27 @@
 import type {
   BasketLeaderboardEntry,
+  ThesisFeedItem,
   TradeFeedItem,
 } from "@/lib/social-api";
 
 /**
- * DEMO overlay for the home live-proof band (NEXT_PUBLIC_HOME_DEMO=1).
- * NEVER rendered from real endpoints — owner-requested demo look for the
- * landing surface (2026-09-12); clearly chipped in the UI. If you are
- * debugging real data, turn the flag off.
+ * DEMO overlay datasets (NEXT_PUBLIC_HOME_DEMO=1) — the home live-proof band
+ * AND the /feed page render these instead of fetching; clearly chipped in the
+ * UI ("demo data" mono chip on both). NEVER rendered from real endpoints —
+ * owner-requested demo look for the landing + social surfaces (2026-09-12).
+ * If you are debugging real data, turn the flag off.
  *
- * This module is pure data (no components, no hooks). The flag read itself
- * lives in live-proof-section.tsx (`process.env.NEXT_PUBLIC_HOME_DEMO ===
- * "1"`); when the flag is off these datasets are tree-shakeable dead weight
- * and the section renders the real feed/leaderboard with its usual honest
+ * This module is pure data (no components, no hooks). The flag read lives in
+ * `lib/demo-mode.ts` (`isDemoMode()`); the home section still reads the same
+ * env inline. When the flag is off these datasets are tree-shakeable dead
+ * weight and every surface renders real data with its usual honest
  * empty/error states. Repo invariant preserved: flag off = real data, flag
  * on = labeled demo — nothing here ever masquerades as production data.
  *
  * Shaping rules:
  *  - Every item is structurally identical to its real endpoint type
- *    (TradeFeedItem / BasketLeaderboardEntry) so the same row renderers
- *    handle both modes.
+ *    (TradeFeedItem / ThesisFeedItem / BasketLeaderboardEntry) so the same
+ *    row renderers handle both modes.
  *  - `ts`/`asOf` are computed relative to module-load time so relative
  *    labels ("2m ago") read alive on every fresh page load and roll
  *    naturally as the session ages.
@@ -27,6 +29,8 @@ import type {
  *    avatar renderer falls back to its identicon glyph if the image fails.
  *  - Baskets carry no images on purpose — the BasketAvatar glyph IS the
  *    demo basket logo.
+ *  - Thesis ids are stringified negative numbers ("-1".."-5") — synthetic,
+ *    never colliding with real post ids (detailed on DEMO_THESES below).
  */
 
 /** Minutes-ago helper — spreads the demo activity over the recent past. */
@@ -198,3 +202,114 @@ export const DEMO_TRADES: TradeFeedItem[] = DEMO_TRADE_SEEDS.map((seed) => ({
   shares: seed.shares,
   usdValue: seed.usdValue,
 }));
+
+// ---------------------------------------------------------------------------
+// Demo theses — 5 items spread over the last ~3 hours so they interleave the
+// trades above when the /feed page merges both datasets by recency.
+// ---------------------------------------------------------------------------
+
+interface DemoThesisSeed {
+  /** Synthetic post number — the exported id is `-${n}`. */
+  n: number;
+  /** Index into DEMO_TRADES — reuses the same 12 demo traders/avatars. */
+  traderIndex: number;
+  basket: string;
+  title: string;
+  body: string;
+  likeCount: number;
+  commentCount: number;
+  /** minutes ago — interleaves the trade window (2–39) up to ~3 hours. */
+  minutesAgo: number;
+}
+
+/**
+ * Genuine mini-theses about the five demo baskets — weights logic, dividend
+ * mechanics, honest concentration takes — so the demo feed reads like real
+ * conviction, not filler copy. Authors/likes/comments follow the same
+ * believability rules as the trades.
+ */
+const DEMO_THESIS_SEEDS: DemoThesisSeed[] = [
+  {
+    n: 1,
+    traderIndex: 0,
+    basket: "demo-basket-1",
+    title: "Why I keep adding to Foundry Tech on red days",
+    body: "The 60/25/15 semis–software–infra split is doing exactly what the weights promise: semis draw down harder, software cushions the ride, infra quietly compounds. I stopped trying to time the rebalance — instead I add small on red days and let the band logic do the selling for me. Four adds in two weeks, zero manual trades since.",
+    likeCount: 41,
+    commentCount: 7,
+    minutesAgo: 9,
+  },
+  {
+    n: 2,
+    traderIndex: 2,
+    basket: "demo-basket-2",
+    title: "Index Plus is the boring core my portfolio was missing",
+    body: "I parked the proceeds of my 'everything bagel' alt portfolio into Index Plus and my drawdown honestly halved. It tracks the broad basket with a slight quality tilt, which is exactly what I want from a core holding I never have to think about. Not exciting — that is the point.",
+    likeCount: 18,
+    commentCount: 3,
+    minutesAgo: 34,
+  },
+  {
+    n: 3,
+    traderIndex: 4,
+    basket: "demo-basket-3",
+    title: "Yield Haven's dividend angle survives a red month",
+    body: "Yes, YHX is down roughly a percent on the window, and that is exactly the test I wanted it to face. The payout-heavy names keep distributing while the price lags, so total return is holding up better than the NAV line suggests. I would rather collect through a flat month than chase the momentum baskets at the top.",
+    likeCount: 12,
+    commentCount: 2,
+    minutesAgo: 76,
+  },
+  {
+    n: 4,
+    traderIndex: 6,
+    basket: "demo-basket-4",
+    title: "On Mag7 concentration: you are already long, so be long on purpose",
+    body: "Most 'diversified' portfolios are 25%+ Mag7 through index drift anyway — pretending otherwise is the real risk. Mag7 Vector at least prices the concentration honestly instead of hiding it inside a hundred mid-caps. I size it as one deliberate position, not seven accidental ones.",
+    likeCount: 27,
+    commentCount: 5,
+    minutesAgo: 124,
+  },
+  {
+    n: 5,
+    traderIndex: 8,
+    basket: "demo-basket-5",
+    title: "Dividend Stack is my counterweight to the tech sleeves",
+    body: "Between Foundry Tech and Mag7 Vector I run hot on growth, so DVX is the ballast. The payout names drag in up-months and then quietly fund the dip-buying everywhere else. Cash flow every cycle beats praying for a catalyst.",
+    likeCount: 5,
+    commentCount: 0,
+    minutesAgo: 168,
+  },
+];
+
+/**
+ * Thesis dataset — structurally identical to ThesisFeedItem.
+ *
+ * `id`s are STRINGIFIED NEGATIVE NUMBERS ("-1".."-5"): synthetic ids that can
+ * never collide with real post ids, so demo items can never act on (or be
+ * mistaken for) a real post — anything that fetches /posts/:id with one gets
+ * a 404 by design, which is why the demo thesis card renders its full body
+ * inline instead of expanding. `bodyTruncated` mirrors the real feed contract
+ * (the API truncates long bodies in list view): demo bodies are stored IN
+ * FULL and demo rendering ignores the flag. Authors are drawn from
+ * DEMO_TRADES so wallets, handles and dicebear avatars stay consistent
+ * across the trades and theses surfaces.
+ */
+export const DEMO_THESES: ThesisFeedItem[] = DEMO_THESIS_SEEDS.map((seed) => {
+  const trader = DEMO_TRADES[seed.traderIndex];
+  return {
+    kind: "thesis",
+    id: `-${seed.n}`,
+    ts: minutesAgo(seed.minutesAgo),
+    wallet: trader.wallet,
+    handle: trader.handle,
+    displayName: trader.displayName,
+    avatarUrl: trader.avatarUrl,
+    basket: seed.basket,
+    basketName: DEMO_BASKET_NAMES.get(seed.basket) ?? null,
+    title: seed.title,
+    body: seed.body,
+    bodyTruncated: true,
+    likeCount: seed.likeCount,
+    commentCount: seed.commentCount,
+  };
+});

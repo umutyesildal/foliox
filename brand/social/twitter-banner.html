@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1500px; height: 500px; overflow: hidden; }
+  body { background: #0A0A0B; color: #F6F6F4; position: relative; font-family: "Geist Mono", ui-monospace, monospace; }
+  .cluster { position: absolute; opacity: 0.065; }
+  .cluster.left { left: -140px; top: -90px; }
+  .cluster.right { right: -120px; bottom: -110px; }
+  .tick { position: absolute; width: 34px; height: 34px; }
+  .lockup {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .row { display: flex; align-items: center; gap: 30px; }
+  .wordmark {
+    font-family: "Chakra Petch", "Arial Black", sans-serif;
+    font-weight: 700; font-size: 108px; letter-spacing: 0.16em; text-indent: 0.16em;
+    line-height: 1; color: #F6F6F4;
+  }
+  .tagline {
+    margin-top: 26px; font-size: 19px; letter-spacing: 0.24em; text-indent: 0.24em;
+    color: rgba(246,246,244,0.62); text-transform: uppercase;
+  }
+  .tagline .sl { color: #FCEE0A; }
+  .sub {
+    margin-top: 16px; font-size: 14px; letter-spacing: 0.3em; text-indent: 0.3em;
+    color: rgba(246,246,244,0.4); text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+  <!-- causeway clusters, faint (columns top-down) -->
+  <svg class="cluster left" width="560" height="560" viewBox="0 0 600 600" fill="none" stroke="#FFFFFF" stroke-width="2">
+    <path d="M300 232 L241.1 266 L241.1 334 L300 368 L358.9 334 L358.9 266 Z"/>
+    <path d="M417.8 232 L358.9 266 L358.9 334 L417.8 368 L476.7 334 L476.7 266 Z"/>
+    <path d="M358.9 130 L300 164 L300 232 L358.9 266 L417.8 232 L417.8 164 Z"/>
+    <path d="M241.1 130 L182.2 164 L182.2 232 L241.1 266 L300 232 L300 164 Z"/>
+    <path d="M182.2 232 L123.3 266 L123.3 334 L182.2 368 L241.1 334 L241.1 266 Z"/>
+    <path d="M241.1 334 L182.2 368 L182.2 436 L241.1 470 L300 436 L300 368 Z"/>
+    <path d="M358.9 334 L300 368 L300 436 L358.9 470 L417.8 436 L417.8 368 Z"/>
+  </svg>
+  <svg class="cluster right" width="560" height="560" viewBox="0 0 600 600" fill="none" stroke="#FFFFFF" stroke-width="2">
+    <path d="M300 232 L241.1 266 L241.1 334 L300 368 L358.9 334 L358.9 266 Z"/>
+    <path d="M417.8 232 L358.9 266 L358.9 334 L417.8 368 L476.7 334 L476.7 266 Z"/>
+    <path d="M358.9 130 L300 164 L300 232 L358.9 266 L417.8 232 L417.8 164 Z"/>
+    <path d="M241.1 130 L182.2 164 L182.2 232 L241.1 266 L300 232 L300 164 Z"/>
+    <path d="M182.2 232 L123.3 266 L123.3 334 L182.2 368 L241.1 334 L241.1 266 Z"/>
+    <path d="M241.1 334 L182.2 368 L182.2 436 L241.1 470 L300 436 L300 368 Z"/>
+    <path d="M358.9 334 L300 368 L300 436 L358.9 470 L417.8 436 L417.8 368 Z"/>
+  </svg>
+
+  <!-- yellow corner ticks -->
+  <div class="tick" style="top:26px;left:26px;border-top:2px solid #FCEE0A;border-left:2px solid #FCEE0A;"></div>
+  <div class="tick" style="top:26px;right:26px;border-top:2px solid #FCEE0A;border-right:2px solid #FCEE0A;"></div>
+  <div class="tick" style="bottom:26px;left:26px;border-bottom:2px solid #FCEE0A;border-left:2px solid #FCEE0A;"></div>
+  <div class="tick" style="bottom:26px;right:26px;border-bottom:2px solid #FCEE0A;border-right:2px solid #FCEE0A;"></div>
+
+  <!-- centered lockup (clear of the avatar overlap zone in the bottom-left) -->
+  <div class="lockup">
+    <div class="row">
+      <svg width="96" height="96" viewBox="0 0 24 24">
+        <g fill="#FCEE0A">
+          <path d="M4.3 3.7 L6.5 2.5 L8.7 3.7 L8.7 21.5 L4.3 21.5 Z"/>
+          <path d="M9.8 10.7 L12 9.5 L14.2 10.7 L14.2 21.5 L9.8 21.5 Z"/>
+          <path d="M15.3 15.7 L17.5 14.5 L19.7 15.7 L19.7 21.5 L15.3 21.5 Z"/>
+        </g>
+        <g stroke="#0A0A0B" stroke-width="0.55">
+          <line x1="4.3" y1="3.7" x2="8.7" y2="3.7"/>
+          <line x1="9.8" y1="10.7" x2="14.2" y2="10.7"/>
+          <line x1="15.3" y1="15.7" x2="19.7" y2="15.7"/>
+        </g>
+      </svg>
+      <div class="wordmark">BASALT</div>
+    </div>
+    <div class="tagline"><span class="sl">//</span> Create an index. Own your thesis. <span class="sl">//</span></div>
+    <div class="sub">xStocks strategy baskets · Solana</div>
+  </div>
+</body>
+</html>

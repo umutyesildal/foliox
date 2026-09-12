@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { DEMO_THESES, DEMO_TRADES } from "@/components/home/home-demo-data";
 import { ErrorState, EmptyState, Skeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { RangeLinks } from "@/components/ui/range-links";
 import { ActorLine, SocialAvatar } from "@/components/social/avatar";
 import { ThesisComposerModal } from "@/components/social/thesis-composer";
+import { isDemoMode } from "@/lib/demo-mode";
 import { formatRelativeTime, formatTokenAmount, formatUsd, truncateAddress } from "@/lib/format";
 import {
   fetchFeed,
@@ -44,8 +46,19 @@ function tabQuery(tab: Tab): { scope: "all" | "following"; type: "all" | "trades
  * polling with manual refresh, cursor "Load more". Trade cards link the
  * trader's profile and the basket; thesis cards expand inline (GET /posts/:id
  * + comments) with an optimistic like button gated behind wallet sign-in.
+ *
+ * Demo overlay (NEXT_PUBLIC_HOME_DEMO=1): renders the static labeled dataset
+ * from home-demo-data.ts instead — zero network calls, zero auth prompts, no
+ * polling, no composer. Flag off → FeedClientReal below, byte-identical.
  */
 export default function FeedClient() {
+  if (isDemoMode()) {
+    return <DemoFeed />;
+  }
+  return <FeedClientReal />;
+}
+
+function FeedClientReal() {
   const social = useSocialAuth();
   const [tab, setTab] = useState<Tab>("all");
 
@@ -239,6 +252,92 @@ export default function FeedClient() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Demo overlay (NEXT_PUBLIC_HOME_DEMO=1) — the same labeled datasets as the
+// home live-proof band. No network, no auth, no polling: the flag branch in
+// FeedClient returns here before any real fetch/auth code ever mounts.
+// ---------------------------------------------------------------------------
+
+/** The mono chip that keeps the demo overlay honest — same as home's. */
+function DemoChip() {
+  return (
+    <span
+      title="Synthetic demo data — not live activity"
+      className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground"
+    >
+      demo data
+    </span>
+  );
+}
+
+/**
+ * Static demo feed: DEMO_TRADES + DEMO_THESES merged by recency over the
+ * real tab row. Every API-hitting affordance is disabled — no refresh, no
+ * composer, no likes, no expand fetch (negative demo ids would 404 on
+ * GET /posts/:id by design).
+ */
+function DemoFeed() {
+  const [tab, setTab] = useState<Tab>("all");
+  // Demo timestamps are computed at module load, so the prerendered HTML
+  // would carry stale relative labels and hydration would see different
+  // strings — show the static skeleton until the client has mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const items = useMemo(() => {
+    const merged = [...DEMO_TRADES, ...DEMO_THESES].sort(
+      (a, b) => Date.parse(b.ts) - Date.parse(a.ts),
+    );
+    // Demo has no follow graph — Following shows everything too; the tab
+    // still switches so the demo audience can exercise the real tab row.
+    return tab === "theses" ? merged.filter((item) => item.kind === "thesis") : merged;
+  }, [tab]);
+
+  if (!mounted) return <FeedSkeleton />;
+
+  return (
+    <div className="mx-auto w-full max-w-4xl">
+      <header className="flex flex-wrap items-baseline justify-between gap-3 pb-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-3xl font-semibold tracking-tight">Feed</h1>
+            <DemoChip />
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Trades and theses from public Basalt baskets — self-reported, not advice.
+          </p>
+        </div>
+        {/* Refresh / Write thesis are hidden in demo — both would need the API. */}
+      </header>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+        <RangeLinks
+          options={TABS}
+          value={tab}
+          onChange={(next) => setTab(next)}
+          label={null}
+          ariaLabel="Feed scope"
+        />
+        {tab === "following" ? (
+          <p className="text-xs text-muted-foreground">
+            Demo mode has no follows — showing the full feed.
+          </p>
+        ) : null}
+      </div>
+
+      <ul className="divide-y divide-border">
+        {items.map((item, index) =>
+          item.kind === "trade" ? (
+            <TradeCard key={`${item.sig}-${index}`} item={item} />
+          ) : (
+            <ThesisCard key={item.id} item={item} social={null} demo />
+          ),
+        )}
+      </ul>
+    </div>
+  );
+}
+
 function FeedSkeleton() {
   return (
     <div className="pt-2" role="status" aria-label="Loading feed">
@@ -325,13 +424,20 @@ function TradeCard({ item }: { item: Extract<FeedItem, { kind: "trade" }> }) {
 /**
  * Thesis card: excerpt + inline expansion (GET /posts/:id brings the full body
  * and the true likedByMe), optimistic like gated behind wallet sign-in.
+ *
+ * Demo mode (`demo`) freezes every API affordance: the full body renders
+ * inline (no expand fetch — negative demo ids 404 on /posts/:id by design),
+ * the like button becomes a static count and no comments panel is reachable.
  */
 function ThesisCard({
   item,
   social,
+  demo = false,
 }: {
   item: Extract<FeedItem, { kind: "thesis" }>;
-  social: ReturnType<typeof useSocialAuth>;
+  /** Real mode only — the wallet sign-in hook. `null` in demo mode. */
+  social: ReturnType<typeof useSocialAuth> | null;
+  demo?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [full, setFull] = useState<FullPost | null>(null);
@@ -362,6 +468,7 @@ function ThesisCard({
   };
 
   const onLike = async () => {
+    if (!social) return; // demo mode never wires this handler
     if (liking) return;
     setLiking(true);
     const wasLiked = liked;
@@ -410,27 +517,40 @@ function ThesisCard({
         </span>
       </div>
 
-      <button
-        type="button"
-        onClick={() => void toggleExpand()}
-        aria-expanded={expanded}
-        className="mt-2 block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        <span className="block text-[15px] font-semibold text-foreground">{item.title}</span>
-        <span className="mt-1 block whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-          {expanded && full ? full.body : item.body}
-          {expanded && !full ? "" : item.bodyTruncated && !expanded ? "…" : ""}
-        </span>
-      </button>
-      {!expanded && item.bodyTruncated ? (
-        <button
-          type="button"
-          onClick={() => void toggleExpand()}
-          className="mt-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-        >
-          Read more
-        </button>
-      ) : null}
+      {demo ? (
+        // Demo: bodyTruncated is ignored — demo bodies are stored in full, so
+        // render straight through with no expand button and no Read more.
+        <div className="mt-2">
+          <span className="block text-[15px] font-semibold text-foreground">{item.title}</span>
+          <span className="mt-1 block whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+            {item.body}
+          </span>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => void toggleExpand()}
+            aria-expanded={expanded}
+            className="mt-2 block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <span className="block text-[15px] font-semibold text-foreground">{item.title}</span>
+            <span className="mt-1 block whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+              {expanded && full ? full.body : item.body}
+              {expanded && !full ? "" : item.bodyTruncated && !expanded ? "…" : ""}
+            </span>
+          </button>
+          {!expanded && item.bodyTruncated ? (
+            <button
+              type="button"
+              onClick={() => void toggleExpand()}
+              className="mt-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              Read more
+            </button>
+          ) : null}
+        </>
+      )}
 
       {expandError ? (
         <p role="alert" className="mt-2 text-xs text-foreground">
@@ -461,19 +581,31 @@ function ThesisCard({
             {item.basketName ?? truncateAddress(item.basket, 4, 4)}
           </Link>
         ) : null}
-        <button
-          type="button"
-          onClick={() => void onLike()}
-          disabled={liking}
-          aria-pressed={liked}
-          className={`inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 font-mono text-xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
-            liked ? "text-primary-text" : "text-muted-foreground hover:text-foreground"
-          }`}
-          title={social.isAuthed ? undefined : "Sign-in with your wallet is requested on like"}
-        >
-          <span aria-hidden="true">{liked ? "♥" : "♡"}</span>
-          {likeCount}
-        </button>
+        {demo ? (
+          // Demo: static count, no handler — likes are write endpoints and
+          // must never fire against the synthetic dataset.
+          <span
+            title="Demo data"
+            className="inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 font-mono text-xs tabular-nums text-muted-foreground"
+          >
+            <span aria-hidden="true">♡</span>
+            {item.likeCount}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void onLike()}
+            disabled={liking}
+            aria-pressed={liked}
+            className={`inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 font-mono text-xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+              liked ? "text-primary-text" : "text-muted-foreground hover:text-foreground"
+            }`}
+            title={social?.isAuthed ? undefined : "Sign-in with your wallet is requested on like"}
+          >
+            <span aria-hidden="true">{liked ? "♥" : "♡"}</span>
+            {likeCount}
+          </button>
+        )}
         <span className="inline-flex items-center gap-1.5 font-mono text-xs tabular-nums text-muted-foreground">
           <span aria-hidden="true">💬</span>
           {item.commentCount}

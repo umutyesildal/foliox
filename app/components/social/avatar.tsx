@@ -68,7 +68,16 @@ export function SocialAvatar({
   );
 }
 
-/** "actor line" — avatar + name/handle-or-truncated-wallet, used on cards. */
+/**
+ * "actor line" — avatar + name/handle-or-truncated-wallet, used on cards.
+ *
+ * `friendlyFallback` softens the anonymous case for marketing surfaces: when
+ * the actor has neither a displayName nor a handle, the label reads "a trader"
+ * instead of a truncated wallet pubkey. Honest, not fabricated — the wallet
+ * address stays on the label's `title` attribute either way (hover reveals
+ * it), and avatars still key off the wallet. Default false: every existing
+ * caller keeps the truncated-pubkey terminal label unchanged.
+ */
 export function ActorLine({
   wallet,
   handle,
@@ -76,6 +85,7 @@ export function ActorLine({
   avatarUrl,
   className,
   emphasis = false,
+  friendlyFallback = false,
 }: {
   wallet: string;
   handle?: string | null;
@@ -85,8 +95,16 @@ export function ActorLine({
   /** Feed mode: regular-case, bolder label so the chosen username is what
    *  reads — default keeps the quiet terminal whisper for other surfaces. */
   emphasis?: boolean;
+  /** When true AND there is no displayName and no handle, render the friendly
+   *  text "a trader" instead of the truncated wallet address. Styling classes
+   *  are unchanged — only the fallback text swaps. */
+  friendlyFallback?: boolean;
 }) {
-  const label = displayName?.trim() || (handle ? `@${handle}` : truncateAddress(wallet, 4, 4));
+  const anonymous = !displayName?.trim() && !handle;
+  const label =
+    friendlyFallback && anonymous
+      ? "a trader"
+      : displayName?.trim() || (handle ? `@${handle}` : truncateAddress(wallet, 4, 4));
   return (
     <span className={cn("flex min-w-0 items-center gap-2", className)}>
       <SocialAvatar

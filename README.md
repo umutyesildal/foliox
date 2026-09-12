@@ -59,7 +59,7 @@ Indexer listens for `BasketCreated/Minted/Redeemed/FeeAccrued` (Borsh decoders),
 
 Owner-approved information architecture (2026-09-03):
 
-- `/` Home — NEON FOUNDRY hero + **live proof band** (latest verified trades + top baskets previews, polled live from the social API) + **CREATE · MINT · SHARE** three-step flow + **SAME EXPOSURE** traditional-vs-tokenized ledger comparison at the full 6xl rhythm + intent cards (Browse baskets / Follow top traders / Open the feed / Build your own)
+- `/` Home — NEON FOUNDRY hero + **live proof band** (friendly sentence-style preview of the latest verified trades + top baskets, polled live from the social API) + **CREATE · MINT · SHARE** three-step flow + **SAME EXPOSURE** traditional-vs-tokenized ledger comparison at the full 6xl rhythm + intent cards (Browse baskets / Follow top traders / Open the feed / Build your own)
 - `/stocks` — provider-grouped grid of tokenized stocks (live price, 24h, sparkline) → `/stock/[ticker]` detail (one clean chart, ethereal series colors, fitY-domain)
 - `/etfs` — pure tokenized-ETF listing (grid, sort, clickable cards)
 - `/explore` — **Baskets** flagship: grid-only cards (name-first — "Tech Duo", composition + price + 24h + vs-SPY), whole card clickable

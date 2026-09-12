@@ -6,18 +6,33 @@
  * placed before any process talk. Two columns:
  *
  *   Left  — "Latest verified trades": first page of GET /api/v1/feed
- *           (?type=trades&limit=4), rendered as compact rows (not the full
- *           feed card) with the feed's Mint/Redeem badge vocabulary.
- *   Right — "Top baskets · all-time": GET /api/v1/leaderboard/baskets
- *           (?window=all), rank + return + NAV/holders sub-line.
+ *           (?type=trades&limit=3), rendered as single-sentence rows —
+ *           "<actor> bought 12.5 shares of <basket>" — with a compact
+ *           usd-value / time block on the right.
+ *   Right — "Top baskets": GET /api/v1/leaderboard/baskets through an
+ *           adaptive window cascade (30d -> 7d -> all-time; the first window
+ *           with rows wins) so a quiet board never shows an empty column and
+ *           absurd all-time devnet mock deltas never lead the surface. The
+ *           header labels whichever window was actually used.
+ *
+ * FRIENDLY PREVIEW (owner feedback, 2026-09-12): same honest data, warmer
+ * presentation — this is a marketing surface, not a terminal. No semantic
+ * red here: Minted/Redeemed read as the words "bought"/"sold" (positive
+ * green on bought only; the red Redeem badges stay inside /feed), basket
+ * deltas follow the same rule (green when positive, muted otherwise — a
+ * losing basket is stated, not shouted), no badges
+ * at all, and anonymous wallets hide behind "a trader" (ActorLine
+ * friendlyFallback). Nothing is fabricated — the wallet address stays on
+ * the label's title attribute, null usdValue renders "—", a null basket
+ * name reads "a basket" (pubkey in the title attr), and every figure is
+ * still the real on-chain one.
  *
  * Both poll silently every 60s while the tab is visible (same visibility
  * gate as feed-client; no manual refresh — this is a preview) and degrade
  * honestly: skeleton rows while loading, one quiet retry line when the
- * backend is unreachable, one muted line when nothing exists yet. Rows are
- * NEVER fabricated — null usdValue renders "—", null basket names fall
- * back to a truncated pubkey. A failed silent refresh keeps the last good
- * list on screen; only a resource that has never loaded shows the error.
+ * backend is unreachable, one muted line when nothing exists yet. A failed
+ * silent refresh keeps the last good list on screen; only a resource that
+ * has never loaded shows the error.
  */
 
 import Link from "next/link";
@@ -26,11 +41,17 @@ import { useEffect, useRef, useState } from "react";
 import { SectionHeader } from "@/components/ui/section-header";
 import { ActorLine } from "@/components/social/avatar";
 import { Skeleton } from "@/components/states";
-import { formatRelativeTime, formatUsd, truncateAddress } from "@/lib/format";
+import {
+  formatRelativeTime,
+  formatTokenAmount,
+  formatUsd,
+  truncateAddress,
+} from "@/lib/format";
 import {
   fetchBasketLeaderboard,
   fetchFeed,
   type BasketLeaderboardEntry,
+  type BasketLeaderboardWindow,
   type TradeFeedItem,
 } from "@/lib/social-api";
 
@@ -38,7 +59,7 @@ import {
 const POLL_MS = 60_000;
 
 /** Row count per column — the trades fetch limit and both skeletons' rows. */
-const PREVIEW_ROW_COUNT = 4;
+const PREVIEW_ROW_COUNT = 3;
 
 // ---------------------------------------------------------------------------
 // Loaders — module-level so their identity is stable and the polling effect
@@ -52,9 +73,32 @@ async function loadRecentTrades(signal: AbortSignal): Promise<TradeFeedItem[]> {
   return payload.items.filter((item): item is TradeFeedItem => item.kind === "trade");
 }
 
-async function loadTopBaskets(signal: AbortSignal): Promise<BasketLeaderboardEntry[]> {
-  const payload = await fetchBasketLeaderboard("all", signal);
-  return payload.items;
+/** What the baskets column renders, plus the window that actually produced it. */
+interface BasketsSnapshot {
+  items: BasketLeaderboardEntry[];
+  window: BasketLeaderboardWindow;
+}
+
+/** Cascade order: 30d first, then 7d, then all-time. */
+const BASKETS_WINDOW_CASCADE = ["30d", "7d", "all"] as const;
+
+/**
+ * Adaptive window cascade — the first window with rows wins. A quiet devnet
+ * board would render an empty 30d column, so the loader widens/narrows
+ * through the fallbacks until something honest shows; the header then labels
+ * the window actually used. One AbortController signal covers the whole
+ * cascade — aborting the resource cancels whichever leg is in flight.
+ */
+async function loadTopBaskets(signal: AbortSignal): Promise<BasketsSnapshot> {
+  let usedWindow: BasketLeaderboardWindow = "all";
+  for (const win of BASKETS_WINDOW_CASCADE) {
+    usedWindow = win;
+    const payload = await fetchBasketLeaderboard(win, signal);
+    if (payload.items.length > 0) {
+      return { items: payload.items, window: win };
+    }
+  }
+  return { items: [], window: usedWindow };
 }
 
 // ---------------------------------------------------------------------------
@@ -202,24 +246,8 @@ function FooterLink({ href, children }: { href: string; children: string }) {
   );
 }
 
-/** The feed trade card's Mint/Redeem badge classes, verbatim. */
-function SideBadge({ type }: { type: TradeFeedItem["type"] }) {
-  const minted = type === "Minted";
-  return (
-    <span
-      className={`shrink-0 rounded-sm border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
-        minted
-          ? "border-[hsl(var(--status-positive)/40)] bg-[hsl(var(--status-positive)/10)] text-[hsl(var(--status-positive))]"
-          : "border-[hsl(var(--destructive)/40)] bg-[hsl(var(--destructive)/10)] text-[hsl(var(--destructive))]"
-      }`}
-    >
-      {type}
-    </span>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Left column — latest verified trades.
+// Left column — latest verified trades, one sentence per trade.
 // ---------------------------------------------------------------------------
 
 function TradesColumn({ resource }: { resource: LiveResource<TradeFeedItem[]> }) {
@@ -230,12 +258,12 @@ function TradesColumn({ resource }: { resource: LiveResource<TradeFeedItem[]> })
         <PreviewSkeleton rows={PREVIEW_ROW_COUNT} label="Loading verified trades" />
       ) : null}
       {resource.status === "error" ? (
-        <QuietError message="Couldn't load the feed." onRetry={resource.retry} />
+        <QuietError message="Couldn't load verified trades just now." onRetry={resource.retry} />
       ) : null}
       {resource.status === "ready" && resource.data ? (
         resource.data.length === 0 ? (
           <p className="py-3 pl-4 text-sm leading-6 text-muted-foreground">
-            No verified trades yet — be the first.{" "}
+            No verified trades yet — be the first to build one.{" "}
             <Link
               href="/create"
               className="font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -245,40 +273,60 @@ function TradesColumn({ resource }: { resource: LiveResource<TradeFeedItem[]> })
           </p>
         ) : (
           <ul className="divide-y divide-border">
-            {resource.data.map((item, index) => (
-              <li
-                key={`${item.sig}-${index}`}
-                className="border-l-2 border-l-primary/0 py-3 pl-4 transition-colors hover:border-l-primary/60"
-              >
-                <div className="flex items-center justify-between gap-3">
+            {resource.data.map((item, index) => {
+              const minted = item.type === "Minted";
+              // Skip the shares phrase when the count is absent/zero rather
+              // than fabricating "0 shares bought …".
+              const hasShares = Number.isFinite(item.shares) && item.shares > 0;
+              return (
+                <li
+                  key={`${item.sig}-${index}`}
+                  className="flex items-center gap-3 border-l-2 border-l-primary/0 py-3 pl-4 transition-colors hover:border-l-primary/60"
+                >
+                  {/* Actor + label, capped so a long displayName truncates
+                      before it crowds the sentence; friendlyFallback renders
+                      anonymous wallets as "a trader" (wallet stays on title). */}
                   <ActorLine
                     wallet={item.wallet}
                     handle={item.handle}
                     displayName={item.displayName}
                     avatarUrl={item.avatarUrl}
-                    className="min-w-0"
+                    friendlyFallback
+                    emphasis
+                    className="max-w-[45%] shrink-0"
                   />
-                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                    {formatRelativeTime(item.ts)}
-                  </span>
-                </div>
-                <div className="mt-1.5 flex items-center justify-between gap-3">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <SideBadge type={item.type} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                    <span
+                      className={
+                        minted
+                          ? "font-medium text-[hsl(var(--status-positive))]"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {minted ? "bought" : "sold"}
+                    </span>
+                    {hasShares ? ` ${formatTokenAmount(item.shares)} shares of ` : " "}
                     <Link
                       href={`/basket/${item.basket}`}
                       title={item.basket}
-                      className="min-w-0 truncate font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      className="font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                     >
-                      {item.basketName ?? truncateAddress(item.basket, 6, 4)}
+                      {item.basketName ?? "a basket"}
                     </Link>
                   </span>
-                  <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">
-                    {item.usdValue !== null ? formatUsd(item.usdValue) : "—"}
+                  {/* Compact two-line right block: real USD (em dash when
+                      null) over the muted relative time. */}
+                  <span className="shrink-0 text-right">
+                    <span className="block font-mono text-sm font-semibold tabular-nums text-foreground">
+                      {item.usdValue !== null ? formatUsd(item.usdValue) : "—"}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {formatRelativeTime(item.ts)}
+                    </span>
                   </span>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )
       ) : null}
@@ -288,7 +336,7 @@ function TradesColumn({ resource }: { resource: LiveResource<TradeFeedItem[]> })
 }
 
 // ---------------------------------------------------------------------------
-// Right column — top baskets, all-time.
+// Right column — top baskets (adaptive window).
 // ---------------------------------------------------------------------------
 
 /** "+X.XX%" convention — negatives already carry their own sign. */
@@ -297,24 +345,34 @@ function formatReturnPct(pct: number): string {
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
 }
 
-function BasketsColumn({ resource }: { resource: LiveResource<BasketLeaderboardEntry[]> }) {
+/** Header label for the window the cascade actually used. */
+function windowLabel(win: BasketLeaderboardWindow): string {
+  return win === "all" ? "ALL-TIME" : win.toUpperCase();
+}
+
+function BasketsColumn({ resource }: { resource: LiveResource<BasketsSnapshot> }) {
   return (
     <div>
-      <ColumnHeader label="TOP BASKETS · ALL-TIME" fetchedAt={resource.fetchedAt} />
+      <ColumnHeader
+        label={
+          resource.data ? `TOP BASKETS · ${windowLabel(resource.data.window)}` : "TOP BASKETS"
+        }
+        fetchedAt={resource.fetchedAt}
+      />
       {resource.status === "loading" ? (
         <PreviewSkeleton rows={PREVIEW_ROW_COUNT} label="Loading top baskets" />
       ) : null}
       {resource.status === "error" ? (
-        <QuietError message="Couldn't load the leaderboard." onRetry={resource.retry} />
+        <QuietError message="Couldn't load the leaderboard just now." onRetry={resource.retry} />
       ) : null}
       {resource.status === "ready" && resource.data ? (
-        resource.data.length === 0 ? (
+        resource.data.items.length === 0 ? (
           <p className="py-3 pl-4 text-sm leading-6 text-muted-foreground">
             The board builds as baskets trade.
           </p>
         ) : (
           <ul className="divide-y divide-border">
-            {resource.data.map((entry, index) => {
+            {resource.data.items.map((entry, index) => {
               const positive = entry.returnPct >= 0;
               const nav = entry.nav.trim() === "" ? NaN : Number(entry.nav);
               return (
@@ -340,9 +398,7 @@ function BasketsColumn({ resource }: { resource: LiveResource<BasketLeaderboardE
                     </span>
                     <span
                       className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
-                        positive
-                          ? "text-[hsl(var(--status-positive))]"
-                          : "text-[hsl(var(--destructive))]"
+                        positive ? "text-[hsl(var(--status-positive))]" : "text-muted-foreground"
                       }`}
                     >
                       {formatReturnPct(entry.returnPct)}
@@ -384,7 +440,7 @@ export function LiveProofSection() {
           id="proof-heading"
           size="eyebrow"
           label="VERIFIED ACTIVITY · LIVE"
-          lead="Real trades and real returns, straight from the chain."
+          lead="What people are building and trading right now."
         />
         <div className="mt-12 grid gap-10 lg:grid-cols-2">
           <TradesColumn resource={trades} />

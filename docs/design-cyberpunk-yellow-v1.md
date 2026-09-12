@@ -191,3 +191,19 @@ ortalanmış" alignment fix); and the closing navigation strip is retired,
 replaced by `IntentCards` — four hairline-divided route-by-intent links
 (Browse baskets / Follow top traders / Open the feed / Build your own)
 carrying the shared lifting-↗ footer language.
+
+## 9. Amendment — friendly preview pass (2026-09-12)
+
+The §8 live-proof band is softened per owner feedback ("same honest data,
+warmer presentation — a marketing surface, not a terminal"): the trades
+column reads as single-sentence rows ("a trader bought 12.5 shares of …")
+with semantic color reduced to positive-green on "bought" only — no red
+anywhere on the home surface, no SideBadge chips; Minted/Redeemed semantics
+and their red styling stay inside `/feed`. The baskets column adopts an
+adaptive window cascade (30d → 7d → all-time; the first window with rows
+wins) so a quiet devnet board never leads with an empty column or the
+absurd all-time mock deltas, and the header labels whichever window was
+actually used. `ActorLine` grows an opt-in `friendlyFallback` prop —
+anonymous wallets render as "a trader" instead of truncated pubkeys (the
+address stays on the `title` attribute; every existing caller is
+unchanged). Three rows per column throughout.

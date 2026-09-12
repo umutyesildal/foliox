@@ -156,7 +156,7 @@ export function DemoCreatorProfile({ creator }: { creator: DemoCreator }) {
           </span>
           <span className="font-mono tabular-nums">
             <span className="font-medium text-foreground">{stats.trades}</span>{" "}
-            <span className="text-muted-foreground">trades</span>
+            <span className="text-muted-foreground">{stats.trades === 1 ? "trade" : "trades"}</span>
           </span>
           <span
             suppressHydrationWarning

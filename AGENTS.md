@@ -243,11 +243,13 @@ Backend never signs — if indexer dies, `redeem_in_kind` still works via RPC di
 ## 10. Frontend Page Map (Next.js App Router — new IA, owner-approved 2026-09-03)
 
 > **UI decisions (owner, 2026-09-02/03):** monochrome UI chrome (classic shadcn dark/light; primary = white/near-black) + **ethereal chart data palette** (`--chart-1..5` sage/rose/blue/sand/lavender; benchmark gray dashed; red reserved for errors). NO site footer. NO LEGAL_REVIEW_REQUIRED chips in the UI (review backlog; the wizard's legal-checkbox step + `/legal` page remain functional). Baskets are NEVER called "ETFs" in UI copy (hard legal ban) — the generic category explanation lives on Home. Charts = verified-official Bklit consumer props (see `docs/bklit-registry-findings-2026-09-01.md`; Brush = documented local adapter). Candlestick/volume/brush UI REMOVED from the stock page at owner request — stock page = one clean fitY-domain AreaChart with text range buttons.
+>
+> **Home refresh (owner, 2026-09-12):** proof-beats-process — live evidence (verified trades + top baskets) leads, process talk follows; ClosingStrip retired → IntentCards absorbs the closing navigation; ledger comparison widened to the site-wide 6xl rhythm.
 
 ```
 app/
   layout.tsx              # flex min-h-screen shell, WalletProvider, header (Stocks · ETFs · Baskets + Create/Portfolio), network chip, wallet button — NO footer
-  page.tsx                # Home: shadcn hero → framed product visual (/brand/market-hero.png, swappable) → Traditional-vs-Tokenized interactive → 01/02/03 gateway rows
+  page.tsx                # Home (refresh 2026-09-12, proof-beats-process): NEON FOUNDRY hero → LiveProofSection (latest verified trades + top baskets, 60s silent poll) → FlowSection (CREATE · MINT · SHARE drawn motifs; step 03 → /leaderboard) → LedgerSection (SAME EXPOSURE rails ledger, full max-w-6xl rhythm) → IntentCards (Browse baskets / Follow top traders / Open the feed / Build your own)
   stocks/page.tsx         # provider-grouped tokenized-stock grid (live price, 24h, sparkline, provider filter) → /stock/[ticker]
   etfs/page.tsx           # pure tokenized-ETF listing grid (sort, clickable cards); education comparison lives on Home
   explore/page.tsx        # "Baskets" flagship: grid-only cards — name-first (metadata_json), composition + price + 24h + vs-SPY; whole card links to /basket/[pubkey]; search + sort; honest NOT INDEXED state
@@ -260,7 +262,8 @@ app/
   market/page.tsx         # normalized 4-index chart (unlinked from nav; benchmark source for Baskets vs-SPY)
   providers/page.tsx      # source registry + backend status strip (unlinked from nav)
 components/stocks/*        # stocks grid + ChangeValue helper (shared 24h coloring via chart tokens)
-components/etfs/*          # etf-grid (clickable cards), traditional-vs-tokenized (interactive, rendered on Home)
+components/etfs/*          # etf-grid (clickable cards)
+components/home/*          # live-proof-section (feed/leaderboard previews), flow-section (CREATE · MINT · SHARE), ledger-section (SAME EXPOSURE ledger), intent-cards (closing gateway)
 components/create/*        # wizard components incl. wallet-gate banner + RangeField (slim native slider)
 components/charts/*        # verified-official Bklit sources; chart-brush.tsx = documented local adapter (used by Market)
 components/ui/*            # card (canonical p-5 padding system), button, slider, copy-button…

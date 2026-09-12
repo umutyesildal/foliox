@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { FlowSection } from "@/components/home/flow-section";
 import { LedgerSection } from "@/components/home/ledger-section";
-import { ClosingStrip } from "@/components/home/closing-strip";
+import { LiveProofSection } from "@/components/home/live-proof-section";
+import { IntentCards } from "@/components/home/intent-cards";
 
 /**
  * Landing — NEON FOUNDRY hero (cyberpunk-yellow restyle, 2026-09-12; was the
@@ -11,11 +12,17 @@ import { ClosingStrip } from "@/components/home/closing-strip";
  * glow, one subline, two CTAs — over a faint engineering grid, with an
  * inline-SVG "circuit blueprint" (concentric hexagons, node squares,
  * straight connector traces) ghosted BEHIND the hero copy as a
- * barely-visible watermark, then the three-step Flow section (drawn
- * motifs), the Ledger rails comparison (traditional vs tokenized), and a
- * closing navigation strip fed by the live xStocks registry. No footer,
- * no photography. `.bg-grid` appears on the hero section only — one grid
- * per page.
+ * barely-visible watermark.
+ *
+ * "Proof beats process" reorder (NEON FOUNDRY, 2026-09-12): the hero's
+ * subline now points at the traders, and the very next thing on the page
+ * is LIVE PROOF — the LiveProofSection's two polled columns (latest
+ * verified trades + all-time top baskets, straight from the social API)
+ * — before any process talk. Then the three-step Flow section (drawn
+ * motifs), the Ledger rails comparison (traditional vs tokenized), and
+ * the IntentCards gateway (which absorbs the deleted closing navigation
+ * strip). No footer, no photography. `.bg-grid` appears on the hero
+ * section only — one grid per page.
  */
 export default function LandingPage() {
   return (
@@ -80,7 +87,7 @@ export default function LandingPage() {
           </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
             Tokenized baskets of xStocks — immutable weights, capped fees,
-            permissionless redemption.
+            permissionless redemption. Follow the traders behind them.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -99,6 +106,11 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Live proof — real trades and real returns from the social API,
+          before any process talk ("proof beats process", NEON FOUNDRY
+          2026-09-12). */}
+      <LiveProofSection />
+
       {/* Flow — the three steps every basket follows, as drawn terminal
           motifs (NEON FOUNDRY, 2026-09-12). */}
       <FlowSection />
@@ -106,9 +118,9 @@ export default function LandingPage() {
       {/* Ledger — same exposure, different rails. No card, no cell borders. */}
       <LedgerSection />
 
-      {/* Closing strip — navigation role of the deleted bento, one hairline
-          row fed by the live xStocks registry. */}
-      <ClosingStrip />
+      {/* Intent cards — the closing gateway; the old asset-class strip became
+          intent routing (browse / follow / feed / build), NEON FOUNDRY 2026-09-12. */}
+      <IntentCards />
     </div>
   );
 }

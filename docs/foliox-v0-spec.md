@@ -582,7 +582,7 @@ Error shape: `{error: {code, message}, data?}`; code `WEIGHT_MISMATCH`, `PAUSED_
 ```
 app/
   layout.tsx              // WalletProvider (Phantom/Solflare), Tailwind, brand, legal footer
-  page.tsx                // Landing: hero "Create an index. Own your thesis." + featured baskets + CTA (Explore / Create)
+  page.tsx                // Landing (home refresh 2026-09-12, proof-beats-process): hero "Create an index. Own your thesis." → live proof band (verified trades + top baskets previews, polled from the social API) → CREATE · MINT · SHARE steps → SAME EXPOSURE traditional-vs-tokenized ledger → intent cards (explore / leaderboard / feed / create)
   explore/
     page.tsx              // Grid + filters (AUM, 24h, creator), rankings from /baskets, card shows NAV/AUM/return drift
     loading.tsx

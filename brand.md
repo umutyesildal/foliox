@@ -12,7 +12,8 @@ Layered ON TOP of the base system, minimally — the laurel/Pantheon/roman-numer
 - **Display font: Chakra Petch** (weights 500/600/700, `next/font/google` as `--font-display`, `.font-display`/`.text-display` utilities) — wordmark, page/section headings, hero stat numerals. Cinzel is gone.
 - **Geist Mono terminal labels**: every uppercase micro-label, eyebrow, numeral and price is mono — tracked, quiet, terminal-style. Zero-padded numerals `01`–`06` replace roman numerals everywhere.
 - **FOUNDRY MARK (the logo)**: a hexagon outline containing three descending horizontal bars — reads as "index weights in a container" and abstractly as an angular F. Same mark on the header wordmark (the X in the wordmark renders yellow), favicon and OG/apple icons. No laurel geometry anywhere.
-- **Motifs**: line-art terminal geometry only — stacked weight-bars, hexagon + plus, bracket + arrow, `//` chip decorations, faint inline-SVG circuit-blueprint hero watermark. No photos, no engravings.
+- **Motifs**: line-art terminal geometry only — stacked weight-bars, hexagon + plus, `//` chip decorations, terminal-prompt window, faint inline-SVG circuit-blueprint hero watermark. No photos, no engravings.
+- **Home order ("proof beats process", 2026-09-12)**: hero → live proof band (verified trades + top baskets previews) → CREATE · MINT · SHARE steps → SAME EXPOSURE rails ledger → intent cards (Browse baskets / Follow top traders / Open the feed / Build your own).
 - **Rule**: the NEON FOUNDRY layer appears on Home + wordmark + stepper numerals; utility pages follow the base system. Baskets are never called "ETFs" in product copy.
 
 ## Direction

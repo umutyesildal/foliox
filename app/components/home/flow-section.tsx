@@ -11,6 +11,11 @@ import { SectionHeader } from "@/components/ui/section-header";
  * only. The motif brightens muted→foreground on hover (≤200ms,
  * reduced-motion honored); the numeral stays still. No color — line art
  * only, all strokes currentColor. (NEON FOUNDRY de-Rome pass, 2026-09-12.)
+ *
+ * Social-era refresh (owner feedback, 2026-09-12): the three steps now end
+ * in the social layer — step 03 SHARE routes to the leaderboard, not
+ * redemption — while discovery itself is carried by the live proof section
+ * above this one. Container unified to the site rhythm (max-w-6xl, was 5xl).
  */
 
 /** 01. CREATE — stacked weights: three horizontal bars of descending
@@ -67,10 +72,11 @@ function HexPlusMotif() {
   );
 }
 
-/** 03. REDEEM — an arrow passing through an opening bracket and out the
- *  far side: value leaving the container, wallet to wallet.
+/** 03. SHARE — a terminal window outline holding a `>` chevron and a
+ *  cursor underscore: a thesis enters the record, typed at the prompt for
+ *  everyone to read. Echoes the `//` chip language.
  *  (NEON FOUNDRY, 2026-09-12.) */
-function BracketArrowMotif() {
+function PromptMotif() {
   return (
     <svg
       aria-hidden="true"
@@ -84,12 +90,12 @@ function BracketArrowMotif() {
       strokeLinejoin="round"
       className="h-16 w-16 text-muted-foreground/80 transition-colors duration-200 group-hover:text-foreground"
     >
-      {/* opening bracket — wall on the left, mouth to the right */}
-      <path d="M38 12H22v40h16" />
-      {/* arrow shaft piercing the wall and exiting through the mouth */}
-      <path d="M14 32h36" />
-      {/* arrowhead, clear of the bracket */}
-      <path d="M43.5 25.5 50 32l-6.5 6.5" />
+      {/* terminal window — the record, open and public */}
+      <rect x={10} y={16} width={44} height={32} />
+      {/* `>` chevron — the prompt awaiting a thesis */}
+      <path d="M18 26l6 6-6 6" />
+      {/* underscore — the cursor on the line being written */}
+      <path d="M30 38h12" />
     </svg>
   );
 }
@@ -97,21 +103,21 @@ function BracketArrowMotif() {
 const STEPS = [
   {
     numeral: "01",
-    copy: "Pick the stocks, set the weights. Immutable after deployment.",
+    copy: "Build a basket from tokenized stocks — you set the weights.",
     href: "/create",
     Motif: WeightBarsMotif,
   },
   {
     numeral: "02",
-    copy: "Deposit tokens, receive basket tokens at the exact weights.",
+    copy: "Buy any basket at exact weights. Seconds to settle, redeemable anytime.",
     href: "/explore",
     Motif: HexPlusMotif,
   },
   {
     numeral: "03",
-    copy: "Burn tokens, receive the underlying. Wallet to wallet.",
-    href: "/portfolio",
-    Motif: BracketArrowMotif,
+    copy: "Post your thesis, build a following, climb the board.",
+    href: "/leaderboard",
+    Motif: PromptMotif,
   },
 ] as const;
 
@@ -121,12 +127,12 @@ export function FlowSection() {
       aria-labelledby="flow-heading"
       className="border-t border-border py-16 dark:border-border/60"
     >
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {/* Section header — tracked mono eyebrow + the one line. */}
         <SectionHeader
           id="flow-heading"
-          label="CREATE · MINT · REDEEM"
-          lead="Every basket follows the same three steps."
+          label="CREATE · MINT · SHARE"
+          lead="From pick to proof — every move lands on-chain."
         />
 
         <ol className="mt-12 grid grid-cols-1 gap-y-12 sm:grid-cols-3">

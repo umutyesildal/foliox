@@ -175,3 +175,19 @@ abstractly as an angular F. Geometry (viewBox `0 0 24 24`, stroke
 - brand.md: update Roman voice/identity references to NEON FOUNDRY (minimal edit).
 - All touched docstrings/comments drop roman/laurel phrasing (historical
   branch names in git/docs stay as-is).
+
+## 8. Amendment — home refresh (2026-09-12, "proof beats process")
+
+The home page reorders around evidence: directly after the hero, a new
+`LiveProofSection` (two silently-polled columns — latest verified trades
+from the feed and all-time top baskets from the leaderboard, 60s
+visibility-gated, honest empty/error states, nothing fabricated) precedes
+any process talk; the Flow section relabels to **CREATE · MINT · SHARE**
+with step 03 now a terminal-prompt motif routing to the leaderboard
+(superseding §7's "arrow exiting a bracket" redeem-out motif); the Ledger
+comparison (SAME EXPOSURE. DIFFERENT RAILS.) widens from max-w-3xl to the
+site-wide max-w-6xl rhythm (spine cell 12rem, text-sm rails — the "her şey
+ortalanmış" alignment fix); and the closing navigation strip is retired,
+replaced by `IntentCards` — four hairline-divided route-by-intent links
+(Browse baskets / Follow top traders / Open the feed / Build your own)
+carrying the shared lifting-↗ footer language.

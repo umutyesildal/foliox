@@ -6,6 +6,12 @@
  * phrase opened by a 6px yellow tick. The only saturated color on the page:
  * the hero chip, these ticks, and the Tokenized header's 2px primary
  * underline.
+ *
+ * Alignment fix (owner feedback 2026-09-12 — "her şey ortalanmış"): the
+ * container widened from max-w-3xl to the site-wide max-w-6xl so the
+ * section sits on the page rhythm instead of a centered narrow column;
+ * the spine cell widened to 12rem and both rails bumped to text-sm on
+ * sm+ (rows h-16 on sm+) so the comparison reads at the larger scale.
  */
 
 import { SectionHeader } from "@/components/ui/section-header";
@@ -39,9 +45,11 @@ const ROWS = [
 ] as const;
 
 /** Fixed 3-column template shared by headers and rows so the halves align.
- *  The spine narrows to 3rem on phones so each rail keeps a readable line. */
+ *  The spine narrows to 3rem on phones so each rail keeps a readable line;
+ *  on desktop it widens to 12rem so the comparison holds at the full 6xl
+ *  container (alignment fix, owner feedback 2026-09-12). */
 const GRID =
-  "grid grid-cols-[1fr_3rem_1fr] items-center gap-x-2 sm:grid-cols-[1fr_7rem_1fr] sm:gap-x-4";
+  "grid grid-cols-[1fr_3rem_1fr] items-center gap-x-2 sm:grid-cols-[1fr_12rem_1fr] sm:gap-x-4";
 
 /** One ledger row (local to this section — the spine layout is ledger-
  *  specific): the traditional rail muted and right-aligned, the mono
@@ -57,14 +65,14 @@ function SpineRow({
   tokenized: string;
 }) {
   return (
-    <li className={`${GRID} h-14 border-b border-border/50`}>
-      <span className="text-right text-xs leading-5 text-muted-foreground/60">
+    <li className={`${GRID} h-14 sm:h-16 border-b border-border/50`}>
+      <span className="text-right text-xs leading-5 text-muted-foreground/60 sm:text-sm">
         {traditional}
       </span>
       <span className="section-label text-center">
         {dimension}
       </span>
-      <span className="flex items-center gap-2.5 text-left text-xs leading-5 text-foreground">
+      <span className="flex items-center gap-2.5 text-left text-xs leading-5 text-foreground sm:text-sm">
         <span
           aria-hidden="true"
           className="h-4 w-1.5 shrink-0 bg-primary"
@@ -81,7 +89,7 @@ export function LedgerSection() {
       aria-labelledby="ledger-heading"
       className="border-t border-border py-16 dark:border-border/60"
     >
-      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeader
           id="ledger-heading"
           size="display"
